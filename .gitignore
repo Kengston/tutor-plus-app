@@ -1,0 +1,44 @@
+# dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+ios/
+android/
+
+# Metro
+.metro-health-check*
+
+# Debug / logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.log
+
+# macOS / editors
+.DS_Store
+.idea/
+.vscode/
+
+# env / secrets (НИКОГДА не коммитим)
+.env
+.env.*
+!.env.example
+
+# build / cache
+*.tsbuildinfo
+.cache/
+coverage/
