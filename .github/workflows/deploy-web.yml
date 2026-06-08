@@ -1,0 +1,61 @@
+name: Deploy web (dev → GitHub Pages)
+
+# Builds the Expo web export and publishes it to GitHub Pages on every push to
+# `dev`. The site is a Phase-0 preview (static; dev-stub auth, no backend/data).
+# Project Pages are served under /tutor-plus-app/, so the build sets EXPO_BASE_URL.
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; cancel superseded runs.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Export web (sub-path base URL)
+        run: npx expo export -p web
+        env:
+          EXPO_BASE_URL: /tutor-plus-app
+
+      - name: SPA fallback + disable Jekyll
+        # .nojekyll keeps the underscore-prefixed _expo/ folder; 404.html lets
+        # direct deep-link loads boot the app and resolve client-side.
+        run: |
+          touch dist/.nojekyll
+          cp dist/index.html dist/404.html
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
