@@ -89,6 +89,7 @@ export const messages = {
   'auth.email': 'Эл. почта',
   'auth.phone': 'Телефон',
   'auth.signOut': 'Выйти',
+  'auth.or': 'или',
 
   // ── Profile / Settings ───────────────────────────────────────────────────
   'profile.title': 'Профиль',
@@ -267,6 +268,35 @@ export const messages = {
   'month.9': 'Октябрь',
   'month.10': 'Ноябрь',
   'month.11': 'Декабрь',
+
+  // ── Months (genitive) — for inline "<day> <month>" dates («9 июня»); headers use nominative above ──
+  'monthGen.0': 'января',
+  'monthGen.1': 'февраля',
+  'monthGen.2': 'марта',
+  'monthGen.3': 'апреля',
+  'monthGen.4': 'мая',
+  'monthGen.5': 'июня',
+  'monthGen.6': 'июля',
+  'monthGen.7': 'августа',
+  'monthGen.8': 'сентября',
+  'monthGen.9': 'октября',
+  'monthGen.10': 'ноября',
+  'monthGen.11': 'декабря',
+
+  // ── Accessibility labels (mode-neutral) ──────────────────────────────────
+  'a11y.close': 'Закрыть',
+  'a11y.prevMonth': 'Предыдущий месяц',
+  'a11y.nextMonth': 'Следующий месяц',
+  'a11y.signOut': 'Выйти из аккаунта',
+  'a11y.themeMode': 'Тема оформления',
+  'a11y.clientMode': 'Режим (ученик/клиент)',
+  'a11y.clearSearch': 'Очистить поиск',
+  'a11y.uiKit': 'UI-кит',
+
+  // ── Not-found screen ─────────────────────────────────────────────────────
+  'notFound.title': 'Экран не найден',
+  'notFound.message': 'Такой страницы нет',
+  'notFound.action': 'На главную',
 } as const;
 
 export type Mode = 'tutor' | 'client';

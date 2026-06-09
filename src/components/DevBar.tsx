@@ -26,22 +26,34 @@ export function DevBar({ title }: { title: string }) {
   return (
     <View style={styles.header}>
       <View style={styles.actions}>
-        <Pressable onPress={cycle} style={[styles.pill, { backgroundColor: colors.stoneLight }]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.themeMode')}
+          onPress={cycle}
+          style={[styles.pill, { backgroundColor: colors.stoneLight }]}>
           <Icon name={themeIcon} size={15} sw={1.8} stroke={colors.stone700} />
           <Text style={[styles.pillText, { color: colors.stone700 }]}>{themeLabel}</Text>
         </Pressable>
-        <Pressable onPress={toggle} style={[styles.pill, { backgroundColor: colors.accentSoft }]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.clientMode')}
+          onPress={toggle}
+          style={[styles.pill, { backgroundColor: colors.accentSoft }]}>
           <Icon name="refresh" size={15} sw={1.8} stroke={colors.heading} />
           <Text style={[styles.pillText, { color: colors.heading }]}>{clientType}</Text>
         </Pressable>
         <Pressable
-          accessibilityLabel="UI kit"
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.uiKit')}
+          hitSlop={5}
           onPress={() => router.push('/gallery')}
           style={[styles.iconBtn, { backgroundColor: colors.stoneLight }]}>
           <Icon name="grid" size={18} sw={1.8} stroke={colors.stone700} />
         </Pressable>
         <Pressable
-          accessibilityLabel={t('auth.signOut')}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.signOut')}
+          hitSlop={5}
           onPress={signOut}
           style={[styles.iconBtn, { backgroundColor: colors.stoneLight }]}>
           <Icon name="back" size={18} sw={1.8} stroke={colors.stone700} />

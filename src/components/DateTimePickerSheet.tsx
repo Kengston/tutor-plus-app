@@ -78,13 +78,23 @@ export function DateTimePickerSheet({
   return (
     <Sheet title={title} visible={visible} onClose={onClose}>
       <View style={styles.monthBar}>
-        <Pressable onPress={() => goMonth(-1)} hitSlop={8} style={[styles.arrow, { backgroundColor: colors.stoneLight }]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.prevMonth')}
+          onPress={() => goMonth(-1)}
+          hitSlop={8}
+          style={[styles.arrow, { backgroundColor: colors.stoneLight }]}>
           <Icon name="chevronLeft" size={18} sw={1.8} stroke={colors.heading} />
         </Pressable>
         <Text style={[styles.monthLabel, { color: colors.heading }]}>
           {t(`month.${month.getMonth()}` as StringKey)} {month.getFullYear()}
         </Text>
-        <Pressable onPress={() => goMonth(1)} hitSlop={8} style={[styles.arrow, { backgroundColor: colors.stoneLight }]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.nextMonth')}
+          onPress={() => goMonth(1)}
+          hitSlop={8}
+          style={[styles.arrow, { backgroundColor: colors.stoneLight }]}>
           <Icon name="chevronRight" size={18} sw={1.8} stroke={colors.heading} />
         </Pressable>
       </View>

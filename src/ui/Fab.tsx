@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet } from 'react-native';
 
+import { useT } from '@/i18n';
 import { useTheme } from '@/theme';
 
 import { Icon } from './Icon';
@@ -9,11 +10,12 @@ export interface FabProps {
   bottom?: number;
 }
 
-export function Fab({ onPress, bottom = 104 }: FabProps) {
+export function Fab({ onPress, bottom = 24 }: FabProps) {
   const { colors } = useTheme();
+  const t = useT();
   return (
     <Pressable
-      accessibilityLabel="Добавить"
+      accessibilityLabel={t('common.add')}
       onPress={onPress}
       style={({ pressed }) => [
         styles.fab,

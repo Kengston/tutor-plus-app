@@ -21,6 +21,7 @@ import Animated, {
   type WithTimingConfig,
 } from 'react-native-reanimated';
 
+import { useT } from '@/i18n';
 import { useTheme } from '@/theme';
 
 import { Icon } from './Icon';
@@ -43,6 +44,7 @@ const PANEL_SHADOW = '0px -10px 40px -12px rgba(0,0,0,0.3)';
 
 export function Sheet({ title, onClose, children, visible = true }: SheetProps) {
   const { colors, radius } = useTheme();
+  const t = useT();
 
   // Vertical drag offset for the panel (0 = resting, >0 = dragged down).
   const dragY = useSharedValue(0);
@@ -85,7 +87,7 @@ export function Sheet({ title, onClose, children, visible = true }: SheetProps) 
             style={[StyleSheet.absoluteFill, { backgroundColor: colors.sheetScrim }]}
             onPress={onClose}
             accessibilityRole="button"
-            accessibilityLabel="Close"
+            accessibilityLabel={t('a11y.close')}
           />
         </Animated.View>
 
@@ -114,7 +116,7 @@ export function Sheet({ title, onClose, children, visible = true }: SheetProps) 
                 onPress={onClose}
                 style={[styles.close, { backgroundColor: colors.stoneLight }]}
                 accessibilityRole="button"
-                accessibilityLabel="Close">
+                accessibilityLabel={t('a11y.close')}>
                 <Icon name="close" size={18} sw={2} stroke={colors.stone700} />
               </Pressable>
             </View>

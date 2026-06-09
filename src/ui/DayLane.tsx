@@ -172,11 +172,12 @@ const styles = StyleSheet.create({
   },
   now: {
     position: 'absolute',
-    top: 1,
+    top: 15,
     width: NOW_SIZE,
     height: NOW_SIZE,
-    // centre horizontally on `left` (prototype translateX(-50%)).
+    // centre on the track line (prototype translate(-50%,-50%)): half size up/left.
     marginLeft: -NOW_SIZE / 2,
+    marginTop: -NOW_SIZE / 2,
     borderRadius: NOW_SIZE / 2,
     borderWidth: 3,
     boxShadow: '0 1px 4px rgba(0,0,0,0.25)',

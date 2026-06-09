@@ -22,11 +22,13 @@ export function Screen({ title, children, scroll = true, floatingAction }: Scree
     <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
       <DevBar title={title} />
       {scroll ? (
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={[styles.content, floatingAction ? styles.contentFab : null]}
+          showsVerticalScrollIndicator={false}>
           {children}
         </ScrollView>
       ) : (
-        <View style={[styles.fill, styles.content]}>{children}</View>
+        <View style={[styles.fill, styles.content, floatingAction ? styles.contentFab : null]}>{children}</View>
       )}
       {floatingAction}
     </SafeAreaView>
@@ -36,4 +38,7 @@ export function Screen({ title, children, scroll = true, floatingAction }: Scree
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   content: { paddingHorizontal: 16, paddingBottom: 32, gap: 14 },
+  // When a FAB overlays the body, reserve space so the last row clears it
+  // (FAB bottom 24 + height 56 + breathing room).
+  contentFab: { paddingBottom: 96 },
 });

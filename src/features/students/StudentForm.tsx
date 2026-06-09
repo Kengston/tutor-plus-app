@@ -186,7 +186,7 @@ export function StudentForm({ initial, studentId, onSave, onDone }: StudentFormP
         </Field>
 
         {/* Rate */}
-        <Field label={t('field.rate')}>
+        <Field label={t('lesson.rate')}>
           <TextInput
             value={rate}
             onChangeText={(v) => setRate(v.replace(/[^0-9]/g, ''))}

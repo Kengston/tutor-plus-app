@@ -21,6 +21,9 @@ export function Segmented({ tabs, active, onChange, scroll }: SegmentedProps) {
       <Pressable
         key={tab}
         onPress={() => onChange(tab)}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: on }}
+        hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
         style={[
           styles.seg,
           many ? styles.segScroll : styles.segFlex,
