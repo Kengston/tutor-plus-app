@@ -116,6 +116,157 @@ export const messages = {
   'unit.lessons.one_client': 'встреча',
   'unit.lessons.few_client': 'встречи',
   'unit.lessons.many_client': 'встреч',
+  'unit.minutes.one': 'минуту',
+  'unit.minutes.few': 'минуты',
+  'unit.minutes.many': 'минут',
+  'unit.hours.one': 'час',
+  'unit.hours.few': 'часа',
+  'unit.hours.many': 'часов',
+
+  // ── Phase 1 · common actions & units ─────────────────────────────────────
+  'common.edit': 'Изменить',
+  'common.delete': 'Удалить',
+  'common.done': 'Готово',
+  'common.copied': 'Скопировано',
+  'common.of': 'из',
+  'common.none': '—',
+  'common.tomorrow': 'Завтра',
+  'common.min': 'мин',
+  'common.online': 'Онлайн',
+  'common.inperson': 'Очно',
+
+  // ── Lesson format ────────────────────────────────────────────────────────
+  'format.online': 'Онлайн',
+  'format.inperson': 'Очно',
+
+  // ── Student status (display) ─────────────────────────────────────────────
+  'status.active': 'Активный',
+  'status.paused': 'Пауза',
+  'status.archived': 'Архив',
+
+  // ── Students: filter / sort / search ─────────────────────────────────────
+  'filter.all': 'Все',
+  'filter.active': 'Активные',
+  'filter.paused': 'Пауза',
+  'filter.archived': 'Архив',
+  'filter.debtors': 'Есть долг',
+  'sort.label': 'Сортировка',
+  'sort.name': 'Имя',
+  'sort.added': 'Дата добавления',
+  'sort.status': 'Статус',
+  'sort.debt': 'Долг',
+  'students.search': 'Поиск учеников',
+  'students.search_client': 'Поиск клиентов',
+  'students.archive': 'Архивировать',
+  'students.emptyFiltered': 'Никого не найдено',
+
+  // ── Payment tri-state (display) ──────────────────────────────────────────
+  'pay.paid': 'Оплачено',
+  'pay.debt': 'Долг',
+  'pay.expected': 'Ожидается',
+
+  // ── Contact actions ──────────────────────────────────────────────────────
+  'contact.call': 'Позвонить',
+  'contact.message': 'Написать',
+  'contact.copy': 'Копировать номер',
+
+  // ── Entity field labels (card + form) ────────────────────────────────────
+  'field.name': 'Имя',
+  'field.category': 'Цвет',
+  'field.status': 'Статус',
+  'field.subjects': 'Предметы',
+  'field.subjects_client': 'Направления',
+  'field.format': 'Формат',
+  'field.rate': 'Ставка',
+  'field.schedule': 'Расписание',
+  'field.phone': 'Телефон',
+  'field.topic': 'Тема',
+  'field.date': 'Дата',
+  'field.time': 'Время',
+  'field.duration': 'Длительность',
+  'field.cost': 'Стоимость',
+  'field.comment': 'Комментарий',
+  'field.student': 'Ученик',
+  'field.student_client': 'Клиент',
+
+  // ── Student card ─────────────────────────────────────────────────────────
+  'student.upcoming': 'Ближайшие занятия',
+  'student.upcoming_client': 'Ближайшие встречи',
+  'student.scheduleLesson': 'Запланировать занятие',
+  'student.scheduleLesson_client': 'Запланировать встречу',
+  'student.archived': 'В архиве',
+  'student.noUpcoming': 'Нет предстоящих занятий',
+  'student.noUpcoming_client': 'Нет предстоящих встреч',
+
+  // ── Student form ─────────────────────────────────────────────────────────
+  'form.editTitle': 'Редактирование',
+  'form.namePlaceholder': 'Имя ученика',
+  'form.namePlaceholder_client': 'Имя клиента',
+  'form.schedulePlaceholder': 'Напр. Пн, Ср · 16:00',
+  'form.subjectsHint': 'Выберите предметы',
+  'form.subjectsHint_client': 'Выберите направления',
+  'form.addSubject': 'Добавить предмет',
+  'form.addSubject_client': 'Добавить направление',
+
+  // ── Lesson lifecycle (display; gendered _client) ─────────────────────────
+  'life.upcoming': 'Предстоит',
+  'life.ongoing': 'Сейчас',
+  'life.done': 'Проведено',
+  'life.done_client': 'Проведена',
+  'life.cancelled': 'Отменено',
+  'life.cancelled_client': 'Отменена',
+
+  // ── Lesson actions (swipe / card) ────────────────────────────────────────
+  'action.conduct': 'Провести',
+  'action.reschedule': 'Перенести',
+  'action.cancel': 'Отменить',
+
+  // ── Lesson card / form ───────────────────────────────────────────────────
+  'lesson.topicPlaceholder': 'Тема урока',
+  'lesson.topicPlaceholder_client': 'Тема встречи',
+  'lesson.cancelReason': 'Причина отмены',
+  'lesson.recordPayment': 'Отметить оплату',
+  'lesson.choose': 'Выберите ученика',
+  'lesson.choose_client': 'Выберите клиента',
+
+  // ── Today ────────────────────────────────────────────────────────────────
+  'today.progress': 'Проведено',
+  'today.next': 'Далее сегодня',
+  'today.nothingNext': 'Больше занятий сегодня нет',
+  'today.nothingNext_client': 'Больше встреч сегодня нет',
+  'today.tomorrowPreview': 'Завтра',
+  'time.in': 'через',
+  'time.now': 'Сейчас',
+
+  // ── Schedule ─────────────────────────────────────────────────────────────
+  'schedule.calendar': 'Календарь',
+  'schedule.list': 'Список',
+  'schedule.free': 'Свободно',
+  'schedule.dayEmpty': 'Нет занятий',
+  'schedule.dayEmpty_client': 'Нет встреч',
+
+  // ── Weekday short (Mon=1..Sun=0) ─────────────────────────────────────────
+  'wd.1': 'Пн',
+  'wd.2': 'Вт',
+  'wd.3': 'Ср',
+  'wd.4': 'Чт',
+  'wd.5': 'Пт',
+  'wd.6': 'Сб',
+  'wd.0': 'Вс',
+
+  // ── Months (nominative) ──────────────────────────────────────────────────
+  'month.0': 'Январь',
+  'month.1': 'Февраль',
+  'month.2': 'Март',
+  'month.3': 'Апрель',
+  'month.4': 'Май',
+  'month.5': 'Июнь',
+  'month.6': 'Июль',
+  'month.7': 'Август',
+  'month.8': 'Сентябрь',
+  'month.9': 'Октябрь',
+  'month.10': 'Ноябрь',
+  'month.11': 'Декабрь',
 } as const;
 
 export type Mode = 'tutor' | 'client';

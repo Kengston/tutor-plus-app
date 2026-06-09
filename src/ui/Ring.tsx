@@ -102,7 +102,7 @@ export function Ring(props: RingProps) {
           />
         </G>
       </Svg>
-      <View style={[StyleSheet.absoluteFill, styles.center]} pointerEvents="none">
+      <View style={[StyleSheet.absoluteFill, styles.center, { pointerEvents: 'none' }]}>
         {centerTop}
         {centerSub}
       </View>
