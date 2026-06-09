@@ -31,12 +31,16 @@ export default function SignIn() {
         <AuthButton variant="outline" icon="sparkle" label={t('auth.withGoogle')} onPress={() => signIn('google')} />
         <View style={styles.dividerRow}>
           <View style={[styles.line, { backgroundColor: colors.hairline }]} />
-          <Text style={[styles.or, { color: colors.label3 }]}>или</Text>
+          <Text style={[styles.or, { color: colors.label3 }]}>{t('auth.or')}</Text>
           <View style={[styles.line, { backgroundColor: colors.hairline }]} />
         </View>
         <AuthButton variant="outline" icon="message" label={t('auth.email')} onPress={() => signIn('email')} />
         <AuthButton variant="outline" icon="phone" label={t('auth.phone')} onPress={() => signIn('phone')} />
-        <Pressable onPress={() => signIn('email')} style={styles.createBtn}>
+        <Pressable
+          onPress={() => signIn('email')}
+          accessibilityRole="button"
+          accessibilityLabel={t('auth.createAccount')}
+          style={styles.createBtn}>
           <Text style={[styles.createText, { color: colors.primary }]}>{t('auth.createAccount')}</Text>
         </Pressable>
       </View>
@@ -60,6 +64,8 @@ function AuthButton({
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
       style={({ pressed }) => [
         styles.btn,
         primary

@@ -1,6 +1,14 @@
+/**
+ * DEV-ONLY — витрина UI-кита (открывается через DevBar «UI-кит»). НЕ в i18n-скоупе.
+ * Реальные продуктовые строки здесь идут через t(), а заголовки секций и демо-данные
+ * (имена/предметы/данные графиков/тексты-заглушки) — строительные леса showcase:
+ * это НЕ продуктовый UI, поэтому намеренно оставлены литералами и НЕ заведены в strings.ts
+ * (ADR-0003 регулирует продуктовые строки). Исключить из i18n-аудита; удалить перед Phase 1.
+ */
 import { type ReactNode, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { useT } from '@/i18n';
 import { formatRub } from '@/lib/format';
 import { chartColors, useTheme } from '@/theme';
 import {
@@ -24,7 +32,8 @@ import {
 /** Phase-0 showcase of the ported UI kit (also a smoke test for the workflow ports). */
 export default function Gallery() {
   const { colors } = useTheme();
-  const [tab, setTab] = useState('Обзор');
+  const t = useT();
+  const [tab, setTab] = useState(t('analytics.overview'));
   const [sheet, setSheet] = useState(false);
 
   return (
@@ -82,20 +91,24 @@ export default function Gallery() {
               </View>
             </View>
             <View style={styles.kpis}>
-              <KpiStat label="Получено" value={formatRub(12500)} color={colors.paid} />
-              <KpiStat label="Долг" value={formatRub(3000)} color={colors.danger} />
+              <KpiStat label={t('finance.received')} value={formatRub(12500)} color={colors.paid} />
+              <KpiStat label={t('finance.debt')} value={formatRub(3000)} color={colors.danger} />
             </View>
           </Card>
         </Section>
 
         <Section title="Сегменты">
-          <Segmented tabs={['Обзор', 'Динамика', 'Задолженности']} active={tab} onChange={setTab} />
+          <Segmented
+            tabs={[t('analytics.overview'), t('analytics.dynamics'), t('analytics.debts')]}
+            active={tab}
+            onChange={setTab}
+          />
         </Section>
 
         <Section title="Свайп · шит · счётчик">
           <Card>
             <SwipeRow
-              rightActions={[{ label: 'Готово', color: colors.paid, icon: 'check', onPress: () => {} }]}>
+              rightActions={[{ label: t('common.done'), color: colors.paid, icon: 'check', onPress: () => {} }]}>
               <Pressable onPress={() => setSheet(true)} style={styles.swipeInner}>
                 <Text style={{ color: colors.heading, fontWeight: '600' }}>Открыть bottom-sheet</Text>
                 <Icon name="chevronRight" size={18} stroke={colors.label3} />

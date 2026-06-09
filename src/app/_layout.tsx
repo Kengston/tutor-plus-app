@@ -7,7 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { seedIfEmpty } from '@/db/seed';
-import { DualModeProvider } from '@/i18n';
+import { DualModeProvider, useT } from '@/i18n';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { ThemeProvider as TutorThemeProvider, useTheme, useThemeMode } from '@/theme';
 
@@ -47,6 +47,7 @@ function useAuthGate() {
 
 function NavigationRoot() {
   const { colors, scheme } = useTheme();
+  const t = useT();
   useThemeMode(); // subscribe so the nav theme updates on toggle
   useAuthGate();
 
@@ -72,7 +73,7 @@ function NavigationRoot() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="student" />
         <Stack.Screen name="lesson" />
-        <Stack.Screen name="gallery" options={{ presentation: 'modal', headerShown: true, title: 'UI kit' }} />
+        <Stack.Screen name="gallery" options={{ presentation: 'modal', headerShown: true, title: t('a11y.uiKit') }} />
         <Stack.Screen name="+not-found" />
       </Stack>
     </ThemeProvider>

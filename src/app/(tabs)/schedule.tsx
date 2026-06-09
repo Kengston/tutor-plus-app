@@ -122,7 +122,8 @@ export default function ScheduleScreen() {
       {/* Month navigator */}
       <View style={styles.monthBar}>
         <Pressable
-          accessibilityLabel={t('common.back')}
+          accessibilityLabel={t('a11y.prevMonth')}
+          accessibilityRole="button"
           onPress={() => goMonth(-1)}
           hitSlop={8}
           style={({ pressed }) => [styles.arrow, { backgroundColor: colors.stoneLight }, pressed && styles.pressed]}>
@@ -130,7 +131,8 @@ export default function ScheduleScreen() {
         </Pressable>
         <Text style={[styles.monthLabel, { color: colors.heading }]}>{monthLabel}</Text>
         <Pressable
-          accessibilityLabel={t('common.add')}
+          accessibilityLabel={t('a11y.nextMonth')}
+          accessibilityRole="button"
           onPress={() => goMonth(1)}
           hitSlop={8}
           style={({ pressed }) => [styles.arrow, { backgroundColor: colors.stoneLight }, pressed && styles.pressed]}>
@@ -152,7 +154,7 @@ export default function ScheduleScreen() {
           lessons={dayLessons}
           studentsById={studentsById}
           txns={txns}
-          dayLabel={`${new Date(selectedDay).getDate()} ${t(`month.${new Date(selectedDay).getMonth()}` as StringKey)}`}
+          dayLabel={`${new Date(selectedDay).getDate()} ${t(`monthGen.${new Date(selectedDay).getMonth()}` as StringKey)}`}
           onOpen={openLesson}
           emptyText={t('schedule.dayEmpty')}
           formatLabel={(online) => t(online ? 'format.online' : 'format.inperson')}

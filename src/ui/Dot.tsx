@@ -12,7 +12,7 @@ export interface DotProps {
 export function Dot({ tone = 'green', size = 9 }: DotProps) {
   const { colors } = useTheme();
   const map: Record<DotTone, string> = {
-    green: colors.primary,
+    green: colors.paid,
     red: colors.danger,
     amber: colors.warning,
     stone: colors.stoneInactive,

@@ -174,7 +174,7 @@ export default function StudentCardScreen() {
           <DataRow label={t('field.format')}>
             <Text style={[styles.value, { color: colors.body }]}>{t(FORMAT_KEY[student.format])}</Text>
           </DataRow>
-          <DataRow label={t('field.rate')}>
+          <DataRow label={t('lesson.rate')}>
             <Text style={[styles.value, { color: colors.body }]}>{formatRub(student.rate)}</Text>
           </DataRow>
           <DataRow label={t('field.schedule')}>
@@ -240,6 +240,7 @@ export default function StudentCardScreen() {
 
 /** Compact stack header: back chevron + title + edit pencil (headerShown is false). */
 function Header({ title, onEdit }: { title: string; onEdit: (() => void) | null }) {
+  const t = useT();
   const { colors } = useTheme();
   return (
     <View style={[styles.header, { borderBottomColor: colors.hairline }]}>
@@ -247,7 +248,8 @@ function Header({ title, onEdit }: { title: string; onEdit: (() => void) | null 
         onPress={() => router.back()}
         hitSlop={10}
         style={({ pressed }) => [styles.headerBtn, pressed && styles.pressed]}
-        accessibilityRole="button">
+        accessibilityRole="button"
+        accessibilityLabel={t('common.back')}>
         <Icon name="chevronLeft" size={24} stroke={colors.heading} />
       </Pressable>
       <Text style={[styles.headerTitle, { color: colors.heading }]} numberOfLines={1}>
@@ -258,7 +260,8 @@ function Header({ title, onEdit }: { title: string; onEdit: (() => void) | null 
           onPress={onEdit}
           hitSlop={10}
           style={({ pressed }) => [styles.headerBtn, pressed && styles.pressed]}
-          accessibilityRole="button">
+          accessibilityRole="button"
+          accessibilityLabel={t('common.edit')}>
           <Icon name="edit" size={22} stroke={colors.heading} />
         </Pressable>
       ) : (

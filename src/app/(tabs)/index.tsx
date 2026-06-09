@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { DateTimePickerSheet } from '@/components/DateTimePickerSheet';
 import { Screen } from '@/components/Screen';
@@ -32,6 +32,11 @@ function minuteForms(t: ReturnType<typeof useT>) {
 /** Lessons phrasing forms (mode-aware). */
 function lessonForms(t: ReturnType<typeof useT>) {
   return { one: t('unit.lessons.one'), few: t('unit.lessons.few'), many: t('unit.lessons.many') };
+}
+
+/** Hours phrasing forms for `plural()`. */
+function hourForms(t: ReturnType<typeof useT>) {
+  return { one: t('unit.hours.one'), few: t('unit.hours.few'), many: t('unit.hours.many') };
 }
 
 /** Derived lesson pay-status → Dot tone. */
@@ -70,6 +75,8 @@ export default function TodayScreen() {
       l.startsAt >= now && (l.lifecycleStatus === 'upcoming' || l.lifecycleStatus === 'ongoing'),
   );
   const nearest = upcomingToday[0];
+  // The nearest lesson is highlighted in its own hero card — drop it from the list below to avoid a duplicate.
+  const restToday = nearest ? upcomingToday.slice(1) : upcomingToday;
 
   const laneItems = lessons.map((l) => ({
     frac: fracOfDay(l.startsAt),
@@ -109,13 +116,13 @@ export default function TodayScreen() {
       {/* Далее сегодня */}
       <View>
         <SectionLabel>{t('today.next')}</SectionLabel>
-        {upcomingToday.length === 0 ? (
+        {restToday.length === 0 ? (
           <View style={[styles.emptyNext, { backgroundColor: colors.surface, borderColor: colors.hairline }]}>
             <Text style={[styles.emptyNextText, { color: colors.muted }]}>{t('today.nothingNext')}</Text>
           </View>
         ) : (
           <View style={styles.list}>
-            {upcomingToday.map((l) => (
+            {restToday.map((l) => (
               <View key={l.id} style={[styles.rowShell, { borderColor: colors.hairline, borderRadius: 16 }]}>
                 <SwipeRow
                   leftActions={[
@@ -142,7 +149,7 @@ export default function TodayScreen() {
                       color: colors.danger,
                       icon: 'close',
                       onPress: () => {
-                        void cancelLesson(l, t('action.cancel'));
+                        void cancelLesson(l);
                       },
                     },
                   ]}>
@@ -202,7 +209,12 @@ function NearestCard({
   const router = useRouter();
 
   const m = minutesUntil(lesson.startsAt, now);
-  const relative = m <= 0 ? t('time.now') : `${t('time.in')} ${m} ${plural(m, minuteForms(t))}`;
+  const relative =
+    m <= 0
+      ? t('time.now')
+      : m < 60
+        ? `${t('time.in')} ${m} ${plural(m, minuteForms(t))}`
+        : `${t('time.in')} ${Math.round(m / 60)} ${plural(Math.round(m / 60), hourForms(t))}`;
   const strip = student ? catColors[student.category].accent : colors.accent;
 
   return (
@@ -228,10 +240,18 @@ function NearestCard({
         </View>
         <Text style={[styles.nearestTime, { color: colors.heading }]}>{hhmm(lesson.startsAt)}</Text>
       </View>
-      <View style={[styles.contactBtn, { backgroundColor: colors.primaryVlight }]}>
+      <Pressable
+        onPress={(e) => {
+          e.stopPropagation();
+          const phone = student?.phone?.replace(/[^\d+]/g, '');
+          if (phone) Linking.openURL(`tel:${phone}`).catch(() => undefined);
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={t('common.contact')}
+        style={({ pressed }) => [styles.contactBtn, { backgroundColor: colors.primaryVlight, opacity: pressed ? 0.85 : 1 }]}>
         <Icon name="phone" size={16} sw={1.8} stroke={colors.heading} />
         <Text style={[styles.contactLabel, { color: colors.heading }]}>{t('common.contact')}</Text>
-      </View>
+      </Pressable>
     </Card>
   );
 }
