@@ -1,3 +1,5 @@
+import '@/lib/silence-rnw-warnings';
+
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
