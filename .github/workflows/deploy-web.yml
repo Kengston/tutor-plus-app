@@ -1,7 +1,7 @@
 name: Deploy web (dev → GitHub Pages)
 
 # Builds the Expo web export and publishes it to GitHub Pages on every push to
-# `dev`. The site is a Phase-0 preview (static; dev-stub auth, no backend/data).
+# `dev`. The site is a Phase-1 preview (static; dev-stub auth, local WatermelonDB/LokiJS seed).
 # Project Pages are served under /tutor-plus-app/, so the build sets EXPO_BASE_URL.
 
 on:
@@ -30,7 +30,10 @@ jobs:
           node-version: 22
           cache: npm
 
-      - run: npm ci
+      # Not `npm ci`: the macOS-generated lockfile omits linux-only optional deps
+      # (@emnapi/*) that npm ci rejects strictly. `npm install` resolves per-platform
+      # and honours the React-19 `overrides`.
+      - run: npm install --no-audit --no-fund
 
       - name: Export web (sub-path base URL)
         run: npx expo export -p web
