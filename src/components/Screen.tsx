@@ -10,10 +10,13 @@ export interface ScreenProps {
   title: string;
   children?: ReactNode;
   scroll?: boolean;
+  /** Pinned overlay over the body (e.g. a <Fab/>) — sits in the FULL-HEIGHT safe area,
+   *  not the scroll content, so it stays anchored above the tab bar regardless of scroll. */
+  floatingAction?: ReactNode;
 }
 
-/** Themed tab-screen shell: safe-area + Phase-0 DevBar header + body. */
-export function Screen({ title, children, scroll = true }: ScreenProps) {
+/** Themed tab-screen shell: safe-area + Phase-0 DevBar header + body + optional pinned FAB. */
+export function Screen({ title, children, scroll = true, floatingAction }: ScreenProps) {
   const { colors } = useTheme();
   return (
     <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
@@ -25,6 +28,7 @@ export function Screen({ title, children, scroll = true }: ScreenProps) {
       ) : (
         <View style={[styles.fill, styles.content]}>{children}</View>
       )}
+      {floatingAction}
     </SafeAreaView>
   );
 }

@@ -87,7 +87,7 @@ export function MultiBarChart(props: MultiBarChartProps) {
                 >
                   <BarFill top={top} base={base} />
                   {tip === i && b.value != null && (
-                    <View style={[styles.tip, { backgroundColor: colors.heading }]} pointerEvents="none">
+                    <View style={[styles.tip, { backgroundColor: colors.heading, pointerEvents: 'none' }]}>
                       <Text style={[styles.tipText, { color: colors.bg }]} numberOfLines={1}>
                         {b.value}
                       </Text>
