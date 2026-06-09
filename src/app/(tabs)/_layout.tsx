@@ -15,7 +15,7 @@ export default function TabsLayout() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.stoneInactive,
         tabBarStyle: { backgroundColor: colors.tabbar, borderTopColor: colors.hairline },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '500' },
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '500' },
       }}>
       <Tabs.Screen
         name="index"

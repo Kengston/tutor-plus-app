@@ -15,12 +15,12 @@ import { hhmm } from '@/lib/time';
 import { useTheme } from '@/theme';
 import { Card, Dot, Icon, Sheet, type DotTone } from '@/ui';
 
-/** Nominative RU date «8 июня» from a UTC-instant ms (device-local), via i18n month keys. */
+/** RU date «8 июня» (genitive day-month) from a UTC-instant ms (device-local), via i18n month keys. */
 function useDateLabel(): (ms: number) => string {
   const t = useT();
   return (ms: number) => {
     const d = new Date(ms);
-    const month = t(`month.${d.getMonth()}` as 'month.0').toLowerCase();
+    const month = t(`monthGen.${d.getMonth()}` as 'monthGen.0');
     return `${d.getDate()} ${month}`;
   };
 }
@@ -121,7 +121,7 @@ export default function LessonCardScreen() {
               </Pressable>
 
               <Pressable
-                onPress={() => cancelLesson(lesson, t('action.cancel'))}
+                onPress={() => cancelLesson(lesson)}
                 style={({ pressed }) => [
                   styles.action,
                   styles.actionGhost,

@@ -122,6 +122,8 @@ export default function StudentsScreen() {
             <Pressable
               key={f.key}
               onPress={() => setFilter(f.key)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
               style={[
                 styles.pill,
                 { backgroundColor: on ? colors.primary : colors.stoneLight },
@@ -154,7 +156,11 @@ export default function StudentsScreen() {
             autoCorrect={false}
           />
           {query.length > 0 && (
-            <Pressable onPress={() => setQuery('')} hitSlop={8} accessibilityLabel={t('common.cancel')}>
+            <Pressable
+              onPress={() => setQuery('')}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t('a11y.clearSearch')}>
               <Icon name="close" size={16} sw={2} stroke={colors.muted} />
             </Pressable>
           )}

@@ -145,11 +145,12 @@ export async function recordLessonPayment(
   });
 }
 
-export async function cancelLesson(lesson: LessonModel, reason: string, comment?: string): Promise<void> {
+export async function cancelLesson(lesson: LessonModel, reason?: string, comment?: string): Promise<void> {
   await database.write(async () => {
     await lesson.update((l) => {
       l.lifecycleStatus = 'cancelled';
-      l.cancelReason = reason;
+      // Neutral by default — never persist a UI label as data (ADR-0006). A typed reason can be passed explicitly.
+      l.cancelReason = reason ?? '';
       if (comment !== undefined) l.comment = comment;
     });
   });

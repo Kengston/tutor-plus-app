@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DateTimePickerSheet } from '@/components/DateTimePickerSheet';
@@ -96,7 +96,11 @@ export default function LessonFormScreen() {
         </Pressable>
       </View>
 
-      <View style={styles.body}>
+      <ScrollView
+        style={styles.fill}
+        contentContainerStyle={styles.body}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}>
         <PickerField
           label={t('field.student')}
           value={selectedStudent?.name}
@@ -123,7 +127,7 @@ export default function LessonFormScreen() {
 
         <PickerField
           label={t('field.date')}
-          value={`${new Date(startsAt).getDate()} ${t(`month.${new Date(startsAt).getMonth()}` as 'month.0')}, ${hhmm(startsAt)}`}
+          value={`${new Date(startsAt).getDate()} ${t(`monthGen.${new Date(startsAt).getMonth()}` as 'monthGen.0')}, ${hhmm(startsAt)}`}
           placeholder={t('field.date')}
           onPress={() => setPickWhen(true)}
         />
@@ -157,7 +161,7 @@ export default function LessonFormScreen() {
             style={[styles.input, { color: colors.heading, backgroundColor: colors.elev, borderColor: colors.hairline }]}
           />
         </FieldBlock>
-      </View>
+      </ScrollView>
 
       {pickStudent && (
         <Sheet title={t('lesson.choose')} onClose={() => setPickStudent(false)}>
@@ -274,7 +278,7 @@ const styles = StyleSheet.create({
   headerTitle: { flex: 1, fontSize: 20, fontWeight: '700', letterSpacing: -0.4 },
   saveBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999 },
   saveLabel: { fontSize: 14.5, fontWeight: '600' },
-  body: { paddingHorizontal: 16, paddingTop: 6, gap: 16 },
+  body: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 32, gap: 16 },
   fieldBlock: { gap: 8 },
   fieldLabel: { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4 },
   input: {
