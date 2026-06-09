@@ -22,9 +22,8 @@ export interface MultiBarChartProps {
   onBar?: (bar: BarDatum, index: number) => void;
 }
 
-/** Prototype-hardcoded gradient stops / glow for the highlighted ("on") bar. */
+/** Prototype-hardcoded gradient top stop for the highlighted ("on") bar. */
 const ACCENT_TOP = '#FFE6A6';
-const ACCENT_GLOW = '0px 4px 12px -4px rgba(232,180,60,0.6)';
 
 const clamp01 = (n: number) => Math.min(Math.max(n, 0), 1);
 
@@ -51,7 +50,7 @@ function BarFill({ top, base }: { top: string; base: string }) {
  */
 export function MultiBarChart(props: MultiBarChartProps) {
   const { data, height = 150, compare, showCompare, onBar } = props;
-  const { colors } = useTheme();
+  const { colors, shadow } = useTheme();
   const [tip, setTip] = useState<number | null>(null);
 
   return (
@@ -82,7 +81,7 @@ export function MultiBarChart(props: MultiBarChartProps) {
                   style={[
                     styles.bar,
                     { height: `${frac * 100}%` },
-                    b.on ? { boxShadow: ACCENT_GLOW } : null,
+                    b.on ? { boxShadow: shadow.barGlow } : null,
                   ]}
                 >
                   <BarFill top={top} base={base} />

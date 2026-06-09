@@ -31,7 +31,7 @@ export default function LessonCardScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const t = useT();
-  const { colors } = useTheme();
+  const { colors, radius } = useTheme();
   const dateLabel = useDateLabel();
 
   const lesson = useLesson(id);
@@ -84,7 +84,7 @@ export default function LessonCardScreen() {
                 onPress={() => markLessonConducted(lesson)}
                 style={({ pressed }) => [
                   styles.action,
-                  { backgroundColor: colors.primary },
+                  { backgroundColor: colors.primary, borderRadius: radius.field },
                   pressed && styles.pressed,
                 ]}>
                 <Icon name="check" size={18} sw={2} stroke={colors.onTint} />
@@ -96,7 +96,7 @@ export default function LessonCardScreen() {
               onPress={() => setPayingOpen(true)}
               style={({ pressed }) => [
                 styles.action,
-                { backgroundColor: colors.stoneLight },
+                { backgroundColor: colors.stoneLight, borderRadius: radius.field },
                 pressed && styles.pressed,
               ]}>
               <Icon name="wallet" size={18} sw={1.8} stroke={colors.body} />
@@ -113,7 +113,7 @@ export default function LessonCardScreen() {
                 style={({ pressed }) => [
                   styles.action,
                   styles.actionGhost,
-                  { backgroundColor: colors.stoneLight },
+                  { backgroundColor: colors.stoneLight, borderRadius: radius.field },
                   pressed && styles.pressed,
                 ]}>
                 <Icon name="refresh" size={17} sw={1.8} stroke={colors.body} />
@@ -125,7 +125,7 @@ export default function LessonCardScreen() {
                 style={({ pressed }) => [
                   styles.action,
                   styles.actionGhost,
-                  { backgroundColor: colors.dangerLight },
+                  { backgroundColor: colors.dangerLight, borderRadius: radius.field },
                   pressed && styles.pressed,
                 ]}>
                 <Icon name="close" size={17} sw={2} stroke={colors.danger} />
@@ -152,7 +152,7 @@ export default function LessonCardScreen() {
                   }}
                   style={({ pressed }) => [
                     styles.payChoice,
-                    { backgroundColor: colors.stoneLight },
+                    { backgroundColor: colors.stoneLight, borderRadius: radius.field },
                     pressed && styles.pressed,
                   ]}>
                   <Dot tone="green" />
@@ -165,7 +165,7 @@ export default function LessonCardScreen() {
                   }}
                   style={({ pressed }) => [
                     styles.payChoice,
-                    { backgroundColor: colors.stoneLight },
+                    { backgroundColor: colors.stoneLight, borderRadius: radius.field },
                     pressed && styles.pressed,
                   ]}>
                   <Dot tone="red" />
@@ -248,7 +248,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 14,
-    borderRadius: 14,
   },
   actionGhost: { flex: 1 },
   actionLabel: { fontSize: 15, fontWeight: '600' },
@@ -259,7 +258,6 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 15,
     paddingHorizontal: 16,
-    borderRadius: 14,
   },
   payChoiceLabel: { fontSize: 15, fontWeight: '600' },
   pressed: { opacity: 0.85 },

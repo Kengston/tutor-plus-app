@@ -23,7 +23,7 @@ export default function LessonFormScreen() {
   const { studentId: preselect } = useLocalSearchParams<{ studentId?: string }>();
   const router = useRouter();
   const t = useT();
-  const { colors } = useTheme();
+  const { colors, radius } = useTheme();
 
   const students = useStudents();
   const subjects = useSubjects();
@@ -120,8 +120,11 @@ export default function LessonFormScreen() {
             value={topic}
             onChangeText={setTopic}
             placeholder={t('lesson.topicPlaceholder')}
-            placeholderTextColor={colors.label3}
-            style={[styles.input, { color: colors.heading, backgroundColor: colors.elev, borderColor: colors.hairline }]}
+            placeholderTextColor={colors.muted}
+            style={[
+              styles.input,
+              { borderRadius: radius.control, color: colors.heading, backgroundColor: colors.elev, borderColor: colors.hairline },
+            ]}
           />
         </FieldBlock>
 
@@ -157,8 +160,11 @@ export default function LessonFormScreen() {
             }}
             keyboardType="number-pad"
             placeholder="0"
-            placeholderTextColor={colors.label3}
-            style={[styles.input, { color: colors.heading, backgroundColor: colors.elev, borderColor: colors.hairline }]}
+            placeholderTextColor={colors.muted}
+            style={[
+              styles.input,
+              { borderRadius: radius.control, color: colors.heading, backgroundColor: colors.elev, borderColor: colors.hairline },
+            ]}
           />
         </FieldBlock>
       </ScrollView>
@@ -244,7 +250,7 @@ function PickerField({
   placeholder: string;
   onPress: () => void;
 }) {
-  const { colors } = useTheme();
+  const { colors, radius } = useTheme();
   return (
     <FieldBlock label={label}>
       <Pressable
@@ -252,7 +258,7 @@ function PickerField({
         style={({ pressed }) => [
           styles.input,
           styles.pickerRow,
-          { backgroundColor: colors.elev, borderColor: colors.hairline },
+          { borderRadius: radius.control, backgroundColor: colors.elev, borderColor: colors.hairline },
           pressed && styles.pressed,
         ]}>
         <Text style={[styles.pickerValue, { color: value ? colors.heading : colors.label3 }]} numberOfLines={1}>
@@ -283,7 +289,6 @@ const styles = StyleSheet.create({
   fieldLabel: { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4 },
   input: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,

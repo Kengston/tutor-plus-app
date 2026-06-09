@@ -11,7 +11,7 @@ export interface FabProps {
 }
 
 export function Fab({ onPress, bottom = 24 }: FabProps) {
-  const { colors } = useTheme();
+  const { colors, shadow } = useTheme();
   const t = useT();
   return (
     <Pressable
@@ -19,7 +19,7 @@ export function Fab({ onPress, bottom = 24 }: FabProps) {
       onPress={onPress}
       style={({ pressed }) => [
         styles.fab,
-        { bottom, backgroundColor: colors.primary, boxShadow: '0px 10px 24px -6px rgba(0,0,0,0.35)' },
+        { bottom, backgroundColor: colors.primary, boxShadow: shadow.fab },
         pressed ? styles.pressed : null,
       ]}>
       <Icon name="plus" size={26} sw={2} stroke={colors.onTint} />
