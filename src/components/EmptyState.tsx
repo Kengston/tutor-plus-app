@@ -15,7 +15,7 @@ export function EmptyState({ icon = 'sparkle', text, hint }: EmptyStateProps) {
     <View style={styles.wrap}>
       <Icon name={icon} size={44} sw={1.4} stroke={colors.label3} />
       <Text style={[styles.text, { color: colors.muted }]}>{text}</Text>
-      {hint ? <Text style={[styles.hint, { color: colors.label3 }]}>{hint}</Text> : null}
+      {hint ? <Text style={[styles.hint, { color: colors.muted }]}>{hint}</Text> : null}
     </View>
   );
 }

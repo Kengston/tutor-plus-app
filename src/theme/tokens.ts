@@ -50,9 +50,9 @@ export interface ColorTokens {
 export interface Theme {
   scheme: 'light' | 'dark';
   colors: ColorTokens;
-  radius: { card: number; sheet: number; control: number; pill: number };
+  radius: { card: number; sheet: number; control: number; pill: number; field: number; row: number; group: number };
   /** Cross-platform boxShadow string (RN 0.85+ supports `boxShadow`). */
-  shadow: { card: string };
+  shadow: { card: string; fab: string; sheet: string; control: string; marker: string; barGlow: string; pill: string };
 }
 
 export const lightColors: ColorTokens = {
@@ -126,20 +126,36 @@ export const darkColors: ColorTokens = {
   catLavender: '#534A75',
 };
 
-const radius = { card: 22, sheet: 26, control: 12, pill: 999 } as const;
+const radius = { card: 22, sheet: 26, control: 12, pill: 999, field: 14, row: 16, group: 18 } as const;
 
 export const lightTheme: Theme = {
   scheme: 'light',
   colors: lightColors,
   radius,
-  shadow: { card: '0px 12px 32px -22px rgba(0,0,0,0.18)' },
+  shadow: {
+    card: '0px 12px 32px -22px rgba(0,0,0,0.18)',
+    fab: '0px 10px 24px -6px rgba(0,0,0,0.35)',
+    sheet: '0px -10px 40px -12px rgba(0,0,0,0.3)',
+    control: '0px 1px 3px rgba(0,0,0,0.12)',
+    marker: '0 1px 4px rgba(0,0,0,0.25)',
+    barGlow: '0px 4px 12px -4px rgba(232,180,60,0.6)',
+    pill: '0px 1px 3px rgba(0,0,0,0.12)',
+  },
 };
 
 export const darkTheme: Theme = {
   scheme: 'dark',
   colors: darkColors,
   radius,
-  shadow: { card: '0px 14px 34px -22px rgba(0,0,0,0.55)' },
+  shadow: {
+    card: '0px 14px 34px -22px rgba(0,0,0,0.55)',
+    fab: '0px 10px 24px -6px rgba(0,0,0,0.35)',
+    sheet: '0px -10px 40px -12px rgba(0,0,0,0.3)',
+    control: '0px 1px 3px rgba(0,0,0,0.12)',
+    marker: '0 1px 4px rgba(0,0,0,0.25)',
+    barGlow: '0px 4px 12px -4px rgba(232,180,60,0.6)',
+    pill: '0px 1px 3px rgba(0,0,0,0.12)',
+  },
 };
 
 /**

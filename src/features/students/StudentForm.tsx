@@ -135,7 +135,7 @@ export function StudentForm({ initial, studentId, onSave, onDone }: StudentFormP
             value={name}
             onChangeText={setName}
             placeholder={t('form.namePlaceholder')}
-            placeholderTextColor={colors.label3}
+            placeholderTextColor={colors.muted}
             style={inputStyle}
             autoFocus={!editing}
             returnKeyType="next"
@@ -191,7 +191,7 @@ export function StudentForm({ initial, studentId, onSave, onDone }: StudentFormP
             value={rate}
             onChangeText={(v) => setRate(v.replace(/[^0-9]/g, ''))}
             placeholder="0"
-            placeholderTextColor={colors.label3}
+            placeholderTextColor={colors.muted}
             keyboardType="number-pad"
             style={inputStyle}
           />
@@ -203,7 +203,7 @@ export function StudentForm({ initial, studentId, onSave, onDone }: StudentFormP
             value={schedule}
             onChangeText={setSchedule}
             placeholder={t('form.schedulePlaceholder')}
-            placeholderTextColor={colors.label3}
+            placeholderTextColor={colors.muted}
             style={inputStyle}
           />
         </Field>
@@ -214,7 +214,7 @@ export function StudentForm({ initial, studentId, onSave, onDone }: StudentFormP
             value={phone}
             onChangeText={setPhone}
             placeholder="+7"
-            placeholderTextColor={colors.label3}
+            placeholderTextColor={colors.muted}
             keyboardType="phone-pad"
             style={inputStyle}
           />
@@ -253,7 +253,7 @@ export function StudentForm({ initial, studentId, onSave, onDone }: StudentFormP
               value={newSubject}
               onChangeText={setNewSubject}
               placeholder={t('form.addSubject')}
-              placeholderTextColor={colors.label3}
+              placeholderTextColor={colors.muted}
               onSubmitEditing={addSubject}
               returnKeyType="done"
               style={[inputStyle, styles.addInput]}
@@ -318,9 +318,9 @@ function Pillbar<T extends string>({
   active: T;
   onChange: (key: T) => void;
 }) {
-  const { colors, radius } = useTheme();
+  const { colors, radius, shadow } = useTheme();
   return (
-    <View style={[styles.pillbar, { backgroundColor: colors.stoneLight }]}>
+    <View style={{ flexDirection: 'row', gap: 3, padding: 3, backgroundColor: colors.stoneLight, borderRadius: radius.control }}>
       {options.map((o) => {
         const on = o.key === active;
         return (
@@ -335,7 +335,7 @@ function Pillbar<T extends string>({
                 backgroundColor: on ? colors.elev : 'transparent',
                 borderRadius: radius.control - 3,
               },
-              on ? styles.pillOn : null,
+              on ? { boxShadow: shadow.pill } : null,
             ]}>
             <Text
               style={{
@@ -389,9 +389,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  pillbar: { flexDirection: 'row', gap: 3, padding: 3, borderRadius: 12 },
   pill: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 9 },
-  pillOn: { boxShadow: '0px 1px 3px rgba(0,0,0,0.12)' },
 
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1 },

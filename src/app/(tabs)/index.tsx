@@ -48,7 +48,7 @@ const DOT_TONE: Record<'paid' | 'debt' | 'expected', DotTone> = {
 
 export default function TodayScreen() {
   const t = useT();
-  const { colors } = useTheme();
+  const { colors, radius } = useTheme();
   const router = useRouter();
 
   const { start, end } = dayBounds();
@@ -117,13 +117,13 @@ export default function TodayScreen() {
       <View>
         <SectionLabel>{t('today.next')}</SectionLabel>
         {restToday.length === 0 ? (
-          <View style={[styles.emptyNext, { backgroundColor: colors.surface, borderColor: colors.hairline }]}>
+          <View style={[styles.emptyNext, { backgroundColor: colors.surface, borderColor: colors.hairline, borderRadius: radius.row }]}>
             <Text style={[styles.emptyNextText, { color: colors.muted }]}>{t('today.nothingNext')}</Text>
           </View>
         ) : (
           <View style={styles.list}>
             {restToday.map((l) => (
-              <View key={l.id} style={[styles.rowShell, { borderColor: colors.hairline, borderRadius: 16 }]}>
+              <View key={l.id} style={[styles.rowShell, { borderColor: colors.hairline, borderRadius: radius.row }]}>
                 <SwipeRow
                   leftActions={[
                     {
@@ -205,7 +205,7 @@ function NearestCard({
   now: number;
 }) {
   const t = useT();
-  const { colors } = useTheme();
+  const { colors, radius } = useTheme();
   const router = useRouter();
 
   const m = minutesUntil(lesson.startsAt, now);
@@ -248,7 +248,7 @@ function NearestCard({
         }}
         accessibilityRole="button"
         accessibilityLabel={t('common.contact')}
-        style={({ pressed }) => [styles.contactBtn, { backgroundColor: colors.primaryVlight, opacity: pressed ? 0.85 : 1 }]}>
+        style={({ pressed }) => [styles.contactBtn, { backgroundColor: colors.primaryVlight, borderRadius: radius.control, opacity: pressed ? 0.85 : 1 }]}>
         <Icon name="phone" size={16} sw={1.8} stroke={colors.heading} />
         <Text style={[styles.contactLabel, { color: colors.heading }]}>{t('common.contact')}</Text>
       </Pressable>
@@ -284,7 +284,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 7,
     paddingVertical: 10,
-    borderRadius: 12,
   },
   contactLabel: { fontSize: 14, fontWeight: '600' },
 
@@ -298,7 +297,6 @@ const styles = StyleSheet.create({
 
   emptyNext: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 16,
     paddingVertical: 22,
     paddingHorizontal: 16,
     alignItems: 'center',
