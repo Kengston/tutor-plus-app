@@ -9,7 +9,8 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.anonymous.tutor-plus-app"
     },
     "android": {
       "adaptiveIcon": {
@@ -30,11 +31,19 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#FAF8F4",
-          "dark": { "backgroundColor": "#16140F" },
+          "dark": {
+            "backgroundColor": "#16140F"
+          },
           "android": {
             "image": "./assets/images/splash-icon.png",
             "imageWidth": 76
           }
+        }
+      ],
+      [
+        "@morrowdigital/watermelondb-expo-plugin",
+        {
+          "disableJsi": false
         }
       ]
     ],

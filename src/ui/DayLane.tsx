@@ -73,10 +73,9 @@ export function DayLane(props: DayLaneProps) {
       <View style={styles.lane}>
         {/* base track + gradient past-fill (SVG for crisp rounded caps + gradient) */}
         <Svg
-          style={StyleSheet.absoluteFill}
+          style={[StyleSheet.absoluteFill, { pointerEvents: 'none' }]}
           width="100%"
-          height={LANE_HEIGHT}
-          pointerEvents="none">
+          height={LANE_HEIGHT}>
           <Defs>
             <LinearGradient id="dayLanePast" x1="0%" y1="0%" x2="100%" y2="0%">
               <Stop offset="0%" stopColor={colors.accent} />
@@ -111,7 +110,6 @@ export function DayLane(props: DayLaneProps) {
           return (
             <View
               key={i}
-              pointerEvents="none"
               style={[
                 styles.dot,
                 {
@@ -120,6 +118,7 @@ export function DayLane(props: DayLaneProps) {
                   borderColor: accent,
                   // 2px halo separating the dot from the track (prototype boxShadow).
                   boxShadow: `0 0 0 2px ${colors.surface}`,
+                  pointerEvents: 'none',
                 },
               ]}
             />
@@ -128,10 +127,9 @@ export function DayLane(props: DayLaneProps) {
 
         {/* now marker */}
         <Animated.View
-          pointerEvents="none"
           style={[
             styles.now,
-            { left: nowPct },
+            { left: nowPct, pointerEvents: 'none' },
             {
               backgroundColor: colors.accent,
               borderColor: colors.surface,
