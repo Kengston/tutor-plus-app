@@ -19,8 +19,8 @@ export default function SignIn() {
   return (
     <SafeAreaView style={[styles.fill, { backgroundColor: colors.bg }]}>
       <View style={styles.hero}>
-        <View style={[styles.logo, { backgroundColor: colors.accent }]}>
-          <Icon name="sparkle" size={34} sw={1.8} stroke={colors.primaryDeep} />
+        <View style={[styles.logo, { backgroundColor: colors.primary }]}>
+          <Icon name="sparkle" size={34} sw={1.8} stroke={colors.onTint} />
         </View>
         <Text style={[styles.title, { color: colors.heading }]}>{t('auth.title')}</Text>
         <Text style={[styles.subtitle, { color: colors.muted }]}>{t('auth.subtitle')}</Text>

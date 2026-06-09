@@ -51,7 +51,7 @@ const PAY_DOT: Record<PayStatus, DotTone> = {
 
 export default function StudentCardScreen() {
   const t = useT();
-  const { colors } = useTheme();
+  const { colors, radius } = useTheme();
   const params = useLocalSearchParams<{ id: string }>();
   const id = typeof params.id === 'string' ? params.id : (params.id?.[0] ?? '');
 
@@ -137,7 +137,7 @@ export default function StudentCardScreen() {
             onPress={openContact}
             style={({ pressed }) => [
               styles.actionBtn,
-              { backgroundColor: colors.surface, borderColor: colors.hairline },
+              { backgroundColor: colors.surface, borderColor: colors.hairline, borderRadius: radius.field },
               pressed && styles.pressed,
             ]}>
             <Icon name="phone" size={18} stroke={colors.heading} />
@@ -148,7 +148,7 @@ export default function StudentCardScreen() {
             style={({ pressed }) => [
               styles.actionBtn,
               styles.actionPrimary,
-              { backgroundColor: colors.primary },
+              { backgroundColor: colors.primary, borderRadius: radius.field },
               pressed && styles.pressed,
             ]}>
             <Icon name="plus" size={18} stroke={colors.onTint} />
@@ -159,7 +159,7 @@ export default function StudentCardScreen() {
         </View>
 
         {/* ── Data block ───────────────────────────────────────────── */}
-        <View style={[styles.dataCard, { backgroundColor: colors.surface, borderColor: colors.hairline }]}>
+        <View style={[styles.dataCard, { backgroundColor: colors.surface, borderColor: colors.hairline, borderRadius: radius.group }]}>
           <DataRow label={t('field.subjects')} divider={false}>
             {subjects.length > 0 ? (
               <View style={styles.chips}>
@@ -168,7 +168,7 @@ export default function StudentCardScreen() {
                 ))}
               </View>
             ) : (
-              <Text style={[styles.value, { color: colors.label3 }]}>{t('common.none')}</Text>
+              <Text style={[styles.value, { color: colors.muted }]}>{t('common.none')}</Text>
             )}
           </DataRow>
           <DataRow label={t('field.format')}>
@@ -203,7 +203,7 @@ export default function StudentCardScreen() {
             ))}
           </View>
         ) : (
-          <Text style={[styles.empty, { color: colors.label3 }]}>{t('student.noUpcoming')}</Text>
+          <Text style={[styles.empty, { color: colors.muted }]}>{t('student.noUpcoming')}</Text>
         )}
 
         {/* ── Archive ──────────────────────────────────────────────── */}
@@ -212,7 +212,7 @@ export default function StudentCardScreen() {
           disabled={isArchived}
           style={({ pressed }) => [
             styles.archiveBtn,
-            { borderColor: colors.hairline },
+            { borderColor: colors.hairline, borderRadius: radius.field },
             pressed && !isArchived && styles.pressed,
           ]}>
           <Icon name="archive" size={18} stroke={isArchived ? colors.label3 : colors.danger} />
@@ -301,13 +301,13 @@ function UpcomingRow({
   onPress: () => void;
 }) {
   const t = useT();
-  const { colors } = useTheme();
+  const { colors, radius } = useTheme();
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.lessonRow,
-        { backgroundColor: colors.surface, borderColor: colors.hairline },
+        { backgroundColor: colors.surface, borderColor: colors.hairline, borderRadius: radius.field },
         pressed && styles.pressed,
       ]}>
       <Text style={[styles.lessonTime, { color: colors.heading }]}>{hhmm(lesson.startsAt)}</Text>
@@ -329,11 +329,15 @@ function ContactAction({
   label: string;
   onPress: () => void;
 }) {
-  const { colors } = useTheme();
+  const { colors, radius } = useTheme();
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.contactRow, pressed && { backgroundColor: colors.stoneLight }]}>
+      style={({ pressed }) => [
+        styles.contactRow,
+        { borderRadius: radius.control },
+        pressed && { backgroundColor: colors.stoneLight },
+      ]}>
       <Icon name={icon} size={20} stroke={colors.heading} />
       <Text style={[styles.contactLabel, { color: colors.heading }]}>{label}</Text>
     </Pressable>
@@ -387,13 +391,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     height: 48,
-    borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
   },
   actionPrimary: { borderWidth: 0 },
   actionLabel: { fontSize: 14.5, fontWeight: '600' },
 
-  dataCard: { borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14 },
+  dataCard: { borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14 },
   dataRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 13, gap: 12 },
   dataLabel: { width: 92, fontSize: 13.5, fontWeight: '500', paddingTop: 1 },
   dataValue: { flex: 1, alignItems: 'flex-end' },
@@ -408,7 +411,6 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 14,
     paddingVertical: 13,
-    borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
   },
   lessonTime: { fontSize: 15, fontWeight: '700', minWidth: 44, fontVariant: ['tabular-nums'] },
@@ -421,7 +423,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     height: 48,
-    borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
     marginTop: 4,
   },
@@ -433,7 +434,6 @@ const styles = StyleSheet.create({
     gap: 14,
     paddingVertical: 15,
     paddingHorizontal: 8,
-    borderRadius: 12,
   },
   contactLabel: { fontSize: 16, fontWeight: '500' },
 

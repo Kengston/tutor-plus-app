@@ -2,7 +2,8 @@ import '@/lib/silence-rnw-warnings';
 
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
+import { Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -45,6 +46,16 @@ function useAuthGate() {
   }, [session, segments, router]);
 }
 
+/** ADR-0010: on web, constrain the app to a centred ~430px mobile column with a bg surround. */
+function WebFrame({ bg, children }: { bg: string; children: ReactNode }) {
+  if (Platform.OS !== 'web') return <>{children}</>;
+  return (
+    <View style={{ flex: 1, backgroundColor: bg, alignItems: 'center' }}>
+      <View style={{ flex: 1, width: '100%', maxWidth: 430, backgroundColor: bg }}>{children}</View>
+    </View>
+  );
+}
+
 function NavigationRoot() {
   const { colors, scheme } = useTheme();
   const t = useT();
@@ -68,14 +79,16 @@ function NavigationRoot() {
   return (
     <ThemeProvider value={navTheme}>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="student" />
-        <Stack.Screen name="lesson" />
-        <Stack.Screen name="gallery" options={{ presentation: 'modal', headerShown: true, title: t('a11y.uiKit') }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
+      <WebFrame bg={colors.bg}>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="student" />
+          <Stack.Screen name="lesson" />
+          <Stack.Screen name="gallery" options={{ presentation: 'modal', headerShown: true, title: t('a11y.uiKit') }} />
+          <Stack.Screen name="+not-found" />
+        </Stack>
+      </WebFrame>
     </ThemeProvider>
   );
 }

@@ -46,7 +46,7 @@ const pct = (f: number) => `${clamp01(f) * 100}%` as const;
  */
 export function DayLane(props: DayLaneProps) {
   const { start = 9, end = 21, items, nowFrac = 0.5 } = props;
-  const { colors } = useTheme();
+  const { colors, shadow } = useTheme();
 
   const ticks: number[] = [];
   for (let h = start; h <= end; h += 3) ticks.push(h);
@@ -133,6 +133,7 @@ export function DayLane(props: DayLaneProps) {
             {
               backgroundColor: colors.accent,
               borderColor: colors.surface,
+              boxShadow: shadow.marker,
             },
             pulseStyle,
           ]}
@@ -141,7 +142,7 @@ export function DayLane(props: DayLaneProps) {
 
       <View style={styles.ticks}>
         {ticks.map((h) => (
-          <Text key={h} style={[styles.tick, { color: colors.label3 }]}>
+          <Text key={h} style={[styles.tick, { color: colors.muted }]}>
             {h}:00
           </Text>
         ))}
@@ -180,7 +181,6 @@ const styles = StyleSheet.create({
     marginTop: -NOW_SIZE / 2,
     borderRadius: NOW_SIZE / 2,
     borderWidth: 3,
-    boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
   },
   ticks: {
     flexDirection: 'row',

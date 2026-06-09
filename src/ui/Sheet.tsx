@@ -39,11 +39,9 @@ const DISMISS_THRESHOLD = 90;
 const DISMISS_VELOCITY = 800;
 /** Scrim fade-in matches the prototype's `om-rise .2s ease`. */
 const SCRIM_FADE: WithTimingConfig = { duration: 200, easing: Easing.inOut(Easing.ease) };
-/** Upward drop-shadow lifted verbatim from the prototype panel. */
-const PANEL_SHADOW = '0px -10px 40px -12px rgba(0,0,0,0.3)';
 
 export function Sheet({ title, onClose, children, visible = true }: SheetProps) {
-  const { colors, radius } = useTheme();
+  const { colors, radius, shadow } = useTheme();
   const t = useT();
 
   // Vertical drag offset for the panel (0 = resting, >0 = dragged down).
@@ -100,7 +98,7 @@ export function Sheet({ title, onClose, children, visible = true }: SheetProps) 
               backgroundColor: colors.surface,
               borderTopLeftRadius: radius.sheet,
               borderTopRightRadius: radius.sheet,
-              boxShadow: PANEL_SHADOW,
+              boxShadow: shadow.sheet,
             },
           ]}>
           <GestureDetector gesture={panGesture}>
