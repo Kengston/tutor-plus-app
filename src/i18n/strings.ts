@@ -193,8 +193,8 @@ export const messages = {
   // ── Student card ─────────────────────────────────────────────────────────
   'student.upcoming': 'Ближайшие занятия',
   'student.upcoming_client': 'Ближайшие встречи',
-  'student.scheduleLesson': 'Запланировать занятие',
-  'student.scheduleLesson_client': 'Запланировать встречу',
+  'student.scheduleLesson': 'Занятие',
+  'student.scheduleLesson_client': 'Встреча',
   'student.archived': 'В архиве',
   'student.noUpcoming': 'Нет предстоящих занятий',
   'student.noUpcoming_client': 'Нет предстоящих встреч',

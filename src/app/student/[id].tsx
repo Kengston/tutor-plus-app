@@ -141,7 +141,7 @@ export default function StudentCardScreen() {
               pressed && styles.pressed,
             ]}>
             <Icon name="phone" size={18} stroke={colors.heading} />
-            <Text style={[styles.actionLabel, { color: colors.heading }]}>{t('common.contact')}</Text>
+            <Text style={[styles.actionLabel, { color: colors.heading }]} numberOfLines={1}>{t('common.contact')}</Text>
           </Pressable>
           <Pressable
             onPress={goSchedule}
@@ -152,7 +152,7 @@ export default function StudentCardScreen() {
               pressed && styles.pressed,
             ]}>
             <Icon name="plus" size={18} stroke={colors.onTint} />
-            <Text style={[styles.actionLabel, { color: colors.onTint }]}>
+            <Text style={[styles.actionLabel, { color: colors.onTint }]} numberOfLines={1}>
               {t('student.scheduleLesson')}
             </Text>
           </Pressable>
