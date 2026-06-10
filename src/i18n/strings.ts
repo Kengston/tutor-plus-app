@@ -297,6 +297,121 @@ export const messages = {
   'notFound.title': 'Экран не найден',
   'notFound.message': 'Такой страницы нет',
   'notFound.action': 'На главную',
+
+  // ══ Phase 2 · Финансы + Аналитика ════════════════════════════════════════
+
+  // ── Период (Финансы + Аналитика) ─────────────────────────────────────────
+  'period.title': 'Период',
+  'period.week': 'Неделя',
+  'period.month': 'Месяц',
+  'period.year': 'Год',
+  'period.custom': 'Произвольный',
+  'period.customTitle': 'Произвольный период',
+  'period.pickDates': 'Выбрать даты',
+  'period.pickHint': 'Выберите начальную и конечную дату периода',
+  'period.apply': 'Применить',
+  'period.selectStart': 'Выберите начальную дату',
+  'period.selectYear': 'Выбрать год',
+
+  // ── Способ оплаты (display) ──────────────────────────────────────────────
+  'method.transfer': 'Перевод',
+  'method.cash': 'Наличные',
+  'method.card': 'Карта',
+
+  // ── Финансы: список + сводка ─────────────────────────────────────────────
+  'finance.tab.all': 'Все',
+  'finance.tab.paid': 'Оплачено',
+  'finance.tab.debts': 'Долги',
+  'finance.tab.expected': 'Ожидается',
+  'finance.searchOps': 'Поиск по операциям',
+  'finance.found': 'Найдено',
+  'finance.allOps': 'Все операции',
+  'finance.nothingFound': 'Ничего не найдено',
+  'finance.emptyTitle': 'Операций нет',
+  'finance.noOpsPeriod': 'За выбранный период операций нет',
+  'finance.noOpsTab': 'По выбранной вкладке операций нет',
+
+  // ── Финансы: деталь операции ─────────────────────────────────────────────
+  'finance.opTitle': 'Операция',
+  'finance.status': 'Статус',
+  'finance.method': 'Способ оплаты',
+  'finance.markPaidCta': 'Отметить оплаченным',
+  'finance.toPay': 'к оплате',
+  'finance.amount': 'Сумма',
+  'finance.payDate': 'Дата оплаты',
+
+  // ── Финансы: новая операция ──────────────────────────────────────────────
+  'finance.newOp': 'Новая операция',
+  'finance.opType': 'Тип операции',
+  'op.paid': 'Оплата',
+  'op.debt': 'Долг',
+  'finance.subject': 'Предмет',
+  'finance.subject_client': 'Тема встречи',
+  'finance.comment': 'Комментарий',
+  'finance.optional': 'Необязательно',
+  'finance.saveOp': 'Сохранить операцию',
+  'finance.chooseStudent': 'Выберите ученика',
+  'finance.chooseStudent_client': 'Выберите клиента',
+
+  // ── Финансы: фильтр ──────────────────────────────────────────────────────
+  'finance.show': 'Показать',
+  'sort.byDate': 'По дате',
+  'sort.byAmount': 'По сумме',
+
+  // ── Аналитика: показатели + KPI ──────────────────────────────────────────
+  'analytics.income': 'Доход',
+  'analytics.lessons': 'Уроки',
+  'analytics.lessons_client': 'Встречи',
+  'analytics.debt': 'Долг',
+  'analytics.kpiLessons': 'Уроков',
+  'analytics.kpiLessons_client': 'Встреч',
+  'analytics.kpiCancels': 'Отмены',
+  'analytics.kpiAvgCheck': 'Средний чек',
+  'analytics.shares': 'Доли направлений',
+  'analytics.topicsShort': 'тем',
+  'analytics.top': 'Топ направлений',
+  'analytics.byWeeks': 'Уроки по неделям',
+  'analytics.byWeeks_client': 'Встречи по неделям',
+  'analytics.compareBtn': 'Сравнить',
+  'analytics.currentPeriod': 'текущий период',
+  'analytics.pastPeriod': 'прошлый период',
+
+  // ── Аналитика: сравнение ─────────────────────────────────────────────────
+  'analytics.comparison': 'Сравнение',
+  'analytics.comparePeriod': 'Период сравнения',
+  'analytics.vs': 'по сравнению с',
+  'analytics.vsPrev': 'по сравнению с прошлым периодом',
+  'analytics.noCompare': 'Нет данных для сравнения',
+  'compare.prev': 'Предыдущий период',
+  'compare.prevMonth': 'Прошлый месяц',
+  'compare.prevYear': 'Прошлый год',
+  'compare.custom': 'Произвольный период',
+
+  // ── Аналитика: пусто / частично / задолженности ──────────────────────────
+  'analytics.noDataHint': 'За выбранный период нет данных для аналитики. Выберите другой период.',
+  'analytics.partial': 'Данные есть не за весь период',
+  'analytics.debtors': 'Ученики с долгом',
+  'analytics.debtors_client': 'Клиенты с долгом',
+  'analytics.noDebts': 'Активных задолженностей нет',
+  'analytics.allPaid': 'Все оплаты получены',
+  'analytics.debtTitle': 'Задолженность',
+
+  // ── Экспорт (ADR-0012: CSV сейчас, PDF/Excel «скоро») ────────────────────
+  'export.title': 'Экспорт отчёта',
+  'export.format': 'Формат',
+  'export.period': 'Период',
+  'export.sections': 'Разделы',
+  'export.income': 'Доходы',
+  'export.lessons': 'Занятия',
+  'export.lessons_client': 'Встречи',
+  'export.debts': 'Задолженности',
+  'export.generate': 'Сформировать отчёт',
+  'export.soon': 'скоро',
+  'export.done': 'Отчёт выгружен',
+
+  // ── Финансы/Аналитика: общее ─────────────────────────────────────────────
+  'common.reset': 'Сбросить',
+  'group.today': 'Сегодня',
 } as const;
 
 export type Mode = 'tutor' | 'client';

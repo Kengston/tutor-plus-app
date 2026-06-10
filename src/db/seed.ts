@@ -65,6 +65,33 @@ const LESSONS: LessonSpec[] = [
   { student: 'Дмитрий Орлов', subject: 'Английский', topic: 'Past Simple', day: -3, hour: 19, dur: 60, fmt: 'online', price: 1600, life: 'done', pay: 'paid' },
 ];
 
+/**
+ * Historical conducted+paid lessons across the past ~5 months (Phase 2, ADR-0012): gives
+ * Analytics realistic monthly/weekly bars, an income growth trend (more recent months
+ * busier), subject spread (donut / top directions) and a few extra debts (debtors list).
+ * Deterministic (no RNG) so the seed stays reproducible across launches.
+ */
+function buildHistory(): LessonSpec[] {
+  const active = STUDENTS.filter((s) => s.status !== 'archived');
+  const perMonth = [9, 8, 7, 6, 5]; // monthsBack 1..5 — recent months busier → upward bars
+  const out: LessonSpec[] = [];
+  let n = 0;
+  for (let mb = 1; mb <= perMonth.length; mb += 1) {
+    for (let i = 0; i < perMonth[mb - 1]; i += 1) {
+      const stu = active[n % active.length];
+      const subject = stu.subjects[i % stu.subjects.length];
+      const day = -(mb * 30) + ((i * 5) % 25) - 12; // cluster in the mb-th month back, ±~12d
+      const hour = 10 + (i % 9);
+      const pay: TxnType = mb <= 2 && i % 6 === 2 ? 'debt' : 'paid'; // a few recent debts
+      out.push({ student: stu.name, subject, topic: subject, day, hour, dur: 60, fmt: stu.format, price: stu.rate, life: 'done', pay });
+      n += 1;
+    }
+  }
+  return out;
+}
+
+const HISTORY: LessonSpec[] = buildHistory();
+
 export async function seedIfEmpty(): Promise<void> {
   const count = await database.get<StudentModel>('students').query().fetchCount();
   if (count > 0) return;
@@ -111,7 +138,7 @@ export async function seedIfEmpty(): Promise<void> {
       }
     }
 
-    for (const spec of LESSONS) {
+    for (const spec of [...LESSONS, ...HISTORY]) {
       const sid = studentId.get(spec.student);
       if (!sid) continue;
       const subjId = subjectId.get(spec.subject) ?? null;
