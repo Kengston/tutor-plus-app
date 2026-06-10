@@ -270,6 +270,23 @@ export function paidByBucket(
   return buckets.map((b) => acc.get(b) ?? 0);
 }
 
+/** Count of conducted (done) lessons per bucket (by `startsAt`) — bars for the Dynamics tab. */
+export function lessonsByBucket(
+  lessons: readonly LessonSlice[],
+  buckets: readonly number[],
+  bucketOf: (ms: number) => number,
+): number[] {
+  const acc = new Map<number, number>();
+  for (const b of buckets) acc.set(b, 0);
+  for (const l of lessons) {
+    if (l.lifecycleStatus !== 'done') continue;
+    const b = bucketOf(l.startsAt);
+    const cur = acc.get(b);
+    if (cur !== undefined) acc.set(b, cur + 1);
+  }
+  return buckets.map((b) => acc.get(b) ?? 0);
+}
+
 /** Count of conducted (done) lessons whose `startsAt` ∈ period. */
 export function lessonsConductedInPeriod(lessons: readonly LessonSlice[], period: Period): number {
   let n = 0;

@@ -63,6 +63,8 @@ export function PeriodSheet({ visible, period, onClose, onApply }: PeriodSheetPr
               <Pressable
                 key={key}
                 onPress={() => onPickType(key)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: on }}
                 style={[
                   styles.chip,
                   {
@@ -98,6 +100,8 @@ export function PeriodSheet({ visible, period, onClose, onApply }: PeriodSheetPr
                     <Pressable
                       key={m}
                       onPress={() => commit(monthOf(new Date(year, m, 1).getTime()))}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: on }}
                       style={[styles.month, { backgroundColor: on ? colors.primary : colors.stoneLight, borderRadius: radius.field }]}>
                       <Text style={[styles.monthText, { color: on ? colors.onTint : colors.body }]}>
                         {t(`month.${m}` as StringKey).slice(0, 3)}

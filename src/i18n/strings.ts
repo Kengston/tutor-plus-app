@@ -123,6 +123,9 @@ export const messages = {
   'unit.hours.one': 'час',
   'unit.hours.few': 'часа',
   'unit.hours.many': 'часов',
+  'unit.directions.one': 'направление',
+  'unit.directions.few': 'направления',
+  'unit.directions.many': 'направлений',
 
   // ── Phase 1 · common actions & units ─────────────────────────────────────
   'common.edit': 'Изменить',
