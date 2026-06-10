@@ -168,7 +168,7 @@ function Field({ label, value, children }: { label: string; value?: string; chil
   return (
     <View style={styles.field}>
       <Text style={[styles.label, { color: colors.muted }]}>{label}</Text>
-      {children ?? <Text style={[styles.value, { color: colors.heading }]}>{value}</Text>}
+      {children ?? <Text numberOfLines={1} style={[styles.value, { color: colors.heading }]}>{value}</Text>}
     </View>
   );
 }

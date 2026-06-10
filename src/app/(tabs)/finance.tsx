@@ -315,9 +315,13 @@ function usePeriodLabel(): (period: Period) => string {
       return `${start.getFullYear()}`;
     }
     // week / custom — inclusive day range; `end` is exclusive, so the last day is end − 1ms.
+    // Compose each endpoint's genitive month separately so cross-month ranges read «29 мая – 4 июня».
     const lastDay = new Date(period.end - 1);
-    const monthGen = t(`monthGen.${start.getMonth()}` as StringKey);
-    return `${start.getDate()}–${lastDay.getDate()} ${monthGen}`;
+    const startGen = t(`monthGen.${start.getMonth()}` as StringKey);
+    const lastGen = t(`monthGen.${lastDay.getMonth()}` as StringKey);
+    return start.getMonth() === lastDay.getMonth()
+      ? `${start.getDate()}–${lastDay.getDate()} ${lastGen}`
+      : `${start.getDate()} ${startGen} – ${lastDay.getDate()} ${lastGen}`;
   };
 }
 

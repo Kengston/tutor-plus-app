@@ -118,6 +118,8 @@ export default function NewOperationScreen() {
               <Pressable
                 key={k}
                 onPress={() => setType(k)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: on }}
                 style={({ pressed }) => [
                   styles.choiceBtn,
                   {
@@ -170,6 +172,7 @@ export default function NewOperationScreen() {
               keyboardType="number-pad"
               placeholder="0"
               placeholderTextColor={colors.stoneInactive}
+              accessibilityLabel={t('finance.amount')}
               style={[styles.amountInput, { color: colors.heading }]}
             />
           </View>
@@ -186,6 +189,8 @@ export default function NewOperationScreen() {
                   <Pressable
                     key={key}
                     onPress={() => setMethod(key)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
                     style={({ pressed }) => [
                       styles.choiceBtn,
                       {
@@ -226,6 +231,7 @@ export default function NewOperationScreen() {
               onChangeText={setComment}
               placeholder={t('finance.optional')}
               placeholderTextColor={colors.stoneInactive}
+              accessibilityLabel={t('finance.comment')}
               style={[styles.commentInput, { color: colors.heading }]}
             />
           </View>

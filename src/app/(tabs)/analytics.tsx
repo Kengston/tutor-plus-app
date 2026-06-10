@@ -27,6 +27,7 @@ import {
   entriesInPeriod,
   financeEntries,
   incomeInPeriod,
+  lessonsByBucket,
   lessonsConductedInPeriod,
   metricDelta,
   paidByBucket,
@@ -69,6 +70,12 @@ interface ExportSections {
   income: boolean;
   lessons: boolean;
   debts: boolean;
+}
+
+/** `YYYY-MM-DD` in DEVICE-LOCAL time — keeps CSV dates consistent with the on-screen day groups. */
+function localYmd(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 export default function AnalyticsScreen() {
@@ -136,6 +143,10 @@ export default function AnalyticsScreen() {
         ? t('analytics.lessons')
         : t('analytics.debt');
 
+  // Debt is point-in-time (whole-ledger, ADR-0012) — the period selector does NOT scope it,
+  // so on the Задолженности tab we drop the period suffix/chevron and don't open the sheet.
+  const isDebts = tab === 'debts';
+
   // ── Big-metric inputs (all DERIVED) ──
   const debtTotal = useMemo(() => debtors(txns).reduce((sum, d) => sum + d.amount, 0), [txns]);
   const conductedCount = lessonsConductedInPeriod(lessons, period);
@@ -170,12 +181,14 @@ export default function AnalyticsScreen() {
       <View style={styles.topRow}>
         <Pressable
           onPress={() => setPeriodOpen(true)}
+          disabled={isDebts}
           accessibilityRole="button"
-          style={({ pressed }) => [styles.periodBtn, pressed && styles.pressed]}>
+          hitSlop={8}
+          style={({ pressed }) => [styles.periodBtn, pressed && !isDebts && styles.pressed]}>
           <Text style={[styles.periodText, { color: colors.muted }]} numberOfLines={1}>
-            {`${eyebrow} · ${periodLabel}`}
+            {isDebts ? eyebrow : `${eyebrow} · ${periodLabel}`}
           </Text>
-          <Icon name="chevronDown" size={15} sw={1.9} stroke={colors.primary} />
+          {!isDebts ? <Icon name="chevronDown" size={15} sw={1.9} stroke={colors.primary} /> : null}
         </Pressable>
         <Pressable
           onPress={() => setExportOpen(true)}
@@ -187,7 +200,17 @@ export default function AnalyticsScreen() {
         </Pressable>
       </View>
 
-      {!hasData ? (
+      {isDebts ? (
+        // Debt is whole-ledger (point-in-time) → render regardless of in-period coverage.
+        <>
+          <CountUp value={debtTotal} format={(v) => formatRub(v)} style={StyleSheet.flatten([styles.metric, { color: colors.danger }])} />
+          <DebtsBody
+            txns={txns}
+            studentName={studentName}
+            onOpen={(id) => router.push({ pathname: '/student/[id]', params: { id } })}
+          />
+        </>
+      ) : !hasData ? (
         <View style={styles.emptyWrap}>
           <EmptyState icon="chart" text={t('analytics.empty')} hint={t('analytics.noDataHint')} />
           <Pressable
@@ -202,10 +225,10 @@ export default function AnalyticsScreen() {
         </View>
       ) : (
         <>
-          {/* Big metric — animated; debt total is danger-coloured. */}
+          {/* Big metric — animated. */}
           {tab === 'overview' ? (
             <CountUp value={incomeNow} format={(v) => formatRub(v)} style={StyleSheet.flatten([styles.metric, { color: colors.heading }])} />
-          ) : tab === 'dynamics' ? (
+          ) : (
             <CountUp
               value={conductedCount}
               format={(v) =>
@@ -217,20 +240,12 @@ export default function AnalyticsScreen() {
               }
               style={StyleSheet.flatten([styles.metric, { color: colors.heading }])}
             />
-          ) : (
-            <CountUp value={debtTotal} format={(v) => formatRub(v)} style={StyleSheet.flatten([styles.metric, { color: colors.danger }])} />
           )}
 
-          {tab === 'overview' && (
+          {tab === 'overview' ? (
             <OverviewBody lessons={lessons} txns={txns} period={period} subjectName={subjectName} />
-          )}
-          {tab === 'dynamics' && <DynamicsBody txns={txns} period={period} />}
-          {tab === 'debts' && (
-            <DebtsBody
-              txns={txns}
-              studentName={studentName}
-              onOpen={(id) => router.push({ pathname: '/student/[id]', params: { id } })}
-            />
+          ) : (
+            <DynamicsBody lessons={lessons} period={period} />
           )}
         </>
       )}
@@ -343,13 +358,19 @@ function OverviewBody({
             center={
               <View style={styles.donutCenter}>
                 <Text style={[styles.donutCount, { color: colors.heading }]}>{String(segments.length)}</Text>
-                <Text style={[styles.donutUnit, { color: colors.muted }]}>{t('analytics.topicsShort')}</Text>
+                <Text style={[styles.donutUnit, { color: colors.muted }]}>
+                  {plural(segments.length, {
+                    one: t('unit.directions.one'),
+                    few: t('unit.directions.few'),
+                    many: t('unit.directions.many'),
+                  })}
+                </Text>
               </View>
             }
           />
           <View style={styles.legend}>
-            {segments.map((s) => (
-              <View key={s.label} style={styles.legendRow}>
+            {segments.map((s, i) => (
+              <View key={i} style={styles.legendRow}>
                 <View style={[styles.legendDot, { backgroundColor: s.color }]} />
                 <Text numberOfLines={1} style={[styles.legendLabel, { color: colors.body }]}>
                   {s.label}
@@ -383,34 +404,45 @@ function OverviewBody({
         </Card>
       </View>
 
-      {/* (e) comparison */}
-      <ComparisonCard delta={delta} />
+      {/* (e) comparison — skipped for custom ranges (no well-defined previous period). */}
+      {period.type !== 'custom' ? <ComparisonCard delta={delta} /> : null}
     </View>
   );
 }
 
 // ── ДИНАМИКА ───────────────────────────────────────────────────────────────────
 
-function DynamicsBody({ txns, period }: { txns: Parameters<typeof incomeInPeriod>[0]; period: Period }) {
+function DynamicsBody({
+  lessons,
+  period,
+}: {
+  lessons: Parameters<typeof lessonsByBucket>[0];
+  period: Period;
+}) {
   const t = useT();
 
-  // Weekly income bars across the period; keep the last ~6 weeks when there are many.
+  // Weekly CONDUCTED-LESSON bars (matches the «Уроки» headline + «Уроки по неделям» section);
+  // keep the last ~6 weeks when there are many. Tooltip is a lesson count, not money.
   const weekBars = useMemo<BarDatum[]>(() => {
     let weeks = weekStarts(period.start, period.end);
     if (weeks.length > 6) weeks = weeks.slice(weeks.length - 6);
-    const vals = paidByBucket(txns, weeks, (ms) => weekOf(ms).start);
+    const vals = lessonsByBucket(lessons, weeks, (ms) => weekOf(ms).start);
     const max = Math.max(1, ...vals);
     return weeks.map((anchor, i) => ({
       label: String(new Date(anchor).getDate()), // start day-number — DATA, not UI copy
       v: vals[i] / max,
-      value: formatRub(vals[i]),
+      value: `${formatNumberRu(vals[i])} ${plural(vals[i], {
+        one: t('unit.lessons.one'),
+        few: t('unit.lessons.few'),
+        many: t('unit.lessons.many'),
+      })}`,
       on: i === weeks.length - 1,
     }));
-  }, [txns, period]);
+  }, [lessons, period, t]);
 
-  // Comparison vs the previous period of the same type.
+  // Comparison on conducted-lesson COUNTS vs the previous period of the same type.
   const prev = shiftPeriod(period, -1);
-  const delta = metricDelta(incomeInPeriod(txns, period), incomeInPeriod(txns, prev));
+  const delta = metricDelta(lessonsConductedInPeriod(lessons, period), lessonsConductedInPeriod(lessons, prev));
 
   return (
     <View style={styles.body}>
@@ -420,7 +452,8 @@ function DynamicsBody({ txns, period }: { txns: Parameters<typeof incomeInPeriod
           <MultiBarChart data={weekBars} height={150} />
         </Card>
       </View>
-      <ComparisonCard delta={delta} />
+      {/* Comparison skipped for custom ranges (no well-defined previous period). */}
+      {period.type !== 'custom' ? <ComparisonCard delta={delta} /> : null}
     </View>
   );
 }
@@ -557,9 +590,15 @@ function ExportSheet({
 
   const toggle = (k: keyof ExportSections) => setSections((s) => ({ ...s, [k]: !s[k] }));
 
-  // Build the CSV from the in-period finance entries (paid + derived debt/expected rows).
+  // Build the CSV from the in-period finance entries, honouring the «Разделы» toggles
+  // (Доходы→paid · Занятия→expected · Задолженности→debt).
   const generate = () => {
-    const rows = entriesInPeriod(financeEntries(lessons, txns), period);
+    const rows = entriesInPeriod(financeEntries(lessons, txns), period).filter(
+      (e) =>
+        (e.kind === 'paid' && sections.income) ||
+        (e.kind === 'expected' && sections.lessons) ||
+        (e.kind === 'debt' && sections.debts),
+    );
     const header: (string | number)[] = [
       t('field.date'),
       t('field.student'),
@@ -569,7 +608,7 @@ function ExportSheet({
       t('finance.method'),
     ];
     const body = rows.map((e) => [
-      new Date(e.occurredAt).toISOString().slice(0, 10), // YYYY-MM-DD — stable, locale-free DATA
+      localYmd(e.occurredAt), // YYYY-MM-DD in DEVICE-LOCAL time (matches the on-screen dates)
       studentName(e.studentId),
       subjectName(e.subjectId),
       e.amount,
@@ -591,13 +630,13 @@ function ExportSheet({
               style={[
                 styles.formatBtn,
                 {
-                  backgroundColor: f.enabled ? colors.primary : colors.surface,
+                  backgroundColor: f.enabled ? colors.primary : colors.stoneLight,
                   borderColor: colors.hairline,
                   borderWidth: f.enabled ? 0 : StyleSheet.hairlineWidth,
                   borderRadius: radius.field,
                 },
               ]}>
-              <Text style={[styles.formatText, { color: f.enabled ? colors.onTint : colors.stoneInactive }]}>
+              <Text style={[styles.formatText, { color: f.enabled ? colors.onTint : colors.muted }]}>
                 {f.label}
               </Text>
             </View>
@@ -672,8 +711,8 @@ const styles = StyleSheet.create({
   // body wrapper
   body: { gap: 20 },
 
-  // cards
-  chartCard: { padding: 16 },
+  // cards — extra top room so a full-height bar's tap-tooltip clears the Card's overflow:hidden clip.
+  chartCard: { paddingTop: 32, paddingHorizontal: 16, paddingBottom: 16 },
   kpiCard: { flexDirection: 'row', paddingVertical: 14, paddingHorizontal: 4 },
   kpiSep: { width: StyleSheet.hairlineWidth, marginVertical: 2 },
 
