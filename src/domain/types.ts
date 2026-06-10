@@ -84,3 +84,27 @@ export interface Transaction {
   comment: string | null;
   createdAt: number;
 }
+
+/**
+ * A money-relevant row in the Finance list (ADR-0011) — a VIEW-MODEL, not a stored
+ * entity. The list is a union of real `paid` transactions, derived `debt`/`expected`
+ * lessons (a lesson's payStatus, not a stored row), and standalone `debt` transactions.
+ * `expected` is never stored — it is always a derived lesson row (ADR-0008/0011).
+ */
+export type FinanceEntryKind = PayStatus; // 'paid' | 'debt' | 'expected'
+
+export interface FinanceEntry {
+  /** Stable row id: the txn id, or `lesson:<lessonId>` for a derived lesson row. */
+  id: string;
+  kind: FinanceEntryKind;
+  studentId: string;
+  /** Present for lesson-anchored rows; null for standalone operations. */
+  lessonId: string | null;
+  subjectId: string | null;
+  amount: number;
+  /** Bucket/sort instant: txn.occurredAt, or lesson.startsAt for a derived row. */
+  occurredAt: number;
+  method: PayMethod | null;
+  /** Origin of the row — drives drill-down (open the txn vs open the lesson). */
+  source: 'txn' | 'lesson';
+}
