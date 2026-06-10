@@ -74,13 +74,32 @@ export function useLessonsInRange(start: number, end: number): LessonModel[] {
   );
 }
 
-/** Whole ledger (reactive on the columns aggregates read) — for cross-student debt. */
+/** Whole ledger (reactive) — cross-student debt + Finance/Analytics aggregates. Append-only,
+ *  so inserts (new payments/debts) re-emit; observed columns cover the netting/entry fields. */
 export function useAllTransactions(): TransactionModel[] {
   return useObservable(
-    () => txnsC().query().observeWithColumns(['type', 'amount', 'student_id', 'lesson_id']),
+    () =>
+      txnsC()
+        .query(Q.sortBy('occurred_at', Q.desc))
+        .observeWithColumns(['type', 'amount', 'student_id', 'lesson_id', 'subject_id', 'occurred_at', 'method']),
     [],
     [],
   );
+}
+
+/** All lessons (reactive), newest first — Finance entries (derived debt/expected rows) +
+ *  Analytics buckets across periods. Single-practitioner scope → whole-table is cheap. */
+export function useAllLessons(): LessonModel[] {
+  return useObservable(
+    () => lessonsC().query(Q.sortBy('starts_at', Q.desc)).observeWithColumns(LESSON_COLS),
+    [],
+    [],
+  );
+}
+
+/** A single transaction (reactive); undefined until loaded — for the Finance operation detail. */
+export function useTransaction(id: string): TransactionModel | undefined {
+  return useObservable<TransactionModel | undefined>(() => txnsC().findAndObserve(id), [id], undefined);
 }
 
 /** One student's transactions (reactive). */

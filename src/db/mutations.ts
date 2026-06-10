@@ -145,6 +145,41 @@ export async function recordLessonPayment(
   });
 }
 
+export interface TransactionInput {
+  studentId: string;
+  /** Only `paid`/`debt` are ever stored — `expected` is derived, never a row (ADR-0011). */
+  type: Exclude<TxnType, 'expected'>;
+  amount: number;
+  method?: PayMethod | null;
+  /** UTC-instant ms; defaults to now. */
+  occurredAt?: number;
+  subjectId?: string | null;
+  comment?: string | null;
+  /** Lesson-anchored (settlement / per-lesson) when set; standalone (prepayment/general) when null. */
+  lessonId?: string | null;
+}
+
+/**
+ * Append a transaction — the general money-write for Phase-2 Finance (ADR-0011). Covers
+ * the «Новая операция» FAB (standalone Оплата/Долг) AND settling a debt FinanceEntry
+ * (pass `type:'paid'` + the debt row's `lessonId` → its lesson's payStatus flips to paid,
+ * debt drops). Append-only: this only ever CREATES rows; corrections are new rows.
+ */
+export async function createTransaction(input: TransactionInput): Promise<TransactionModel> {
+  return database.write(async () =>
+    database.get<TransactionModel>('transactions').create((t) => {
+      t.studentId = input.studentId;
+      t.lessonId = input.lessonId ?? null;
+      t.amount = input.amount;
+      t.type = input.type;
+      t.method = input.method ?? null;
+      t.subjectId = input.subjectId ?? null;
+      t.occurredAt = input.occurredAt ?? Date.now();
+      t.comment = input.comment ?? null;
+    }),
+  );
+}
+
 export async function cancelLesson(lesson: LessonModel, reason?: string, comment?: string): Promise<void> {
   await database.write(async () => {
     await lesson.update((l) => {
