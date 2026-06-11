@@ -126,17 +126,22 @@ export function buildFeed(input: FeedInput): NotificationItem[] {
     }
   }
 
-  // 3. Cancelled — schedule change we CAN derive (current cancelled state), anchored to startsAt.
+  // 3. Cancelled — schedule change we CAN derive (current cancelled state). The event «you
+  //    cancelled this» happens NOW, so anchor `time` to an event instant ≤ now (clamp the
+  //    usually-future startsAt) — keeps it in the right today/yesterday/earlier bucket, off the
+  //    top of the newest-first sort, and out of a future clock; bound the 30d horizon on it too.
+  //    `lessonAt` keeps the original scheduled time for the subtitle.
   if (prefs.schedule) {
     for (const l of lessons) {
       if (l.lifecycleStatus !== 'cancelled') continue;
-      if (l.startsAt < horizon) continue; // long-past cancellations aren't notification-worthy
+      const eventAt = Math.min(l.startsAt, now);
+      if (eventAt < horizon) continue; // long-past cancellations aren't notification-worthy
       const stu = byId.get(l.studentId);
       push({
         id: `cancelled:${l.id}`,
         category: 'schedule',
         kind: 'cancelled',
-        time: l.startsAt,
+        time: eventAt,
         ref: { kind: 'lesson', id: l.id },
         studentName: stu?.name,
         studentCategory: stu?.category,

@@ -16,12 +16,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAllLessons, useAllTransactions, useNotificationReads, useProfile, useStudents } from '@/db/hooks';
 import { markAllNotificationsRead, markNotificationRead } from '@/db/mutations';
-import { buildFeed, NOTIFICATION_CATEGORIES, unreadCount } from '@/domain/notifications';
+import { buildFeed, NOTIFICATION_CATEGORIES } from '@/domain/notifications';
 import type { NotificationCategory, NotificationItem, NotificationKind } from '@/domain/types';
+import { useNow } from '@/hooks/use-now';
 import { plural, useT } from '@/i18n';
 import { formatRub, initialsOf } from '@/lib/format';
 import { DEFAULT_REMINDER_PREFS, reminderPrefsOf } from '@/lib/profile';
-import { hhmm, minutesUntil, nowMs } from '@/lib/time';
+import { hhmm, minutesUntil } from '@/lib/time';
 import { useTheme } from '@/theme';
 import { CatAvatar, Icon, SectionLabel, Segmented, SwipeRow, type IconName } from '@/ui';
 
@@ -53,6 +54,10 @@ function minuteForms(t: ReturnType<typeof useT>) {
 function hourForms(t: ReturnType<typeof useT>) {
   return { one: t('unit.hours.one'), few: t('unit.hours.few'), many: t('unit.hours.many') };
 }
+/** Days phrasing forms — for a 1-day-lead reminder («через 1 день», not «через 24 часа»). */
+function dayForms(t: ReturnType<typeof useT>) {
+  return { one: t('unit.days.one'), few: t('unit.days.few'), many: t('unit.days.many') };
+}
 
 export default function NotificationsScreen() {
   const router = useRouter();
@@ -65,12 +70,17 @@ export default function NotificationsScreen() {
   const students = useStudents();
   const profile = useProfile();
   const reads = useNotificationReads();
-  const prefs = profile ? reminderPrefsOf(profile) : DEFAULT_REMINDER_PREFS;
-  const items = useMemo(
-    () => buildFeed({ lessons, transactions, students, prefs, reads, now: nowMs() }),
-    [lessons, transactions, students, prefs, reads],
+  // `now` ticks each minute so reminders/summary appear and «через N» refreshes while open;
+  // memoized `prefs` (stable model ref) keeps the feed memo from recomputing every render.
+  const now = useNow();
+  const prefs = useMemo(
+    () => (profile ? reminderPrefsOf(profile) : DEFAULT_REMINDER_PREFS),
+    [profile],
   );
-  const unread = unreadCount(items);
+  const items = useMemo(
+    () => buildFeed({ lessons, transactions, students, prefs, reads, now }),
+    [lessons, transactions, students, prefs, reads, now],
+  );
 
   // ── Filter state: a category chip (or «Все») + an unread-only toggle. ──
   const [filter, setFilter] = useState<Filter>('all');
@@ -128,8 +138,9 @@ export default function NotificationsScreen() {
         title={t('notif.title')}
         onBack={() => router.back()}
         action={
-          unread > 0
-            ? { label: t('notif.markAllRead'), onPress: () => void markAllNotificationsRead(items.map((i) => i.id)) }
+          // Acts on the VISIBLE (filtered) set — least surprise when a category/unread filter is active.
+          filtered.some((i) => i.unread)
+            ? { label: t('notif.markAllRead'), onPress: () => void markAllNotificationsRead(filtered.map((i) => i.id)) }
             : undefined
         }
       />
@@ -222,6 +233,8 @@ function Row({ item, onOpen }: { item: NotificationItem; onOpen: (it: Notificati
         <Pressable
           onPress={() => onOpen(item)}
           accessibilityRole="button"
+          accessibilityLabel={`${TITLE[item.kind]}${subtitle ? `, ${subtitle}` : ''}${item.unread ? `, ${t('a11y.unread')}` : ''}`}
+          accessibilityState={{ selected: item.unread }}
           style={styles.row}>
           {/* Leading: a student avatar when the item carries one, else a per-kind icon. */}
           {item.studentName && item.studentCategory ? (
@@ -266,7 +279,9 @@ function subtitleOf(item: NotificationItem, t: ReturnType<typeof useT>): string 
       const rel =
         m < 60
           ? `${t('time.in')} ${m} ${plural(m, minuteForms(t))}`
-          : `${t('time.in')} ${Math.round(m / 60)} ${plural(Math.round(m / 60), hourForms(t))}`;
+          : m < 1440
+            ? `${t('time.in')} ${Math.round(m / 60)} ${plural(Math.round(m / 60), hourForms(t))}`
+            : `${t('time.in')} ${Math.round(m / 1440)} ${plural(Math.round(m / 1440), dayForms(t))}`;
       return `${name} · ${rel}`;
     }
     case 'payment':

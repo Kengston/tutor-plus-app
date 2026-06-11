@@ -238,10 +238,12 @@ export const PROFILE_DEFAULTS = {
  */
 export async function ensureProfile(): Promise<ProfileModel> {
   const coll = database.get<ProfileModel>('profiles');
-  const existing = await coll.query().fetch();
-  if (existing.length > 0) return existing[0];
-  return database.write(async () =>
-    coll.create((p) => {
+  // Get-or-create INSIDE the writer queue so two concurrent calls (StrictMode / HMR remount)
+  // can't both observe an empty table and create duplicate rows (mirrors markNotificationRead).
+  return database.write(async () => {
+    const existing = await coll.query().fetch();
+    if (existing.length > 0) return existing[0];
+    return coll.create((p) => {
       p.name = PROFILE_DEFAULTS.name;
       p.activity = PROFILE_DEFAULTS.activity;
       p.clientType = PROFILE_DEFAULTS.clientType;
@@ -253,8 +255,8 @@ export async function ensureProfile(): Promise<ProfileModel> {
       p.notifSchedule = PROFILE_DEFAULTS.notifSchedule;
       p.notifSummary = PROFILE_DEFAULTS.notifSummary;
       p.pushGranted = PROFILE_DEFAULTS.pushGranted;
-    }),
-  );
+    });
+  });
 }
 
 export interface ProfilePatch {
