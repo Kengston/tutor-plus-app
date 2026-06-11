@@ -17,9 +17,9 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useProfile } from '@/db/hooks';
 import type { ProfileModel } from '@/db/models';
 import { updateProfile } from '@/db/mutations';
-import { useProfile } from '@/db/hooks';
 import { useMode, useT, type Activity, type ClientType, type StringKey } from '@/i18n';
 import { scheduler } from '@/lib/notifications';
 import { useTheme, useThemeMode, type ThemeMode } from '@/theme';
@@ -61,25 +61,28 @@ const TOGGLES: { label: StringKey; field: 'notifLessons' | 'notifPayment' | 'not
 const DEFERRED: StringKey[] = ['settings.account', 'settings.backup', 'settings.support'];
 
 export default function SettingsScreen() {
+  // Reactive single-row profile (ADR-0013 C); undefined until `ensureProfile` has run. Gate the
+  // form on it so SettingsForm's local `name` buffer initializes from the LOADED row — not the
+  // stale '' of the first undefined render, which blanked «Имя» on every re-open (ADR-0013).
+  const profile = useProfile();
+  if (!profile) return null; // brief null splash; ProfileGate already gated launch
+  return <SettingsForm profile={profile} />;
+}
+
+function SettingsForm({ profile }: { profile: ProfileModel }) {
   const router = useRouter();
   const t = useT();
   const { colors, radius } = useTheme();
-
-  // Reactive single-row profile (ADR-0013 C); undefined until `ensureProfile` has run.
-  const profile = useProfile();
   // Dual-mode + theme context controls — written alongside the row so the change is instant.
   const { clientType, setClientType } = useMode();
   const { mode: themeMode, setMode } = useThemeMode();
 
   // Activity picker sheet visibility.
   const [activityPicker, setActivityPicker] = useState(false);
-  // Local mirror of the editable name (so typing is smooth); persisted on every change.
-  const [name, setName] = useState<string>(profile?.name ?? '');
+  // Local mirror of the editable name (smooth typing); seeded from the loaded row + persisted on change.
+  const [name, setName] = useState(profile.name);
   // Tracks a denied push request so we can surface the «отключены» hint (vs. the neutral CTA).
   const [pushAttemptedDenied, setPushAttemptedDenied] = useState(false);
-
-  // Brief null splash until the profile row loads (Phase-0 parity; ProfileGate already gated launch).
-  if (!profile) return null;
 
   /** Persist the name to the row on each keystroke (DB write is cheap; no debounce needed). */
   const onChangeName = (next: string) => {

@@ -8,6 +8,18 @@ import * as Notifications from 'expo-notifications';
 
 import type { LocalReminder, NotificationScheduler } from './notification-scheduler';
 
+// Present scheduled reminders while the app is FOREGROUNDED. SDK 56 drops foreground
+// notifications unless a handler is registered (the default is "do not show"). Native-only —
+// this module never bundles on web (notifications.web.ts wins there), so it's safe at load.
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+
 export const scheduler: NotificationScheduler = {
   async getPermission() {
     const { granted } = await Notifications.getPermissionsAsync();

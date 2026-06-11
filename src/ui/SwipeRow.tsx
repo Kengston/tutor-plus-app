@@ -123,6 +123,8 @@ function Panel({
           <Pressable
             key={i}
             onPress={() => onFire(a.onPress)}
+            accessibilityRole="button"
+            accessibilityLabel={a.label}
             style={[styles.action, { width: unit, backgroundColor: a.color }]}>
             {a.icon && <Icon name={a.icon} size={20} sw={1.9} stroke={fg} />}
             <Text style={[styles.label, { color: fg }]}>{a.label}</Text>
