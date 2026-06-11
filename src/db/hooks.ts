@@ -6,13 +6,15 @@
  * Derived values (debt, payStatus, «N из M») are NOT here — compute them in render via
  * the pure `domain/aggregates` over the transactions/lessons these hooks return (ADR-0008).
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { Q } from '@nozbe/watermelondb';
 
 import { database } from '.';
 import {
   LessonModel,
+  NotificationReadModel,
+  ProfileModel,
   StudentModel,
   StudentSubjectModel,
   SubjectModel,
@@ -147,4 +149,30 @@ export function useLessonTransactions(lessonId: string): TransactionModel[] {
     [lessonId],
     [],
   );
+}
+
+// ── Profile + notification read-state (ADR-0013, Phase 3) ────────────────────
+
+const profilesC = () => database.get<ProfileModel>('profiles');
+const notifReadsC = () => database.get<NotificationReadModel>('notification_reads');
+
+const PROFILE_COLS = [
+  'name', 'activity', 'client_type', 'tz', 'theme', 'reminder_lead_min',
+  'notif_lessons', 'notif_payment', 'notif_schedule', 'notif_summary', 'push_granted',
+];
+
+/** The single practitioner profile row (reactive); undefined until `ensureProfile` has run. */
+export function useProfile(): ProfileModel | undefined {
+  const rows = useObservable<ProfileModel[]>(
+    () => profilesC().query().observeWithColumns(PROFILE_COLS),
+    [],
+    [],
+  );
+  return rows[0];
+}
+
+/** Read item-ids of the derived feed (reactive) — `unread = item.id ∉ this set`. */
+export function useNotificationReads(): Set<string> {
+  const rows = useObservable<NotificationReadModel[]>(() => notifReadsC().query().observe(), [], []);
+  return useMemo(() => new Set(rows.map((r) => r.itemId)), [rows]);
 }

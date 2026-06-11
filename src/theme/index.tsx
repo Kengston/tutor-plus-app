@@ -4,8 +4,9 @@
  * `useTheme()`     → active design tokens (stable reference per scheme).
  * `useThemeMode()` → light/dark/system controls (drives the dev toggle).
  *
- * Light/dark follows the OS by default ('system'); an explicit override is
- * kept in memory for Phase 0 (persistence lands with the settings screen).
+ * Light/dark follows the OS by default ('system'). The active override is hydrated
+ * from the persisted `profiles` row at launch (ADR-0013, via `initial`); the Settings
+ * screen persists changes by calling both `setMode` and `updateProfile`.
  */
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 
@@ -24,9 +25,9 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
+export function ThemeProvider({ children, initial = 'system' }: { children: ReactNode; initial?: ThemeMode }) {
   const system = useColorScheme();
-  const [mode, setMode] = useState<ThemeMode>('system');
+  const [mode, setMode] = useState<ThemeMode>(initial);
 
   const value = useMemo<ThemeContextValue>(() => {
     const scheme: 'light' | 'dark' =
