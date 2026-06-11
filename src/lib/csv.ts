@@ -12,7 +12,7 @@ function csvCell(value: string | number): string {
 }
 
 /** Rows → CSV text (CRLF line breaks, Excel-friendly). First row is usually the header. */
-export function toCsv(rows: ReadonlyArray<ReadonlyArray<string | number>>): string {
+export function toCsv(rows: readonly (readonly (string | number)[])[]): string {
   return rows.map((r) => r.map(csvCell).join(',')).join('\r\n');
 }
 

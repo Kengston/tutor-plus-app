@@ -48,7 +48,9 @@ export default function OperationDetailScreen() {
   const subjectName = useMemo(() => {
     if (!txn?.subjectId) return undefined;
     return subjects.find((s) => s.id === txn.subjectId)?.name;
-  }, [subjects, txn?.subjectId]);
+    // Depend on `txn` (not `txn?.subjectId`) to match the compiler-inferred dependency
+    // (react-hooks/preserve-manual-memoization); txn is a single fetched record, so this is cheap.
+  }, [subjects, txn]);
 
   // `expected` is never a stored row (ADR-0008/0011) → a real txn is paid | debt. Treat paid specially,
   // everything else (debt) takes the danger styling + the settle action.

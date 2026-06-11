@@ -36,9 +36,11 @@ export function Donut(props: DonutProps) {
   const cx = size / 2;
   const cy = size / 2;
 
-  // Lay segments end-to-end: offset each arc back by the accumulated length so
-  // it begins where the previous one ended.
-  let acc = 0;
+  // Lay segments end-to-end: offset each arc back by the accumulated length so it begins where
+  // the previous one ended. Precompute the cumulative start-fraction per segment functionally —
+  // no in-render reassignment (keeps the render pure; segment count is tiny so O(n²) is fine).
+  const fracs = segments.map((seg) => Math.min(Math.max(seg.pct, 0), 100) / 100);
+  const starts = fracs.map((_, i) => fracs.slice(0, i).reduce((a, b) => a + b, 0));
 
   const innerSize = size - 2 * thickness;
 
@@ -47,11 +49,9 @@ export function Donut(props: DonutProps) {
       <Svg width={size} height={size}>
         {/* -90° so the first segment starts at 12 o'clock, like conic-gradient. */}
         <G transform={`rotate(-90, ${cx}, ${cy})`}>
-          {segments.map((seg) => {
-            const frac = Math.min(Math.max(seg.pct, 0), 100) / 100;
-            const dash = frac * circumference;
-            const offset = -acc * circumference;
-            acc += frac;
+          {segments.map((seg, i) => {
+            const dash = fracs[i] * circumference;
+            const offset = -starts[i] * circumference;
             return (
               <Circle
                 key={seg.label}

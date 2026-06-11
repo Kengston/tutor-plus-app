@@ -18,7 +18,6 @@ const adapter = new SQLiteAdapter({
   jsi: true,
   dbName: 'tutorplus',
   onSetUpError: (error) => {
-    // eslint-disable-next-line no-console
     console.error('[db] SQLite setup failed', error);
   },
 });
