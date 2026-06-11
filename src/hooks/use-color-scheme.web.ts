@@ -1,21 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 import { useColorScheme as useRNColorScheme } from 'react-native';
 
 /**
- * To support static rendering, this value needs to be re-calculated on the client side for web
+ * SSR-safe color scheme for web: returns 'light' during the server render and the first client
+ * paint (so hydration matches), then the real device scheme. Uses `useSyncExternalStore` (with a
+ * server snapshot) instead of a mount-effect hydration flag, so there is no setState-in-effect
+ * (react-hooks/set-state-in-effect). `useRNColorScheme()` drives the re-render on scheme change;
+ * `getSnapshot` then returns the updated value.
  */
-export function useColorScheme() {
-  const [hasHydrated, setHasHydrated] = useState(false);
+const noopSubscribe = () => () => {};
 
-  useEffect(() => {
-    setHasHydrated(true);
-  }, []);
-
-  const colorScheme = useRNColorScheme();
-
-  if (hasHydrated) {
-    return colorScheme;
-  }
-
-  return 'light';
+export function useColorScheme(): 'light' | 'dark' {
+  const scheme = useRNColorScheme();
+  return useSyncExternalStore(
+    noopSubscribe,
+    () => (scheme === 'dark' ? 'dark' : 'light'),
+    () => 'light',
+  );
 }

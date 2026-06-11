@@ -18,7 +18,6 @@ const adapter = new LokiJSAdapter({
   useIncrementalIndexedDB: true,
   dbName: 'tutorplus',
   onSetUpError: (error) => {
-    // eslint-disable-next-line no-console
     console.error('[db] LokiJS setup failed', error);
   },
 });
