@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useT } from '@/i18n';
-import { useAuth, type AuthMethod } from '@/lib/auth';
+import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/theme';
 import { Icon, type IconName } from '@/ui';
 
