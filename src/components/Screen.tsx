@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useTheme } from '@/theme';
 
+import { AppHeader } from './AppHeader';
 import { DevBar } from './DevBar';
 
 export interface ScreenProps {
@@ -15,12 +16,14 @@ export interface ScreenProps {
   floatingAction?: ReactNode;
 }
 
-/** Themed tab-screen shell: safe-area + Phase-0 DevBar header + body + optional pinned FAB. */
+/** Themed tab-screen shell: safe-area + real AppHeader (bell+avatar) + body + optional pinned FAB.
+ *  The Phase-0 DevBar (theme/mode/dev pills) is kept under `__DEV__` only (ADR-0013). */
 export function Screen({ title, children, scroll = true, floatingAction }: ScreenProps) {
   const { colors } = useTheme();
   return (
     <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
-      <DevBar title={title} />
+      <AppHeader title={title} />
+      {__DEV__ ? <DevBar /> : null}
       {scroll ? (
         <ScrollView
           contentContainerStyle={[styles.content, floatingAction ? styles.contentFab : null]}

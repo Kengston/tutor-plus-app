@@ -415,6 +415,101 @@ export const messages = {
   // ── Финансы/Аналитика: общее ─────────────────────────────────────────────
   'common.reset': 'Сбросить',
   'group.today': 'Сегодня',
+
+  // ══ Phase 3 · Уведомления + Настройки (ADR-0013) ══════════════════════════
+
+  // ── Шапка / a11y ─────────────────────────────────────────────────────────
+  'a11y.notifications': 'Уведомления',
+  'a11y.profile': 'Профиль и настройки',
+  'a11y.markRead': 'Отметить прочитанным',
+
+  // ── Лента: каркас ────────────────────────────────────────────────────────
+  'notif.title': 'Уведомления',
+  'notif.empty': 'Уведомлений нет',
+  'notif.emptyHint': 'Здесь появятся напоминания о занятиях, оплатах и изменениях',
+  'notif.emptyHint_client': 'Здесь появятся напоминания о встречах, оплатах и изменениях',
+  'notif.emptyFiltered': 'Ничего не найдено',
+  'notif.markAllRead': 'Прочитать всё',
+  'notif.unreadOnly': 'Только непрочитанные',
+
+  // ── Лента: фильтр по типу ────────────────────────────────────────────────
+  'notif.filter.all': 'Все',
+  'notif.filter.lesson': 'Занятия',
+  'notif.filter.lesson_client': 'Встречи',
+  'notif.filter.payment': 'Оплата',
+  'notif.filter.schedule': 'Расписание',
+  'notif.filter.system': 'Система',
+
+  // ── Лента: группы по времени ─────────────────────────────────────────────
+  'notif.group.today': 'Сегодня',
+  'notif.group.yesterday': 'Вчера',
+  'notif.group.earlier': 'Ранее',
+
+  // ── Лента: заголовки по типу (kind) ──────────────────────────────────────
+  'notif.reminder': 'Напоминание о занятии',
+  'notif.reminder_client': 'Напоминание о встрече',
+  'notif.payment': 'Оплата получена',
+  'notif.debt': 'Зафиксирован долг',
+  'notif.cancelled': 'Занятие отменено',
+  'notif.cancelled_client': 'Встреча отменена',
+  'notif.summary': 'План на сегодня',
+
+  // ── Лента: вспомогательные ───────────────────────────────────────────────
+  /** Title used by the OS reminder (ReminderSync) — short, mode-aware. */
+  'notif.reminderTitle': 'Скоро занятие',
+  'notif.reminderTitle_client': 'Скоро встреча',
+  'notif.openLesson': 'Открыть занятие',
+  'notif.openLesson_client': 'Открыть встречу',
+  'notif.openOperation': 'Открыть операцию',
+
+  // ── Настройки: секции ────────────────────────────────────────────────────
+  'settings.notifications': 'Уведомления',
+  'settings.mode': 'Режим',
+  'settings.modeHint': 'Как называть тех, с кем вы работаете',
+  'settings.profile': 'Профиль',
+  'settings.profileName': 'Имя',
+  'settings.activity': 'Вид деятельности',
+  'settings.tz': 'Часовой пояс',
+
+  // ── Настройки: режим (dual-mode) ─────────────────────────────────────────
+  'mode.student': 'Ученик',
+  'mode.client': 'Клиент',
+
+  // ── Настройки: тема ──────────────────────────────────────────────────────
+  'settings.themeSystem': 'Авто',
+  'settings.themeLight': 'Светлая',
+  'settings.themeDark': 'Тёмная',
+
+  // ── Настройки: вид деятельности ──────────────────────────────────────────
+  'activity.teacher': 'Преподаватель',
+  'activity.psychologist': 'Психолог',
+  'activity.coach': 'Коуч',
+  'activity.mentor': 'Наставник',
+  'activity.trainer': 'Тренер',
+
+  // ── Настройки: напоминания (lead-time + тумблеры) ────────────────────────
+  'settings.reminderLead': 'Напоминать заранее',
+  'lead.10': 'За 10 минут',
+  'lead.20': 'За 20 минут',
+  'lead.60': 'За 1 час',
+  'lead.1440': 'За 1 день',
+  'settings.notifLessons': 'Напоминания о занятиях',
+  'settings.notifLessons_client': 'Напоминания о встречах',
+  'settings.notifPayment': 'Оплаты и долги',
+  'settings.notifSchedule': 'Изменения расписания',
+  'settings.notifSummary': 'Дневная сводка',
+
+  // ── Настройки: push-разрешение ───────────────────────────────────────────
+  'settings.push': 'Push-уведомления',
+  'settings.pushRequest': 'Разрешить уведомления',
+  'settings.pushGranted': 'Уведомления разрешены',
+  'settings.pushDenied': 'Уведомления отключены — включите их в настройках браузера',
+
+  // ── Настройки: отложенные секции (заглушки Ф4/Ф5) ────────────────────────
+  'settings.account': 'Аккаунт и безопасность',
+  'settings.backup': 'Резервная копия',
+  'settings.support': 'Помощь и поддержка',
+  'settings.soon': 'Скоро',
 } as const;
 
 export type Mode = 'tutor' | 'client';

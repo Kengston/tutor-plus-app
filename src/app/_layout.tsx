@@ -10,6 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { seedIfEmpty } from '@/db/seed';
 import { DualModeProvider, useT } from '@/i18n';
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { ProfileGate, ReminderSync } from '@/lib/profile';
 import { ThemeProvider as TutorThemeProvider, useTheme, useThemeMode } from '@/theme';
 
 export default function RootLayout() {
@@ -21,13 +22,17 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <TutorThemeProvider>
-          <DualModeProvider>
-            <AuthProvider>
-              <NavigationRoot />
-            </AuthProvider>
-          </DualModeProvider>
-        </TutorThemeProvider>
+        <ProfileGate>
+          {(initial) => (
+            <TutorThemeProvider initial={initial.theme}>
+              <DualModeProvider initial={initial.clientType}>
+                <AuthProvider>
+                  <NavigationRoot />
+                </AuthProvider>
+              </DualModeProvider>
+            </TutorThemeProvider>
+          )}
+        </ProfileGate>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
@@ -79,6 +84,7 @@ function NavigationRoot() {
   return (
     <ThemeProvider value={navTheme}>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+      <ReminderSync />
       <WebFrame bg={colors.bg}>
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
           <Stack.Screen name="(auth)" />
@@ -86,6 +92,8 @@ function NavigationRoot() {
           <Stack.Screen name="student" />
           <Stack.Screen name="lesson" />
           <Stack.Screen name="finance" />
+          <Stack.Screen name="notifications" />
+          <Stack.Screen name="settings" />
           <Stack.Screen name="gallery" options={{ presentation: 'modal', headerShown: true, title: t('a11y.uiKit') }} />
           <Stack.Screen name="+not-found" />
         </Stack>

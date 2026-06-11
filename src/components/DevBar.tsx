@@ -7,11 +7,11 @@ import { useTheme, useThemeMode } from '@/theme';
 import { Icon, type IconName } from '@/ui';
 
 /**
- * Phase-0 scaffold header: large title + DEV toggles for theme and dual-mode,
- * satisfying the Phase-0 DoD ("5 tabs with themes and a dual-mode switcher").
- * Replaced by the real RootHeader / settings flow in later phases.
+ * Dev-only utility strip (`__DEV__`): quick theme + dual-mode toggles, UI-kit, sign-out.
+ * The real header (title + bell + avatar) is `AppHeader`; persisted theme/mode controls live
+ * in the Settings screen (ADR-0013). Kept for dev ergonomics only — not shipped in production.
  */
-export function DevBar({ title }: { title: string }) {
+export function DevBar() {
   const { colors } = useTheme();
   const { mode: themeMode, cycle } = useThemeMode();
   const { clientType, toggle } = useMode();
@@ -59,7 +59,6 @@ export function DevBar({ title }: { title: string }) {
           <Icon name="back" size={18} sw={1.8} stroke={colors.stone700} />
         </Pressable>
       </View>
-      <Text style={[styles.title, { color: colors.heading }]}>{title}</Text>
     </View>
   );
 }
