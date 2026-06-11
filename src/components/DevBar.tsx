@@ -69,5 +69,4 @@ const styles = StyleSheet.create({
   pill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
   pillText: { fontSize: 12.5, fontWeight: '600' },
   iconBtn: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  title: { marginTop: 6, fontSize: 30, fontWeight: '600', letterSpacing: -0.6 },
 });

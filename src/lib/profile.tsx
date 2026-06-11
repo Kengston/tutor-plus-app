@@ -74,7 +74,6 @@ export function ProfileGate({ children }: { children: (initial: InitialProfile) 
         if (alive) setInitial({ theme: p.theme, clientType: p.clientType });
       })
       .catch((e) => {
-        // eslint-disable-next-line no-console
         console.error('[profile] ensure failed', e);
         if (alive) setInitial({ theme: 'system', clientType: 'Ученик' });
       });
@@ -113,7 +112,9 @@ export function ReminderSync() {
         body: name ? `${name} · ${hhmm(p.lessonAt)}` : hhmm(p.lessonAt),
       };
     });
-    void scheduler.sync(reminders);
+    void scheduler.sync(reminders).catch((e) => {
+      console.error('[reminders] sync failed', e);
+    });
   }, [lessons, students, profile, t]);
 
   return null;

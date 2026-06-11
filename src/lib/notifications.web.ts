@@ -22,7 +22,6 @@ export const scheduler: NotificationScheduler = {
       return false;
     }
   },
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async sync(_reminders: readonly LocalReminder[]) {
     // no-op on web — OS-level scheduling is native-only (ADR-0013).
   },

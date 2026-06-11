@@ -123,6 +123,9 @@ export const messages = {
   'unit.hours.one': 'час',
   'unit.hours.few': 'часа',
   'unit.hours.many': 'часов',
+  'unit.days.one': 'день',
+  'unit.days.few': 'дня',
+  'unit.days.many': 'дней',
   'unit.directions.one': 'направление',
   'unit.directions.few': 'направления',
   'unit.directions.many': 'направлений',
@@ -422,6 +425,7 @@ export const messages = {
   'a11y.notifications': 'Уведомления',
   'a11y.profile': 'Профиль и настройки',
   'a11y.markRead': 'Отметить прочитанным',
+  'a11y.unread': 'Непрочитано',
 
   // ── Лента: каркас ────────────────────────────────────────────────────────
   'notif.title': 'Уведомления',

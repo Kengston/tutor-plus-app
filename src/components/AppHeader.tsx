@@ -4,6 +4,7 @@
  * count is derived live from the same feed builder the list uses (`domain/notifications`).
  */
 import { useRouter } from 'expo-router';
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -14,10 +15,10 @@ import {
   useStudents,
 } from '@/db/hooks';
 import { buildFeed, unreadCount } from '@/domain/notifications';
+import { useNow } from '@/hooks/use-now';
 import { useT } from '@/i18n';
 import { initialsOf } from '@/lib/format';
 import { DEFAULT_REMINDER_PREFS, reminderPrefsOf } from '@/lib/profile';
-import { nowMs } from '@/lib/time';
 import { useTheme } from '@/theme';
 import { Icon } from '@/ui';
 
@@ -32,9 +33,16 @@ export function AppHeader({ title }: { title: string }) {
   const profile = useProfile();
   const reads = useNotificationReads();
 
-  const prefs = profile ? reminderPrefsOf(profile) : DEFAULT_REMINDER_PREFS;
-  const unread = unreadCount(
-    buildFeed({ lessons, transactions, students, prefs, reads, now: nowMs() }),
+  // Stable `prefs` ref (profile is a stable model instance between emissions) so the memo below
+  // actually holds; `now` ticks each minute so a freshly-fired reminder lights the bell promptly.
+  const now = useNow();
+  const prefs = useMemo(
+    () => (profile ? reminderPrefsOf(profile) : DEFAULT_REMINDER_PREFS),
+    [profile],
+  );
+  const unread = useMemo(
+    () => unreadCount(buildFeed({ lessons, transactions, students, prefs, reads, now })),
+    [lessons, transactions, students, prefs, reads, now],
   );
   const initials = profile?.name ? initialsOf(profile.name) : '';
 
@@ -43,7 +51,7 @@ export function AppHeader({ title }: { title: string }) {
       <View style={styles.actions}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={t('a11y.notifications')}
+          accessibilityLabel={unread > 0 ? `${t('a11y.notifications')}, ${unread}` : t('a11y.notifications')}
           hitSlop={6}
           onPress={() => router.push('/notifications')}
           style={[styles.iconBtn, { backgroundColor: colors.stoneLight }]}>
