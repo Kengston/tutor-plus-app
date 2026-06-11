@@ -108,3 +108,71 @@ export interface FinanceEntry {
   /** Origin of the row — drives drill-down (open the txn vs open the lesson). */
   source: 'txn' | 'lesson';
 }
+
+// ── Notifications (Phase 3, ADR-0013) ───────────────────────────────────────
+// The feed is a VIEW-MODEL (sibling of `FinanceEntry`), NOT a stored entity. Items are
+// DERIVED from lessons + the append-only ledger by `domain/notifications`; the only
+// persistence is read-state (`notification_reads`): `unread = item.id ∉ that table`.
+
+/** Filter axis (the 4 feed chips + «Все»). */
+export type NotificationCategory = 'lesson' | 'payment' | 'schedule' | 'system';
+
+/** Specific item type — drives icon + title template at render (no inline strings here). */
+export type NotificationKind = 'reminder' | 'payment' | 'debt' | 'cancelled' | 'summary';
+
+/** Time bucket relative to local day bounds. */
+export type NotificationGroup = 'today' | 'yesterday' | 'earlier';
+
+/** Drill-down target (open the lesson card vs the operation detail). */
+export type NotificationRef =
+  | { kind: 'lesson'; id: string }
+  | { kind: 'transaction'; id: string }
+  | { kind: 'none' };
+
+/**
+ * A derived row in the notification feed. Carries STRUCTURED payload (studentName, amount,
+ * …) — the screen composes the localized title via `useT()`, keeping the builder lexicon-free.
+ */
+export interface NotificationItem {
+  /** Stable synthetic id: `reminder:<lessonId>` / `payment:<txnId>` / `debt:<txnId>` / `cancelled:<lessonId>` / `summary:<YYYY-MM-DD>`. */
+  id: string;
+  category: NotificationCategory;
+  kind: NotificationKind;
+  /** Source instant (ms): lesson.startsAt / txn.occurredAt / lesson.updatedAt / day-start. */
+  time: number;
+  group: NotificationGroup;
+  /** Derived from read-state — `id ∉ notification_reads`. */
+  unread: boolean;
+  ref: NotificationRef;
+  // Structured payload for i18n title composition:
+  studentName?: string;
+  studentCategory?: CatColor;
+  /** payment / debt amount (whole RUB). */
+  amount?: number;
+  /** daily-summary lesson count. */
+  count?: number;
+  /** reminder / cancelled — the lesson's startsAt (for «через N» / time subtitle). */
+  lessonAt?: number;
+}
+
+/** Theme choice persisted in the profile (mirrors `theme` `ThemeMode`). */
+export type ThemeChoice = 'system' | 'light' | 'dark';
+
+/**
+ * Reminder/notification preferences (ADR-0013), persisted on the single `profiles` row.
+ * The four toggles map 1:1 to the feed filter categories.
+ */
+export interface ReminderPrefs {
+  /** Lead-time minutes: 10 | 20 | 60 | 1440. */
+  leadMin: number;
+  /** «Занятия» — upcoming-lesson reminders. */
+  lessons: boolean;
+  /** «Оплата» — payment + debt events. */
+  payment: boolean;
+  /** «Расписание» — cancellations / schedule changes. */
+  schedule: boolean;
+  /** «Система» — daily summary. */
+  summary: boolean;
+  /** OS notification permission granted. */
+  pushGranted: boolean;
+}
