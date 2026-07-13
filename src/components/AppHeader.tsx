@@ -22,7 +22,7 @@ import { DEFAULT_REMINDER_PREFS, reminderPrefsOf } from '@/lib/profile';
 import { useTheme } from '@/theme';
 import { Icon } from '@/ui';
 
-export function AppHeader({ title }: { title: string }) {
+export function AppHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   const { colors } = useTheme();
   const t = useT();
   const router = useRouter();
@@ -76,6 +76,11 @@ export function AppHeader({ title }: { title: string }) {
       <Text style={[styles.title, { color: colors.heading }]} numberOfLines={1}>
         {title}
       </Text>
+      {subtitle ? (
+        <Text style={[styles.subtitle, { color: colors.body }]} numberOfLines={1}>
+          {subtitle}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -89,4 +94,6 @@ const styles = StyleSheet.create({
   avatar: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 14, fontWeight: '700', letterSpacing: 0.2 },
   title: { marginTop: 6, fontSize: 30, fontWeight: '600', letterSpacing: -0.6 },
+  // Date line under the greeting (spec 04: «вторник, 26 мая»; prototype RootHeader).
+  subtitle: { marginTop: 3, fontSize: 15, fontWeight: '500' },
 });

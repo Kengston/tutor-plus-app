@@ -38,6 +38,22 @@ export const messages = {
   'today.nearest_client': 'Ближайшая встреча',
   'today.empty': 'На сегодня уроков нет',
   'today.empty_client': 'На сегодня встреч нет',
+  // «Ваш день» card (spec 04, prototype TodayScreen)
+  'today.yourDay': 'Ваш день',
+  'today.conducted': 'проведено',
+  'today.ahead': 'впереди',
+  'today.nextAt': 'следующее в',
+  // Debt badge in «Далее сегодня» rows (spec 04; prototype TLRow «Есть долг»)
+  'today.debtBadge': 'Есть долг',
+
+  // ── Full weekday names (genitive-free, lowercase — «вторник, 26 мая») ────
+  'wdFull.0': 'воскресенье',
+  'wdFull.1': 'понедельник',
+  'wdFull.2': 'вторник',
+  'wdFull.3': 'среда',
+  'wdFull.4': 'четверг',
+  'wdFull.5': 'пятница',
+  'wdFull.6': 'суббота',
 
   // ── Schedule ─────────────────────────────────────────────────────────────
   // Screen header is FIXED «Расписание» in both modes (spec 05 preamble);
@@ -273,11 +289,9 @@ export const messages = {
   'link.openFailed': 'Не удалось открыть ссылку',
 
   // ── Today ────────────────────────────────────────────────────────────────
-  'today.progress': 'Проведено',
   'today.next': 'Далее сегодня',
   'today.nothingNext': 'Больше занятий сегодня нет',
   'today.nothingNext_client': 'Больше встреч сегодня нет',
-  'today.tomorrowPreview': 'Завтра',
   'time.in': 'через',
   'time.now': 'Сейчас',
 

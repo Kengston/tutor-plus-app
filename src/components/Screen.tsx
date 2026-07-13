@@ -9,6 +9,8 @@ import { DevBar } from './DevBar';
 
 export interface ScreenProps {
   title: string;
+  /** Optional line under the title — the Today screen's date («вторник, 26 мая»). */
+  subtitle?: string;
   children?: ReactNode;
   scroll?: boolean;
   /** Pinned overlay over the body (e.g. a <Fab/>) — sits in the FULL-HEIGHT safe area,
@@ -18,11 +20,11 @@ export interface ScreenProps {
 
 /** Themed tab-screen shell: safe-area + real AppHeader (bell+avatar) + body + optional pinned FAB.
  *  The Phase-0 DevBar (theme/mode/dev pills) is kept under `__DEV__` only (ADR-0013). */
-export function Screen({ title, children, scroll = true, floatingAction }: ScreenProps) {
+export function Screen({ title, subtitle, children, scroll = true, floatingAction }: ScreenProps) {
   const { colors } = useTheme();
   return (
     <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
-      <AppHeader title={title} />
+      <AppHeader title={title} subtitle={subtitle} />
       {__DEV__ ? <DevBar /> : null}
       {scroll ? (
         <ScrollView

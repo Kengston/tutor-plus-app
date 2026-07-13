@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -52,6 +52,23 @@ export default function ScheduleScreen() {
   const [selectedDay, setSelectedDay] = useState<number>(() => startOfDay(nowMs()));
   // Month/year picker sheet (spec 05 §5.1: tap on «Май 2026 ⌄»).
   const [pickingMonth, setPickingMonth] = useState(false);
+
+  // Deep-link from «Сегодня» («Все» / tomorrow card): ?view=list&day=<local-midnight ms>.
+  // Applied once per NEW param value (prototype's initKey pattern) via the render-time
+  // state-adjustment idiom (react.dev «storing information from previous renders») so
+  // the user can freely change view/day afterwards without stale params snapping back.
+  const params = useLocalSearchParams<{ view?: string; day?: string }>();
+  const paramsKey = `${params.view ?? ''}|${params.day ?? ''}`;
+  const [appliedKey, setAppliedKey] = useState('|');
+  if (paramsKey !== '|' && paramsKey !== appliedKey) {
+    setAppliedKey(paramsKey);
+    if (params.view === 'list' || params.view === 'calendar') setView(params.view);
+    const day = Number(params.day);
+    if (Number.isFinite(day) && day > 0) {
+      setSelectedDay(day);
+      setMonth(new Date(day));
+    }
+  }
 
   const students = useStudents();
   const txns = useAllTransactions();
