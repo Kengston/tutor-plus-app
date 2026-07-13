@@ -40,9 +40,23 @@ export const messages = {
   'today.empty_client': 'На сегодня встреч нет',
 
   // ── Schedule ─────────────────────────────────────────────────────────────
+  // Screen header is FIXED «Расписание» in both modes (spec 05 preamble);
+  // the mode-pair `schedule.title` is legacy, kept for reference only.
+  'schedule.header': 'Расписание',
   'schedule.title': 'Расписание уроков',
   'schedule.title_client': 'Расписание встреч',
   'schedule.empty': 'Здесь появится расписание',
+  // Day block under the calendar grid (spec 05 preamble: `scheduleDay`).
+  'schedule.day': 'Расписание дня',
+  'schedule.day_client': 'Расписание встреч',
+  // Day summary (spec 05 §5.1; prototype DayGlance)
+  'schedule.conducted': 'проведено',
+  'schedule.nextAt': 'следующее в',
+  'schedule.dayOver': 'день завершён',
+  'schedule.today': 'Сегодня',
+  'schedule.pickMonth': 'Месяц и год',
+  'schedule.legend': 'Цвета учеников',
+  'schedule.legend_client': 'Цвета клиентов',
 
   // ── Students / Clients ───────────────────────────────────────────────────
   'students.title': 'Ученики',
@@ -315,6 +329,8 @@ export const messages = {
   'a11y.close': 'Закрыть',
   'a11y.prevMonth': 'Предыдущий месяц',
   'a11y.nextMonth': 'Следующий месяц',
+  'a11y.prevYear': 'Предыдущий год',
+  'a11y.nextYear': 'Следующий год',
   'a11y.signOut': 'Выйти из аккаунта',
   'a11y.themeMode': 'Тема оформления',
   'a11y.clientMode': 'Режим (ученик/клиент)',

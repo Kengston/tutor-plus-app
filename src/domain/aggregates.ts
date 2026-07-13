@@ -73,6 +73,31 @@ export function doneOfTotal(
   return { done, total: lessons.length };
 }
 
+/**
+ * Selected-day summary under the calendar grid (UI-v2 S4, spec 05 §5.1; prototype
+ * `DayGlance`): «Сегодня · N уроков» + «K проведено · следующее в HH:MM». Cancelled
+ * lessons are excluded entirely; `nextAt` is the earliest still-active (upcoming/
+ * ongoing) lesson's instant, `null` when the day is over (prototype: «день завершён»).
+ */
+export function daySummary(
+  lessons: readonly Pick<LessonSlice, 'lifecycleStatus' | 'startsAt'>[],
+): { total: number; done: number; nextAt: number | null } {
+  let total = 0;
+  let done = 0;
+  let nextAt: number | null = null;
+  for (const l of lessons) {
+    if (l.lifecycleStatus === 'cancelled') continue;
+    total += 1;
+    if (l.lifecycleStatus === 'done') {
+      done += 1;
+    } else if (nextAt === null || l.startsAt < nextAt) {
+      // upcoming/ongoing — candidate for «следующее в HH:MM»
+      nextAt = l.startsAt;
+    }
+  }
+  return { total, done, nextAt };
+}
+
 // ── Debt (Phase-2 netting, ADR-0011) ─────────────────────────────────────────
 
 type DebtTxnSlice = Pick<TxnSlice, 'type' | 'amount' | 'lessonId'>;
