@@ -6,12 +6,14 @@ import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { plural, useT } from '@/i18n';
 import { daySummary, payStatusOf } from '@/domain/aggregates';
+import { daySegments, isBookableGap } from '@/domain/day-timeline';
 import type { PayStatus } from '@/domain/types';
 import { useAllTransactions, useLessonsInRange, useStudents } from '@/db/hooks';
 import type { LessonModel, StudentModel } from '@/db/models';
+import { formatRub } from '@/lib/format';
 import { dayBounds, hhmm, nowMs } from '@/lib/time';
 import { catColors, useTheme, type CatColor } from '@/theme';
-import { Card, Dot, Fab, Icon, SectionLabel, Segmented, Sheet, type DotTone } from '@/ui';
+import { Card, CatAvatar, Chip, Dot, Fab, Icon, SectionLabel, Segmented, Sheet, type DotTone } from '@/ui';
 import type { StringKey } from '@/i18n';
 
 type ViewKind = 'calendar' | 'list';
@@ -45,6 +47,7 @@ export default function ScheduleScreen() {
   const { colors } = useTheme();
   const router = useRouter();
 
+  const now = nowMs();
   const [view, setView] = useState<ViewKind>('calendar');
   // Month being viewed (any instant within it); only y/m matter.
   const [month, setMonth] = useState<Date>(() => new Date(nowMs()));
@@ -277,16 +280,32 @@ export default function ScheduleScreen() {
           />
         </>
       ) : (
-        <ListView
-          lessons={dayLessons}
-          studentsById={studentsById}
-          txns={txns}
-          dayLabel={`${new Date(selectedDay).getDate()} ${t(`monthGen.${new Date(selectedDay).getMonth()}` as StringKey)}`}
-          onOpen={openLesson}
-          emptyText={t('schedule.dayEmpty')}
-          formatLabel={(online) => t(online ? 'format.online' : 'format.inperson')}
-          payLabel={(p) => t(payKey(p))}
-        />
+        <View style={styles.listWrap}>
+          <View style={styles.dayHeading}>
+            <Text style={[styles.dayHeadingText, { color: colors.heading }]}>
+              {`${new Date(selectedDay).getDate()} ${t(`monthGen.${new Date(selectedDay).getMonth()}` as StringKey)}`}
+            </Text>
+            {visibleDayLessons.length > 0 ? (
+              <Text style={[styles.dayCount, { color: colors.muted }]}>
+                {visibleDayLessons.length}{' '}
+                {plural(visibleDayLessons.length, {
+                  one: t('unit.lessons.one'),
+                  few: t('unit.lessons.few'),
+                  many: t('unit.lessons.many'),
+                })}
+              </Text>
+            ) : null}
+          </View>
+          <DayTimeline
+            lessons={visibleDayLessons}
+            studentsById={studentsById}
+            txns={txns}
+            now={now}
+            isToday={selectedDay === todayStart}
+            onOpen={openLesson}
+            onNewAt={(startsAt) => router.push({ pathname: '/lesson/new', params: { at: String(startsAt) } })}
+          />
+        </View>
       )}
 
       {pickingMonth ? (
@@ -502,29 +521,188 @@ function DayFeed({ lessons, studentsById, txns, onOpen, emptyText, formatLabel, 
   );
 }
 
-function ListView({
-  dayLabel,
-  ...feed
-}: DayFeedProps & { dayLabel: string }) {
+// ── Day timeline (Список tab, spec 05 §5.2; prototype DayTimeline) ───────────
+
+interface DayTimelineProps {
+  lessons: LessonModel[];
+  studentsById: Map<string, StudentModel>;
+  txns: { type: PayStatus; lessonId: string | null }[];
+  now: number;
+  isToday: boolean;
+  onOpen: (id: string) => void;
+  /** Create a lesson prefilled at this instant (tap on a ≥60-min free window). */
+  onNewAt: (startsAt: number) => void;
+}
+
+/** Whether a lesson's window contains `now` (drives the «Сейчас» state on today). */
+function isNowLesson(l: LessonModel, now: number): boolean {
+  return (
+    l.lifecycleStatus !== 'done' &&
+    l.lifecycleStatus !== 'cancelled' &&
+    l.startsAt <= now &&
+    now < l.startsAt + l.durationMin * 60_000
+  );
+}
+
+/** The «Список» timeline: left time column + lesson cards + free-window gaps. */
+function DayTimeline({ lessons, studentsById, txns, now, isToday, onOpen, onNewAt }: DayTimelineProps) {
   const t = useT();
   const { colors } = useTheme();
 
+  if (lessons.length === 0) {
+    return (
+      <Card style={styles.freeDay}>
+        <View style={[styles.freeDayIcon, { backgroundColor: colors.stoneLight }]}>
+          <Icon name="calendar" size={19} sw={1.7} stroke={colors.stoneInactive} />
+        </View>
+        <View style={styles.freeDayBody}>
+          <Text style={[styles.freeDayTitle, { color: colors.heading }]}>{t('schedule.freeDay')}</Text>
+          <Text style={[styles.freeDayHint, { color: colors.muted }]}>{t('schedule.freeDayHint')}</Text>
+        </View>
+      </Card>
+    );
+  }
+
+  const segs = daySegments(lessons);
+  // Bookmark «сейчас» before the first still-active lesson (today only).
+  const nowSegIdx = isToday
+    ? segs.findIndex((s) => s.type === 'lesson' && s.lesson.lifecycleStatus !== 'done')
+    : -1;
+
   return (
-    <View style={styles.listWrap}>
-      <View style={styles.dayHeading}>
-        <Text style={[styles.dayHeadingText, { color: colors.heading }]}>{dayLabel}</Text>
-        {feed.lessons.length > 0 && (
-          <Text style={[styles.dayCount, { color: colors.muted }]}>
-            {feed.lessons.length}{' '}
-            {plural(feed.lessons.length, {
-              one: t('unit.lessons.one'),
-              few: t('unit.lessons.few'),
-              many: t('unit.lessons.many'),
-            })}
+    <View>
+      {segs.map((seg, i) => (
+        <View key={seg.type === 'lesson' ? seg.lesson.id : `gap-${seg.start}`}>
+          {i === nowSegIdx ? <NowBookmark label={t('schedule.now')} /> : null}
+          <View style={styles.tlRow}>
+            <Text style={[styles.tlTime, { color: seg.type === 'lesson' ? colors.stone700 : colors.stoneInactive }]}>
+              {hhmm(seg.type === 'lesson' ? seg.lesson.startsAt : seg.start)}
+            </Text>
+            {seg.type === 'lesson' ? (
+              <TimelineLesson
+                lesson={seg.lesson}
+                student={studentsById.get(seg.lesson.studentId)}
+                pay={payStatusOf(seg.lesson.id, txns)}
+                isNow={isNowLesson(seg.lesson, now)}
+                onPress={() => onOpen(seg.lesson.id)}
+              />
+            ) : (
+              <TimelineGap seg={seg} onNew={isBookableGap(seg) ? () => onNewAt(seg.start) : undefined} />
+            )}
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/** «сейчас» marker line before the current/next lesson. */
+function NowBookmark({ label }: { label: string }) {
+  const { colors } = useTheme();
+  return (
+    <View style={styles.nowRow}>
+      <Text style={[styles.nowLabel, { color: colors.terracotta }]}>{label}</Text>
+      <View style={[styles.nowDot, { backgroundColor: colors.terracotta }]} />
+      <View style={[styles.nowLine, { backgroundColor: colors.terracotta }]} />
+    </View>
+  );
+}
+
+/** One lesson card in the timeline — strip colour + status per pay/lifecycle. */
+function TimelineLesson({
+  lesson,
+  student,
+  pay,
+  isNow,
+  onPress,
+}: {
+  lesson: LessonModel;
+  student: StudentModel | undefined;
+  pay: PayStatus;
+  isNow: boolean;
+  onPress: () => void;
+}) {
+  const t = useT();
+  const { colors, radius } = useTheme();
+  const cat: CatColor = student?.category ?? 'slate';
+  const isDone = lesson.lifecycleStatus === 'done';
+  const isDebt = pay === 'debt';
+  // Strip + card tint (prototype TimelineLesson): now → accent, debt → danger, else cat.
+  const strip = isNow ? colors.accent : isDebt ? colors.danger : catColors[cat].accent;
+  const bg = isNow ? colors.primaryVlight : isDebt ? colors.dangerLight : colors.surface;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.tlCard,
+        { backgroundColor: bg, borderColor: colors.hairline, borderLeftColor: strip, borderRadius: radius.row, opacity: isDone && !pressed ? 0.9 : 1 },
+        pressed && styles.pressed,
+      ]}>
+      <CatAvatar initials={student?.initials ?? '—'} cat={cat} size={38} />
+      <View style={styles.tlBody}>
+        <View style={styles.tlNameRow}>
+          <Text numberOfLines={1} style={[styles.name, { color: colors.heading }]}>
+            {student?.name ?? t('common.none')}
           </Text>
-        )}
+          {isDebt ? (
+            <Chip tone="danger">{`${t('schedule.debtAmount')} ${formatRub(lesson.price)}`}</Chip>
+          ) : isNow ? (
+            <Chip tone="primary">{t('schedule.now')}</Chip>
+          ) : isDone ? (
+            <Chip tone="neutral">{t('status.conducted')}</Chip>
+          ) : (
+            <Dot tone={pay === 'paid' ? 'green' : 'amber'} />
+          )}
+        </View>
+        {lesson.topic ? (
+          <Text numberOfLines={1} style={[styles.topic, { color: colors.body }]}>
+            {lesson.topic}
+          </Text>
+        ) : null}
+        <View style={styles.tlMeta}>
+          <Icon name={lesson.format === 'online' ? 'video' : 'pin'} size={12} sw={1.8} stroke={colors.muted} />
+          <Text style={[styles.tlMetaText, { color: colors.muted }]}>
+            {t(lesson.format === 'online' ? 'format.online' : 'format.inperson')}
+          </Text>
+          <View style={[styles.tlMetaDot, { backgroundColor: colors.label3 }]} />
+          <Text style={[styles.tlMetaText, { color: colors.muted }]}>
+            {lesson.durationMin} {t('common.min')}
+          </Text>
+        </View>
       </View>
-      <DayFeed {...feed} />
+    </Pressable>
+  );
+}
+
+/** A free window between lessons — bookable (≥60 min, dashed CTA) or a thin divider. */
+function TimelineGap({ seg, onNew }: { seg: { mins: number }; onNew?: () => void }) {
+  const t = useT();
+  const { colors, radius } = useTheme();
+  const label = `${durLabel(seg.mins, t)} ${t('schedule.freeWindow')}`;
+
+  if (onNew) {
+    return (
+      <Pressable
+        onPress={onNew}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        style={({ pressed }) => [
+          styles.gapBookable,
+          { borderColor: colors.stoneInactive, borderRadius: radius.row },
+          pressed && styles.pressed,
+        ]}>
+        <View style={[styles.gapPlus, { backgroundColor: colors.surface, borderColor: colors.stoneInactive }]}>
+          <Icon name="plus" size={17} sw={2} stroke={colors.primaryDeep} />
+        </View>
+        <Text style={[styles.gapLabel, { color: colors.muted }]}>{label}</Text>
+      </Pressable>
+    );
+  }
+  return (
+    <View style={styles.gapThin}>
+      <Text style={[styles.gapThinText, { color: colors.stoneInactive }]}>{label}</Text>
+      <View style={[styles.gapThinLine, { backgroundColor: colors.hairline }]} />
     </View>
   );
 }
@@ -533,6 +711,15 @@ function ListView({
 
 function payKey(p: PayStatus): StringKey {
   return p === 'paid' ? 'pay.paid' : p === 'debt' ? 'pay.debt' : 'pay.expected';
+}
+
+/** «1 ч 30 мин» / «1 ч» / «30 мин» from minutes (prototype durLabel; units via i18n). */
+function durLabel(min: number, t: ReturnType<typeof useT>): string {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  if (h && m) return `${h} ${t('common.hour')} ${m} ${t('common.min')}`;
+  if (h) return `${h} ${t('common.hour')}`;
+  return `${m} ${t('common.min')}`;
 }
 
 const styles = StyleSheet.create({
@@ -593,8 +780,68 @@ const styles = StyleSheet.create({
   timeText: { fontSize: 16, fontWeight: '600', fontVariant: ['tabular-nums'] },
   formatText: { fontSize: 11.5, fontWeight: '500', marginTop: 2 },
   rowBody: { flex: 1 },
-  name: { fontSize: 15, fontWeight: '600' },
+  name: { fontSize: 15, fontWeight: '600', flexShrink: 1 },
   topic: { fontSize: 13, marginTop: 2 },
   rowPay: { alignItems: 'center', gap: 4, width: 64 },
   payText: { fontSize: 11, fontWeight: '500' },
+
+  // day timeline (Список tab, spec 05 §5.2)
+  tlRow: { flexDirection: 'row', gap: 10 },
+  tlTime: { width: 42, textAlign: 'right', fontSize: 12.5, fontWeight: '500', fontVariant: ['tabular-nums'] },
+  tlCard: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    marginBottom: 10,
+    padding: 11,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderLeftWidth: 3,
+  },
+  tlBody: { flex: 1, minWidth: 0 },
+  tlNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  tlMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
+  tlMetaText: { fontSize: 12, fontWeight: '500', fontVariant: ['tabular-nums'] },
+  tlMetaDot: { width: 3, height: 3, borderRadius: 1.5 },
+
+  // «сейчас» bookmark
+  nowRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8, paddingTop: 2 },
+  nowLabel: { width: 42, textAlign: 'right', fontSize: 10, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
+  nowDot: { width: 8, height: 8, borderRadius: 4 },
+  nowLine: { flex: 1, height: 2, borderRadius: 2, opacity: 0.5 },
+
+  // free window
+  gapBookable: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    marginBottom: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 13,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+  },
+  gapPlus: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gapLabel: { flex: 1, fontSize: 13, fontWeight: '500' },
+  gapThin: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10, paddingVertical: 7 },
+  gapThinText: { fontSize: 12.5, fontWeight: '500' },
+  gapThinLine: { flex: 1, height: StyleSheet.hairlineWidth },
+
+  // free day
+  freeDay: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 },
+  freeDayIcon: { width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  freeDayBody: { flex: 1, minWidth: 0 },
+  freeDayTitle: { fontSize: 14.5, fontWeight: '600' },
+  freeDayHint: { fontSize: 12.5, fontWeight: '500', marginTop: 2 },
 });

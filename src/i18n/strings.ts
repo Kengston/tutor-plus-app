@@ -169,6 +169,7 @@ export const messages = {
   'common.none': '—',
   'common.tomorrow': 'Завтра',
   'common.min': 'мин',
+  'common.hour': 'ч',
   'common.online': 'Онлайн',
   'common.inperson': 'Очно',
 
@@ -284,6 +285,7 @@ export const messages = {
   'lesson.join': 'Подключиться',
   'lesson.openMeeting': 'Открыть встречу',
   'lesson.linkField': 'Ссылка на подключение',
+  'lesson.payStatus': 'Статус оплаты',
   'field.link': 'Ссылка',
   'link.fallback': 'ссылка',
   'link.openFailed': 'Не удалось открыть ссылку',
@@ -301,6 +303,15 @@ export const messages = {
   'schedule.free': 'Свободно',
   'schedule.dayEmpty': 'Нет занятий',
   'schedule.dayEmpty_client': 'Нет встреч',
+  // Day timeline (spec 05 §5.2; prototype DayTimeline)
+  'schedule.now': 'Сейчас',
+  'schedule.freeWindow': 'свободно', // «1 ч 30 мин свободно»
+  'schedule.freeDay': 'свободный день',
+  'schedule.freeDayHint': 'Можно добавить новый урок.',
+  'schedule.freeDayHint_client': 'Можно добавить новую встречу.',
+  'schedule.debtAmount': 'Долг', // «Долг 1 500 ₽»
+  'status.conducted': 'Проведено',
+  'status.conducted_client': 'Проведена',
 
   // ── Weekday short (Mon=1..Sun=0) ─────────────────────────────────────────
   'wd.1': 'Пн',
