@@ -5,8 +5,11 @@
  * v2 (ADR-0013, Phase 3): add `profiles` (single-row prefs) + `notification_reads`
  * (derived-feed read-state). Existing Phase-1/2 data (students/lessons/transactions)
  * survives — the seed back-fills the single `profiles` row on next launch.
+ *
+ * v3 (UI-v2 S1, undo): add `transactions.reverses_id` — compensating-row link
+ * (`domain/undo`). Existing rows get `null` (= a normal, non-reversal record).
  */
-import { schemaMigrations, createTable } from '@nozbe/watermelondb/Schema/migrations';
+import { schemaMigrations, createTable, addColumns } from '@nozbe/watermelondb/Schema/migrations';
 
 export const migrations = schemaMigrations({
   migrations: [
@@ -37,6 +40,15 @@ export const migrations = schemaMigrations({
             { name: 'item_id', type: 'string', isIndexed: true },
             { name: 'read_at', type: 'number' },
           ],
+        }),
+      ],
+    },
+    {
+      toVersion: 3,
+      steps: [
+        addColumns({
+          table: 'transactions',
+          columns: [{ name: 'reverses_id', type: 'string', isOptional: true, isIndexed: true }],
         }),
       ],
     },

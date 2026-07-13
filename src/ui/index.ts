@@ -16,3 +16,4 @@ export * from './MultiBarChart';
 export * from './CountUp';
 export * from './SwipeRow';
 export * from './Sheet';
+export * from './Snackbar';

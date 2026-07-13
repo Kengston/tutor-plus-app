@@ -3,12 +3,15 @@ import { useMemo, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { DateTimePickerSheet } from '@/components/DateTimePickerSheet';
+import { QuickActionsSheet } from '@/components/QuickActionsSheet';
 import { Screen } from '@/components/Screen';
 import { payStatusOf, doneOfTotal } from '@/domain/aggregates';
+import { lifecycleSnapshot } from '@/domain/undo';
 import type { LessonModel, StudentModel } from '@/db/models';
 import { useAllTransactions, useLessonsInRange, useStudents } from '@/db/hooks';
-import { cancelLesson, markLessonConducted, rescheduleLesson } from '@/db/mutations';
+import { cancelLesson, markLessonConducted, rescheduleLesson, restoreLessonLifecycle } from '@/db/mutations';
 import { plural, useT } from '@/i18n';
+import { useSnack } from '@/lib/snack';
 import { dayBounds, dayBoundsOffset, fracOfDay, hhmm, minutesUntil, nowMs } from '@/lib/time';
 import { catColors, useTheme } from '@/theme';
 import {
@@ -57,9 +60,33 @@ export default function TodayScreen() {
   const students = useStudents();
 
   const now = nowMs();
+  const snack = useSnack();
 
   // Reschedule target — the lesson whose date/time the picker sheet is editing.
   const [reschedulingLesson, setReschedulingLesson] = useState<LessonModel | null>(null);
+  // FAB opens the quick-actions sheet (spec 04-today) instead of the lesson form directly.
+  const [quickOpen, setQuickOpen] = useState(false);
+
+  // «Готово»/«Отменить» + undo snack: capture the lifecycle snapshot BEFORE the
+  // mutation; «Вернуть» restores it (reverse mutation, domain/undo).
+  const conductWithUndo = (l: LessonModel) => {
+    const snap = lifecycleSnapshot(l);
+    void markLessonConducted(l).then(() => {
+      snack.show(t('snack.lessonDone'), {
+        actionLabel: t('action.undo'),
+        onAction: () => void restoreLessonLifecycle(l, snap),
+      });
+    });
+  };
+  const cancelWithUndo = (l: LessonModel) => {
+    const snap = lifecycleSnapshot(l);
+    void cancelLesson(l).then(() => {
+      snack.show(t('snack.lessonCancelled'), {
+        actionLabel: t('action.undo'),
+        onAction: () => void restoreLessonLifecycle(l, snap),
+      });
+    });
+  };
 
   const studentsById = useMemo(() => {
     const m = new Map<string, StudentModel>();
@@ -91,7 +118,7 @@ export default function TodayScreen() {
   return (
     <Screen
       title={t('today.greeting')}
-      floatingAction={<Fab onPress={() => router.push('/lesson/new')} />}>
+      floatingAction={<Fab onPress={() => setQuickOpen(true)} />}>
       {/* Progress ring + day timeline */}
       <Card style={styles.hero}>
         <View style={styles.ringWrap}>
@@ -130,9 +157,7 @@ export default function TodayScreen() {
                       label: t('action.conduct'),
                       color: colors.paid,
                       icon: 'check',
-                      onPress: () => {
-                        void markLessonConducted(l);
-                      },
+                      onPress: () => conductWithUndo(l),
                     },
                   ]}
                   rightActions={[
@@ -148,9 +173,7 @@ export default function TodayScreen() {
                       label: t('action.cancel'),
                       color: colors.danger,
                       icon: 'close',
-                      onPress: () => {
-                        void cancelLesson(l);
-                      },
+                      onPress: () => cancelWithUndo(l),
                     },
                   ]}>
                   <Pressable
@@ -190,6 +213,8 @@ export default function TodayScreen() {
           if (reschedulingLesson) void rescheduleLesson(reschedulingLesson, ms);
         }}
       />
+
+      {quickOpen ? <QuickActionsSheet onClose={() => setQuickOpen(false)} /> : null}
     </Screen>
   );
 }

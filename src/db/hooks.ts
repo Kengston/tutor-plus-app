@@ -10,6 +10,8 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { Q } from '@nozbe/watermelondb';
 
+import { withoutReversals } from '@/domain/undo';
+
 import { database } from '.';
 import {
   LessonModel,
@@ -76,14 +78,22 @@ export function useLessonsInRange(start: number, end: number): LessonModel[] {
   );
 }
 
+/** Wrap a txn-list observable so subscribers see the EFFECTIVE ledger — reversal pairs
+ *  (undo, `domain/undo`) dropped in one place; aggregates/screens stay reversal-blind. */
+function effective(obs: Observableish<TransactionModel[]>): Observableish<TransactionModel[]> {
+  return { subscribe: (next) => obs.subscribe((rows) => next(withoutReversals(rows))) };
+}
+
 /** Whole ledger (reactive) — cross-student debt + Finance/Analytics aggregates. Append-only,
  *  so inserts (new payments/debts) re-emit; observed columns cover the netting/entry fields. */
 export function useAllTransactions(): TransactionModel[] {
   return useObservable(
     () =>
-      txnsC()
-        .query(Q.sortBy('occurred_at', Q.desc))
-        .observeWithColumns(['type', 'amount', 'student_id', 'lesson_id', 'subject_id', 'occurred_at', 'method']),
+      effective(
+        txnsC()
+          .query(Q.sortBy('occurred_at', Q.desc))
+          .observeWithColumns(['type', 'amount', 'student_id', 'lesson_id', 'subject_id', 'occurred_at', 'method']),
+      ),
     [],
     [],
   );
@@ -99,7 +109,9 @@ export function useAllLessons(): LessonModel[] {
   );
 }
 
-/** A single transaction (reactive); undefined until loaded — for the Finance operation detail. */
+/** A single transaction (reactive); undefined until loaded — for the Finance operation detail.
+ *  Intentionally NOT reversal-filtered: list rows come from `useAllTransactions` (effective),
+ *  so no in-app path leads to a reversal's detail — a by-id read needs no pair lookup. */
 export function useTransaction(id: string): TransactionModel | undefined {
   return useObservable<TransactionModel | undefined>(() => txnsC().findAndObserve(id), [id], undefined);
 }
@@ -107,7 +119,10 @@ export function useTransaction(id: string): TransactionModel | undefined {
 /** One student's transactions (reactive). */
 export function useStudentTransactions(studentId: string): TransactionModel[] {
   return useObservable(
-    () => txnsC().query(Q.where('student_id', studentId)).observeWithColumns(['type', 'amount', 'lesson_id']),
+    () =>
+      effective(
+        txnsC().query(Q.where('student_id', studentId)).observeWithColumns(['type', 'amount', 'lesson_id']),
+      ),
     [studentId],
     [],
   );
@@ -145,7 +160,10 @@ export function useLesson(id: string): LessonModel | undefined {
 /** Transactions linked to one lesson (reactive) — for its derived payStatus. */
 export function useLessonTransactions(lessonId: string): TransactionModel[] {
   return useObservable(
-    () => txnsC().query(Q.where('lesson_id', lessonId)).observeWithColumns(['type', 'lesson_id']),
+    () =>
+      effective(
+        txnsC().query(Q.where('lesson_id', lessonId)).observeWithColumns(['type', 'lesson_id']),
+      ),
     [lessonId],
     [],
   );

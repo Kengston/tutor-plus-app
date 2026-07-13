@@ -52,7 +52,7 @@ export interface Theme {
   colors: ColorTokens;
   radius: { card: number; sheet: number; control: number; pill: number; field: number; row: number; group: number };
   /** Cross-platform boxShadow string (RN 0.85+ supports `boxShadow`). */
-  shadow: { card: string; fab: string; sheet: string; control: string; marker: string; barGlow: string; pill: string };
+  shadow: { card: string; fab: string; sheet: string; control: string; marker: string; barGlow: string; pill: string; snack: string };
 }
 
 export const lightColors: ColorTokens = {
@@ -140,6 +140,7 @@ export const lightTheme: Theme = {
     marker: '0 1px 4px rgba(0,0,0,0.25)',
     barGlow: '0px 4px 12px -4px rgba(232,180,60,0.6)',
     pill: '0px 1px 3px rgba(0,0,0,0.12)',
+    snack: '0px 16px 34px -14px rgba(0,0,0,0.5)',
   },
 };
 
@@ -155,6 +156,7 @@ export const darkTheme: Theme = {
     marker: '0 1px 4px rgba(0,0,0,0.25)',
     barGlow: '0px 4px 12px -4px rgba(232,180,60,0.6)',
     pill: '0px 1px 3px rgba(0,0,0,0.12)',
+    snack: '0px 16px 34px -14px rgba(0,0,0,0.5)',
   },
 };
 

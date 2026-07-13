@@ -9,11 +9,15 @@
  * theme/dual-mode TODO; reminder settings live here) and `+notification_reads` (the ONLY
  * persistence the DERIVED notification feed needs — `unread = itemId ∉ this table`). The feed
  * itself is a view-model (`domain/notifications`), never a stored `notifications` table.
+ *
+ * v3 (UI-v2 S1, undo): `transactions.reverses_id` — a compensating row's link to the txn
+ * it reverses (`domain/undo`). Undo never edits/deletes ledger rows (ADR-0002); the pair
+ * is filtered out of derived values at the data boundary.
  */
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export const schema = appSchema({
-  version: 2,
+  version: 3,
   tables: [
     tableSchema({
       name: 'students',
@@ -66,6 +70,7 @@ export const schema = appSchema({
         { name: 'subject_id', type: 'string', isOptional: true },
         { name: 'occurred_at', type: 'number', isIndexed: true },
         { name: 'comment', type: 'string', isOptional: true },
+        { name: 'reverses_id', type: 'string', isOptional: true, isIndexed: true },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
       ],

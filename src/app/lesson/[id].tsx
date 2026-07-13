@@ -6,10 +6,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { DateTimePickerSheet } from '@/components/DateTimePickerSheet';
 import { EmptyState } from '@/components/EmptyState';
 import { useLesson, useLessonTransactions, useStudent } from '@/db/hooks';
-import { cancelLesson, markLessonConducted, recordLessonPayment, rescheduleLesson } from '@/db/mutations';
+import {
+  cancelLesson,
+  markLessonConducted,
+  recordLessonPayment,
+  rescheduleLesson,
+  restoreLessonLifecycle,
+  reverseTransaction,
+} from '@/db/mutations';
 import { payStatusOf } from '@/domain/aggregates';
-import { type PayStatus } from '@/domain/types';
+import { type PayStatus, type TxnType } from '@/domain/types';
+import { lifecycleSnapshot } from '@/domain/undo';
 import { useT } from '@/i18n';
+import { useSnack } from '@/lib/snack';
 import { formatRub } from '@/lib/format';
 import { hhmm } from '@/lib/time';
 import { useTheme } from '@/theme';
@@ -41,8 +50,43 @@ export default function LessonCardScreen() {
 
   const [rescheduling, setRescheduling] = useState(false);
   const [payingOpen, setPayingOpen] = useState(false);
+  const snack = useSnack();
 
   const conducted = lesson?.lifecycleStatus === 'done';
+
+  // «Готово»/«Отменить» + undo: snapshot BEFORE the mutation, «Вернуть» restores it.
+  const conductWithUndo = () => {
+    if (!lesson) return;
+    const snap = lifecycleSnapshot(lesson);
+    void markLessonConducted(lesson).then(() => {
+      snack.show(t('snack.lessonDone'), {
+        actionLabel: t('action.undo'),
+        onAction: () => void restoreLessonLifecycle(lesson, snap),
+      });
+    });
+  };
+  const cancelWithUndo = () => {
+    if (!lesson) return;
+    const snap = lifecycleSnapshot(lesson);
+    void cancelLesson(lesson).then(() => {
+      snack.show(t('snack.lessonCancelled'), {
+        actionLabel: t('action.undo'),
+        onAction: () => void restoreLessonLifecycle(lesson, snap),
+      });
+    });
+  };
+  // Money undo (ADR-0002): «Отменить» appends the COMPENSATING row — never deletes.
+  const recordPaymentWithUndo = (type: Exclude<TxnType, 'expected'>) => {
+    if (!lesson) return;
+    void recordLessonPayment(lesson, { type }).then((txn) => {
+      snack.show(t('snack.paymentRecorded'), {
+        actionLabel: t('action.cancel'),
+        onAction: () => {
+          void reverseTransaction(txn).then(() => snack.show(t('snack.undone')));
+        },
+      });
+    });
+  };
 
   return (
     <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
@@ -81,7 +125,7 @@ export default function LessonCardScreen() {
           <View style={styles.actions}>
             {conducted ? null : (
               <Pressable
-                onPress={() => markLessonConducted(lesson)}
+                onPress={conductWithUndo}
                 style={({ pressed }) => [
                   styles.action,
                   { backgroundColor: colors.primary, borderRadius: radius.field },
@@ -121,7 +165,7 @@ export default function LessonCardScreen() {
               </Pressable>
 
               <Pressable
-                onPress={() => cancelLesson(lesson)}
+                onPress={cancelWithUndo}
                 style={({ pressed }) => [
                   styles.action,
                   styles.actionGhost,
@@ -147,7 +191,7 @@ export default function LessonCardScreen() {
               <View style={styles.paySheet}>
                 <Pressable
                   onPress={() => {
-                    void recordLessonPayment(lesson, { type: 'paid' });
+                    recordPaymentWithUndo('paid');
                     setPayingOpen(false);
                   }}
                   style={({ pressed }) => [
@@ -160,7 +204,7 @@ export default function LessonCardScreen() {
                 </Pressable>
                 <Pressable
                   onPress={() => {
-                    void recordLessonPayment(lesson, { type: 'debt' });
+                    recordPaymentWithUndo('debt');
                     setPayingOpen(false);
                   }}
                   style={({ pressed }) => [

@@ -7,6 +7,7 @@
 import { Q } from '@nozbe/watermelondb';
 
 import type { Duration, LessonFormat, PayMethod, StudentStatus, TxnType } from '@/domain/types';
+import { reversalOf, type LessonLifecycleSnapshot } from '@/domain/undo';
 import type { Activity, ClientType } from '@/i18n';
 import { initialsOf } from '@/lib/format';
 import type { CatColor, ThemeMode } from '@/theme';
@@ -136,13 +137,14 @@ export async function markLessonConducted(lesson: LessonModel): Promise<void> {
  * Record a payment against a lesson — APPENDS a linked transaction (ADR-0008/0009).
  * Append-only: a correction is a NEW compensating row, never an in-place edit. Debt is
  * always explicit (chosen here), never auto-derived from a conducted-but-unpaid lesson.
+ * Returns the created row so the caller's undo snack can `reverseTransaction` it.
  */
 export async function recordLessonPayment(
   lesson: LessonModel,
   pay: { type: Exclude<TxnType, 'expected'>; method?: PayMethod },
-): Promise<void> {
-  await database.write(async () => {
-    await database.get<TransactionModel>('transactions').create((t) => {
+): Promise<TransactionModel> {
+  return database.write(async () =>
+    database.get<TransactionModel>('transactions').create((t) => {
       t.studentId = lesson.studentId;
       t.lessonId = lesson.id;
       t.amount = lesson.price;
@@ -150,8 +152,8 @@ export async function recordLessonPayment(
       t.method = pay.method ?? null;
       t.subjectId = lesson.subjectId;
       t.occurredAt = Date.now();
-    });
-  });
+    }),
+  );
 }
 
 export interface TransactionInput {
@@ -207,6 +209,43 @@ export async function rescheduleLesson(lesson: LessonModel, startsAt: number): P
       l.lifecycleStatus = 'upcoming';
     });
   });
+}
+
+// ── Undo («Вернуть», UI-v2 S1) — see domain/undo ─────────────────────────────
+
+/** Reverse mutation for a lifecycle action: restore the snapshot captured before it. */
+export async function restoreLessonLifecycle(
+  lesson: LessonModel,
+  snapshot: LessonLifecycleSnapshot,
+): Promise<void> {
+  await database.write(async () => {
+    await lesson.update((l) => {
+      l.lifecycleStatus = snapshot.lifecycleStatus;
+      l.cancelReason = snapshot.cancelReason ?? '';
+      l.comment = snapshot.comment;
+    });
+  });
+}
+
+/**
+ * Undo a money action: APPEND the compensating row (`domain/undo.reversalOf`) — the
+ * original is never edited/deleted (ADR-0002). Derived values drop the pair via
+ * `withoutReversals` at the data boundary (db/hooks).
+ */
+export async function reverseTransaction(txn: TransactionModel): Promise<TransactionModel> {
+  const input = reversalOf(txn);
+  return database.write(async () =>
+    database.get<TransactionModel>('transactions').create((t) => {
+      t.studentId = input.studentId;
+      t.lessonId = input.lessonId;
+      t.amount = input.amount;
+      t.type = input.type;
+      t.method = input.method;
+      t.subjectId = input.subjectId;
+      t.occurredAt = Date.now();
+      t.reversesId = input.reversesId;
+    }),
+  );
 }
 
 export async function createSubject(name: string): Promise<SubjectModel> {

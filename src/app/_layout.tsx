@@ -11,6 +11,7 @@ import { seedIfEmpty } from '@/db/seed';
 import { DualModeProvider, useT } from '@/i18n';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { ProfileGate, ReminderSync } from '@/lib/profile';
+import { SnackHost, SnackProvider } from '@/lib/snack';
 import { ThemeProvider as TutorThemeProvider, useTheme, useThemeMode } from '@/theme';
 
 export default function RootLayout() {
@@ -85,19 +86,24 @@ function NavigationRoot() {
     <ThemeProvider value={navTheme}>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
       <ReminderSync />
-      <WebFrame bg={colors.bg}>
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="student" />
-          <Stack.Screen name="lesson" />
-          <Stack.Screen name="finance" />
-          <Stack.Screen name="notifications" />
-          <Stack.Screen name="settings" />
-          <Stack.Screen name="gallery" options={{ presentation: 'modal', headerShown: true, title: t('a11y.uiKit') }} />
-          <Stack.Screen name="+not-found" />
-        </Stack>
-      </WebFrame>
+      <SnackProvider>
+        <WebFrame bg={colors.bg}>
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+            <Stack.Screen name="(auth)" />
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="student" />
+            <Stack.Screen name="lesson" />
+            <Stack.Screen name="finance" />
+            <Stack.Screen name="notifications" />
+            <Stack.Screen name="settings" />
+            <Stack.Screen name="gallery" options={{ presentation: 'modal', headerShown: true, title: t('a11y.uiKit') }} />
+            <Stack.Screen name="+not-found" />
+          </Stack>
+          {/* Single global snack host — inside the WebFrame column (ADR-0010) so the bar
+              tracks the app width, above the Stack so it overlays every screen. */}
+          <SnackHost />
+        </WebFrame>
+      </SnackProvider>
     </ThemeProvider>
   );
 }

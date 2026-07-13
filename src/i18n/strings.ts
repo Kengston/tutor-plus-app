@@ -227,6 +227,20 @@ export const messages = {
   'action.conduct': 'Провести',
   'action.reschedule': 'Перенести',
   'action.cancel': 'Отменить',
+  'action.undo': 'Вернуть',
+
+  // ── Snackbar confirmations (spec 00 §подтверждения, 04-today) ────────────
+  'snack.lessonDone': 'Урок проведён',
+  'snack.lessonDone_client': 'Встреча проведена',
+  'snack.lessonCancelled': 'Урок отменён',
+  'snack.lessonCancelled_client': 'Встреча отменена',
+  'snack.paymentRecorded': 'Оплата отмечена',
+  'snack.undone': 'Отменено',
+
+  // ── Quick actions (FAB on «Сегодня», spec 04-today) ──────────────────────
+  'quick.title': 'Быстрое действие',
+  'quick.newLesson': 'Новый урок',
+  'quick.newLesson_client': 'Новая встреча',
 
   // ── Lesson card / form ───────────────────────────────────────────────────
   'lesson.topicPlaceholder': 'Тема урока',

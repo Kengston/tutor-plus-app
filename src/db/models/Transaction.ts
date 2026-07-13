@@ -25,6 +25,8 @@ export class TransactionModel extends Model {
   @field('subject_id') subjectId!: string | null;
   @field('occurred_at') occurredAt!: number;
   @field('comment') comment!: string | null;
+  /** Compensating-row link (undo, `domain/undo`): id of the txn this row reverses. */
+  @field('reverses_id') reversesId!: string | null;
   @readonly @date('created_at') createdAt!: Date;
   @readonly @date('updated_at') updatedAt!: Date;
 }

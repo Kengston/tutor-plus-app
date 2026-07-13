@@ -82,6 +82,9 @@ export interface Transaction {
   /** UTC-instant ms. */
   occurredAt: number;
   comment: string | null;
+  /** Set on a COMPENSATING row (undo, `domain/undo`): id of the txn it reverses. The
+   *  pair is excluded from derived values via `withoutReversals` — never deleted. */
+  reversesId: string | null;
   createdAt: number;
 }
 
