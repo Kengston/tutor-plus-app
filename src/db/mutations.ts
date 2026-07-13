@@ -103,6 +103,8 @@ export interface LessonInput {
   durationMin: Duration;
   format: LessonFormat;
   price: number;
+  /** Meeting URL (delta v2.1 §3.1) — optional; meaningful for online lessons. */
+  link?: string | null;
 }
 
 export async function createLesson(input: LessonInput): Promise<LessonModel> {
@@ -115,6 +117,7 @@ export async function createLesson(input: LessonInput): Promise<LessonModel> {
       l.durationMin = input.durationMin;
       l.format = input.format;
       l.price = input.price;
+      l.link = input.link?.trim() || null;
       l.lifecycleStatus = 'upcoming';
     }),
   );

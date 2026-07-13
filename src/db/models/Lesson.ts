@@ -25,6 +25,8 @@ export class LessonModel extends Model {
   @field('duration_min') durationMin!: Duration;
   @field('format') format!: LessonFormat;
   @field('price') price!: number;
+  /** Meeting URL (delta v2.1 §3.1) — see domain/lesson-link for visibility rules. */
+  @field('link') link!: string | null;
   @field('lifecycle_status') lifecycleStatus!: LifecycleStatus;
   @field('cancel_reason') cancelReason!: string | null;
   @field('comment') comment!: string | null;

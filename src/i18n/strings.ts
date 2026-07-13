@@ -250,6 +250,14 @@ export const messages = {
   'lesson.choose': 'Выберите ученика',
   'lesson.choose_client': 'Выберите клиента',
 
+  // ── Meeting link (delta v2.1 §3.1; prototype openMeetingLink/meetHost) ───
+  'lesson.join': 'Подключиться',
+  'lesson.openMeeting': 'Открыть встречу',
+  'lesson.linkField': 'Ссылка на подключение',
+  'field.link': 'Ссылка',
+  'link.fallback': 'ссылка',
+  'link.openFailed': 'Не удалось открыть ссылку',
+
   // ── Today ────────────────────────────────────────────────────────────────
   'today.progress': 'Проведено',
   'today.next': 'Далее сегодня',

@@ -35,6 +35,8 @@ interface LessonSpec {
   price: number;
   life: 'upcoming' | 'done' | 'cancelled';
   pay: TxnType | null;
+  /** Meeting URL (delta v2.1 §3.1) — set on some online lessons to demo «Подключиться». */
+  link?: string;
 }
 
 const SUBJECTS = ['Английский', 'Математика', 'Подготовка к IELTS', 'Разговорный клуб', 'Физика'];
@@ -52,10 +54,10 @@ const LESSONS: LessonSpec[] = [
   // today
   { student: 'Анна Котова', subject: 'Английский', topic: 'Present Perfect', day: 0, hour: 10, dur: 60, fmt: 'online', price: 1500, life: 'done', pay: 'paid' },
   { student: 'Игорь Лебедев', subject: 'Математика', topic: 'Производные', day: 0, hour: 12, dur: 90, fmt: 'inperson', price: 3000, life: 'done', pay: 'debt' },
-  { student: 'Мария Сорокина', subject: 'Разговорный клуб', topic: 'Small talk', day: 0, hour: 15, dur: 45, fmt: 'online', price: 1350, life: 'upcoming', pay: null },
+  { student: 'Мария Сорокина', subject: 'Разговорный клуб', topic: 'Small talk', day: 0, hour: 15, dur: 45, fmt: 'online', price: 1350, life: 'upcoming', pay: null, link: 'https://meet.google.com/mia-6821-tve' },
   { student: 'Елена Зайцева', subject: 'Математика', topic: 'Интегралы', day: 0, hour: 17, dur: 60, fmt: 'inperson', price: 2200, life: 'upcoming', pay: null },
   // tomorrow
-  { student: 'Анна Котова', subject: 'Подготовка к IELTS', topic: 'Writing Task 2', day: 1, hour: 11, dur: 60, fmt: 'online', price: 1500, life: 'upcoming', pay: null },
+  { student: 'Анна Котова', subject: 'Подготовка к IELTS', topic: 'Writing Task 2', day: 1, hour: 11, dur: 60, fmt: 'online', price: 1500, life: 'upcoming', pay: null, link: 'https://zoom.us/j/98123456789' },
   { student: 'Игорь Лебедев', subject: 'Физика', topic: 'Кинематика', day: 1, hour: 18, dur: 60, fmt: 'inperson', price: 2000, life: 'upcoming', pay: null },
   // later this week
   { student: 'Елена Зайцева', subject: 'Математика', topic: 'Векторы', day: 2, hour: 15, dur: 60, fmt: 'inperson', price: 2200, life: 'upcoming', pay: null },
@@ -150,6 +152,7 @@ export async function seedIfEmpty(): Promise<void> {
         m.durationMin = spec.dur;
         m.format = spec.fmt;
         m.price = spec.price;
+        m.link = spec.link ?? null;
         m.lifecycleStatus = spec.life;
       });
       if (spec.pay) {

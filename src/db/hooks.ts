@@ -45,7 +45,7 @@ const studentSubjectsC = () => database.get<StudentSubjectModel>('student_subjec
 
 const STUDENT_COLS = ['name', 'initials', 'category', 'status', 'format', 'rate', 'schedule', 'phone'];
 const LESSON_COLS = [
-  'student_id', 'subject_id', 'topic', 'starts_at', 'duration_min', 'format', 'price', 'lifecycle_status',
+  'student_id', 'subject_id', 'topic', 'starts_at', 'duration_min', 'format', 'price', 'link', 'lifecycle_status',
 ];
 
 /** All students, sorted by name (reactive). Filter/search/sort further in the screen. */

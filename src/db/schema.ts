@@ -13,11 +13,14 @@
  * v3 (UI-v2 S1, undo): `transactions.reverses_id` — a compensating row's link to the txn
  * it reverses (`domain/undo`). Undo never edits/deletes ledger rows (ADR-0002); the pair
  * is filtered out of derived values at the data boundary.
+ *
+ * v4 (UI-v2 S3, delta v2.1 §3.1): `lessons.link` — meeting URL on the lesson;
+ * «Подключиться»/«Открыть встречу» show only for online lessons with a link.
  */
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export const schema = appSchema({
-  version: 3,
+  version: 4,
   tables: [
     tableSchema({
       name: 'students',
@@ -52,6 +55,7 @@ export const schema = appSchema({
         { name: 'duration_min', type: 'number' },
         { name: 'format', type: 'string' },
         { name: 'price', type: 'number' },
+        { name: 'link', type: 'string', isOptional: true },
         { name: 'lifecycle_status', type: 'string', isIndexed: true },
         { name: 'cancel_reason', type: 'string', isOptional: true },
         { name: 'comment', type: 'string', isOptional: true },

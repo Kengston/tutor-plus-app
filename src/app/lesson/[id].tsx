@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { type ReactNode, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DateTimePickerSheet } from '@/components/DateTimePickerSheet';
@@ -15,6 +15,7 @@ import {
   reverseTransaction,
 } from '@/db/mutations';
 import { payStatusOf } from '@/domain/aggregates';
+import { canJoinOnline, meetHost } from '@/domain/lesson-link';
 import { type PayStatus, type TxnType } from '@/domain/types';
 import { lifecycleSnapshot } from '@/domain/undo';
 import { useT } from '@/i18n';
@@ -106,6 +107,25 @@ export default function LessonCardScreen() {
             <Field label={t('field.duration')} value={`${lesson.durationMin} ${t('common.min')}`} />
             <Hairline />
             <Field label={t('field.format')} value={t(`format.${lesson.format}` as 'format.online')} />
+            {lesson.link ? (
+              <>
+                <Hairline />
+                {/* Link rendered as its short host (delta §3.1) — tap opens the meeting. */}
+                <Field label={t('field.link')}>
+                  <Pressable
+                    onPress={() => Linking.openURL(lesson.link as string).catch(() => snack.show(t('link.openFailed')))}
+                    hitSlop={6}
+                    accessibilityRole="link"
+                    accessibilityLabel={t('lesson.openMeeting')}
+                    style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}>
+                    <Icon name="link" size={16} sw={1.7} stroke={colors.stoneInactive} />
+                    <Text style={[styles.linkHost, { color: colors.primaryDeep }]} numberOfLines={1}>
+                      {meetHost(lesson.link) ?? t('link.fallback')}
+                    </Text>
+                  </Pressable>
+                </Field>
+              </>
+            ) : null}
             <Hairline />
             <Field label={t('field.cost')} value={formatRub(lesson.price)} />
             <Hairline />
@@ -123,6 +143,19 @@ export default function LessonCardScreen() {
           </Card>
 
           <View style={styles.actions}>
+            {/* «Открыть встречу» — primary, only for online lessons with a link (spec/delta §3.1). */}
+            {canJoinOnline(lesson) ? (
+              <Pressable
+                onPress={() => Linking.openURL(lesson.link as string).catch(() => snack.show(t('link.openFailed')))}
+                style={({ pressed }) => [
+                  styles.action,
+                  { backgroundColor: colors.primary, borderRadius: radius.field },
+                  pressed && styles.pressed,
+                ]}>
+                <Icon name="video" size={18} sw={1.8} stroke={colors.onTint} />
+                <Text style={[styles.actionLabel, { color: colors.onTint }]}>{t('lesson.openMeeting')}</Text>
+              </Pressable>
+            ) : null}
             {conducted ? null : (
               <Pressable
                 onPress={conductWithUndo}
@@ -284,6 +317,8 @@ const styles = StyleSheet.create({
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1, justifyContent: 'flex-end' },
   payPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999 },
   payText: { fontSize: 12.5, fontWeight: '600' },
+  linkRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, justifyContent: 'flex-end' },
+  linkHost: { fontSize: 14, fontWeight: '600', flexShrink: 1 },
   actions: { gap: 10 },
   actionPair: { flexDirection: 'row', gap: 10 },
   action: {

@@ -63,6 +63,9 @@ export interface Lesson {
   durationMin: Duration;
   format: LessonFormat;
   price: number;
+  /** Meeting URL (delta v2.1 §3.1) — drives «Подключиться»/«Открыть встречу»
+   *  visibility together with `format === 'online'` (`domain/lesson-link`). */
+  link: string | null;
   lifecycleStatus: LifecycleStatus;
   cancelReason: string | null;
   comment: string | null;

@@ -34,6 +34,7 @@ export default function LessonFormScreen() {
   const [startsAt, setStartsAt] = useState<number>(defaultStartsAt);
   const [duration, setDuration] = useState<Duration>(60);
   const [format, setFormat] = useState<LessonFormat>('online');
+  const [link, setLink] = useState('');
   const [price, setPrice] = useState<string>('');
   const [priceTouched, setPriceTouched] = useState(false);
 
@@ -60,6 +61,7 @@ export default function LessonFormScreen() {
       durationMin: duration,
       format,
       price: Number.isNaN(parsed) ? 0 : parsed,
+      link: link.trim() || null,
     });
     router.back();
   };
@@ -148,6 +150,24 @@ export default function LessonFormScreen() {
             tabs={[formatLabels.online, formatLabels.inperson]}
             active={formatLabels[format]}
             onChange={(tab) => setFormat(tab === formatLabels.inperson ? 'inperson' : 'online')}
+          />
+        </FieldBlock>
+
+        {/* Meeting link (delta v2.1 §3.1) — optional; prominent right under «Формат»
+            for online lessons (spec: «опционально для очного, заметно для онлайн»). */}
+        <FieldBlock label={t('lesson.linkField')}>
+          <TextInput
+            value={link}
+            onChangeText={setLink}
+            placeholder={format === 'online' ? 'https://meet.google.com/…' : ''}
+            placeholderTextColor={colors.muted}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+            style={[
+              styles.input,
+              { borderRadius: radius.control, color: colors.heading, backgroundColor: colors.elev, borderColor: colors.hairline },
+            ]}
           />
         </FieldBlock>
 

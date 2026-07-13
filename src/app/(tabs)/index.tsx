@@ -6,6 +6,7 @@ import { DateTimePickerSheet } from '@/components/DateTimePickerSheet';
 import { QuickActionsSheet } from '@/components/QuickActionsSheet';
 import { Screen } from '@/components/Screen';
 import { payStatusOf, doneOfTotal } from '@/domain/aggregates';
+import { canJoinOnline } from '@/domain/lesson-link';
 import { lifecycleSnapshot } from '@/domain/undo';
 import type { LessonModel, StudentModel } from '@/db/models';
 import { useAllTransactions, useLessonsInRange, useStudents } from '@/db/hooks';
@@ -232,6 +233,7 @@ function NearestCard({
   const t = useT();
   const { colors, radius } = useTheme();
   const router = useRouter();
+  const snack = useSnack();
 
   const m = minutesUntil(lesson.startsAt, now);
   const relative =
@@ -265,18 +267,35 @@ function NearestCard({
         </View>
         <Text style={[styles.nearestTime, { color: colors.heading }]}>{hhmm(lesson.startsAt)}</Text>
       </View>
-      <Pressable
-        onPress={(e) => {
-          e.stopPropagation();
-          const phone = student?.phone?.replace(/[^\d+]/g, '');
-          if (phone) Linking.openURL(`tel:${phone}`).catch(() => undefined);
-        }}
-        accessibilityRole="button"
-        accessibilityLabel={t('common.contact')}
-        style={({ pressed }) => [styles.contactBtn, { backgroundColor: colors.primaryVlight, borderRadius: radius.control, opacity: pressed ? 0.85 : 1 }]}>
-        <Icon name="phone" size={16} sw={1.8} stroke={colors.heading} />
-        <Text style={[styles.contactLabel, { color: colors.heading }]}>{t('common.contact')}</Text>
-      </Pressable>
+      {/* «Подключиться» — primary, ONLY for online lessons with a link (spec 04-today,
+          delta §3.1); «Связаться» stays alongside (or full-width when no join button). */}
+      <View style={styles.ctaRow}>
+        {canJoinOnline(lesson) ? (
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation();
+              Linking.openURL(lesson.link as string).catch(() => snack.show(t('link.openFailed')));
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={t('lesson.join')}
+            style={({ pressed }) => [styles.contactBtn, styles.ctaFlex, { backgroundColor: colors.primary, borderRadius: radius.control, opacity: pressed ? 0.85 : 1 }]}>
+            <Icon name="video" size={16} sw={1.8} stroke={colors.onTint} />
+            <Text style={[styles.contactLabel, { color: colors.onTint }]}>{t('lesson.join')}</Text>
+          </Pressable>
+        ) : null}
+        <Pressable
+          onPress={(e) => {
+            e.stopPropagation();
+            const phone = student?.phone?.replace(/[^\d+]/g, '');
+            if (phone) Linking.openURL(`tel:${phone}`).catch(() => undefined);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.contact')}
+          style={({ pressed }) => [styles.contactBtn, styles.ctaFlex, { backgroundColor: colors.primaryVlight, borderRadius: radius.control, opacity: pressed ? 0.85 : 1 }]}>
+          <Icon name="phone" size={16} sw={1.8} stroke={colors.heading} />
+          <Text style={[styles.contactLabel, { color: colors.heading }]}>{t('common.contact')}</Text>
+        </Pressable>
+      </View>
     </Card>
   );
 }
@@ -311,6 +330,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   contactLabel: { fontSize: 14, fontWeight: '600' },
+  ctaRow: { flexDirection: 'row', gap: 10 },
+  ctaFlex: { flex: 1 },
 
   list: { gap: 10 },
   rowShell: { borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
