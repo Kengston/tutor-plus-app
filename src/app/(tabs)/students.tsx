@@ -3,30 +3,35 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { useRouter } from 'expo-router';
 
-import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
-import { useStudents, useAllTransactions } from '@/db/hooks';
-import type { StudentModel, TransactionModel } from '@/db/models';
+import { useAllLessons, useAllTransactions, useStudentPrimarySubject, useStudents } from '@/db/hooks';
+import type { LessonModel, StudentModel, TransactionModel } from '@/db/models';
 import { debtOf } from '@/domain/aggregates';
+import {
+  filterSortStudents,
+  nextUpcomingAt,
+  type StudentFilter,
+  type StudentListItem,
+  type StudentSort,
+} from '@/domain/student-list';
 import type { StudentStatus } from '@/domain/types';
-import { plural, useT } from '@/i18n';
+import { useT } from '@/i18n';
 import type { StringKey } from '@/i18n';
 import { formatRub } from '@/lib/format';
-import { catColors, useTheme } from '@/theme';
-import { CatAvatar, Card, Fab, Icon, Sheet } from '@/ui';
+import { dayBounds, hhmm, nowMs } from '@/lib/time';
+import { useTheme } from '@/theme';
+import { CatAvatar, Card, Chip, Fab, Icon, Sheet } from '@/ui';
 
-type FilterKey = 'all' | 'active' | 'paused' | 'archived' | 'debtors';
-type SortKey = 'name' | 'added' | 'status' | 'debt';
-
-const FILTERS: { key: FilterKey; label: StringKey }[] = [
+const FILTERS: { key: StudentFilter; label: StringKey }[] = [
   { key: 'all', label: 'filter.all' },
   { key: 'active', label: 'filter.active' },
   { key: 'paused', label: 'filter.paused' },
   { key: 'archived', label: 'filter.archived' },
   { key: 'debtors', label: 'filter.debtors' },
+  { key: 'hasLessons', label: 'filter.hasLessons' },
 ];
 
-const SORTS: { key: SortKey; label: StringKey }[] = [
+const SORTS: { key: StudentSort; label: StringKey }[] = [
   { key: 'name', label: 'sort.name' },
   { key: 'added', label: 'sort.added' },
   { key: 'status', label: 'sort.status' },
@@ -39,9 +44,6 @@ const STATUS_LABEL: Record<StudentStatus, StringKey> = {
   archived: 'status.archived',
 };
 
-/** Stable display order for the «Статус» sort: active → paused → archived. */
-const STATUS_ORDER: Record<StudentStatus, number> = { active: 0, paused: 1, archived: 2 };
-
 export default function StudentsScreen() {
   const t = useT();
   const { colors, radius } = useTheme();
@@ -49,66 +51,48 @@ export default function StudentsScreen() {
 
   const students = useStudents();
   const txns = useAllTransactions();
+  const lessons = useAllLessons();
+  const subjectByStudent = useStudentPrimarySubject();
 
-  const [filter, setFilter] = useState<FilterKey>('all');
-  const [sort, setSort] = useState<SortKey>('name');
+  const [filter, setFilter] = useState<StudentFilter>('all');
+  const [sort, setSort] = useState<StudentSort>('name');
   const [query, setQuery] = useState('');
   const [sortOpen, setSortOpen] = useState(false);
 
-  /** Per-student outstanding debt, derived once from the whole ledger (ADR-0008). */
-  const debtByStudent = useMemo(() => {
-    const groups = new Map<string, TransactionModel[]>();
+  const now = nowMs();
+
+  // Per-student debt (ADR-0008) and next-lesson instant — the row's derived data.
+  const items = useMemo<StudentListItem[]>(() => {
+    const txByStudent = new Map<string, TransactionModel[]>();
     for (const tx of txns) {
-      const list = groups.get(tx.studentId);
-      if (list) list.push(tx);
-      else groups.set(tx.studentId, [tx]);
+      const arr = txByStudent.get(tx.studentId);
+      if (arr) arr.push(tx);
+      else txByStudent.set(tx.studentId, [tx]);
     }
-    const map = new Map<string, number>();
-    for (const [id, list] of groups) map.set(id, debtOf(list));
-    return map;
-  }, [txns]);
+    const lessonsByStudent = new Map<string, LessonModel[]>();
+    for (const l of lessons) {
+      const arr = lessonsByStudent.get(l.studentId);
+      if (arr) arr.push(l);
+      else lessonsByStudent.set(l.studentId, [l]);
+    }
+    return students.map((s) => ({
+      id: s.id,
+      name: s.name,
+      status: s.status,
+      createdAt: s.createdAt.getTime(),
+      debt: debtOf(txByStudent.get(s.id) ?? []),
+      nextLessonAt: nextUpcomingAt(lessonsByStudent.get(s.id) ?? [], now),
+    }));
+  }, [students, txns, lessons, now]);
 
-  const debtFor = (s: StudentModel) => debtByStudent.get(s.id) ?? 0;
+  const visible = useMemo(() => filterSortStudents(items, { filter, sort, query }), [items, filter, sort, query]);
 
-  const visible = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    let list = students.filter((s) => {
-      if (filter === 'debtors') {
-        if (debtFor(s) <= 0) return false;
-      } else if (filter !== 'all' && s.status !== filter) {
-        return false;
-      }
-      if (needle && !s.name.toLowerCase().includes(needle)) return false;
-      return true;
-    });
-
-    list = [...list].sort((a, b) => {
-      switch (sort) {
-        case 'added':
-          return b.createdAt.getTime() - a.createdAt.getTime();
-        case 'status':
-          return STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || a.name.localeCompare(b.name, 'ru');
-        case 'debt':
-          return debtFor(b) - debtFor(a) || a.name.localeCompare(b.name, 'ru');
-        case 'name':
-        default:
-          return a.name.localeCompare(b.name, 'ru');
-      }
-    });
-    return list;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [students, debtByStudent, filter, sort, query]);
-
-  const countLabel =
-    visible.length > 0
-      ? `${visible.length} ${plural(visible.length, {
-          one: t('unit.students.one'),
-          few: t('unit.students.few'),
-          many: t('unit.students.many'),
-        })}`
-      : null;
-
+  const searching = query.trim().length > 0;
+  // «Найдено: N» while searching/filtering; a plain count otherwise (spec 06 §6.1).
+  const countLabel = visible.length > 0 ? `${t('students.found')}: ${visible.length}` : null;
   const activeSortLabel = t(SORTS.find((s) => s.key === sort)!.label);
+
+  const studentById = useMemo(() => new Map(students.map((s) => [s.id, s])), [students]);
 
   return (
     <Screen
@@ -124,13 +108,8 @@ export default function StudentsScreen() {
               onPress={() => setFilter(f.key)}
               accessibilityRole="button"
               accessibilityState={{ selected: on }}
-              style={[
-                styles.pill,
-                { backgroundColor: on ? colors.primary : colors.stoneLight },
-              ]}>
-              <Text
-                style={[styles.pillLabel, { color: on ? colors.onTint : colors.body }]}
-                numberOfLines={1}>
+              style={[styles.pill, { backgroundColor: on ? colors.primary : colors.stoneLight }]}>
+              <Text style={[styles.pillLabel, { color: on ? colors.onTint : colors.body }]} numberOfLines={1}>
                 {t(f.label)}
               </Text>
             </Pressable>
@@ -140,11 +119,7 @@ export default function StudentsScreen() {
 
       {/* Search + sort */}
       <View style={styles.toolRow}>
-        <View
-          style={[
-            styles.search,
-            { backgroundColor: colors.surface, borderColor: colors.hairline, borderRadius: radius.control },
-          ]}>
+        <View style={[styles.search, { backgroundColor: colors.surface, borderColor: colors.hairline, borderRadius: radius.control }]}>
           <Icon name="search" size={18} sw={1.8} stroke={colors.muted} />
           <TextInput
             value={query}
@@ -156,103 +131,157 @@ export default function StudentsScreen() {
             autoCorrect={false}
           />
           {query.length > 0 && (
-            <Pressable
-              onPress={() => setQuery('')}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel={t('a11y.clearSearch')}>
+            <Pressable onPress={() => setQuery('')} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('a11y.clearSearch')}>
               <Icon name="close" size={16} sw={2} stroke={colors.muted} />
             </Pressable>
           )}
         </View>
         <Pressable
           onPress={() => setSortOpen(true)}
-          style={[
-            styles.sortBtn,
-            { backgroundColor: colors.surface, borderColor: colors.hairline, borderRadius: radius.control },
-          ]}
+          style={[styles.sortBtn, { backgroundColor: colors.surface, borderColor: colors.hairline, borderRadius: radius.control }]}
           accessibilityLabel={t('sort.label')}>
           <Icon name="sort" size={18} sw={1.8} stroke={colors.heading} />
-          <Text style={[styles.sortLabel, { color: colors.heading }]} numberOfLines={1}>
-            {activeSortLabel}
-          </Text>
+          <Text style={[styles.sortLabel, { color: colors.heading }]} numberOfLines={1}>{activeSortLabel}</Text>
         </Pressable>
       </View>
 
       {countLabel && <Text style={[styles.count, { color: colors.muted }]}>{countLabel}</Text>}
 
-      {/* List / empty */}
+      {/* List / three empty states (spec 06 §6.1–6.2) */}
       {students.length === 0 ? (
-        <View style={styles.emptyWrap}>
-          <EmptyState icon="users" text={t('students.empty')} />
-        </View>
+        <EmptyBlock
+          icon="users"
+          title={t('students.emptyTitle')}
+          body={t('students.emptyBody')}
+          actionLabel={t('students.addFirst')}
+          onAction={() => router.push('/student/new')}
+        />
+      ) : visible.length === 0 && searching ? (
+        <EmptyBlock
+          icon="search"
+          title={t('students.searchEmpty')}
+          body={`${t('students.searchEmptyBy')} «${query.trim()}» ${t('students.searchEmptyNo')}`}
+          actionLabel={t('students.clearSearch')}
+          onAction={() => setQuery('')}
+        />
       ) : visible.length === 0 ? (
-        <View style={styles.emptyWrap}>
-          <EmptyState icon="search" text={t('students.emptyFiltered')} />
-        </View>
+        <EmptyBlock icon="filter" title={t('students.emptyFiltered')} body={t('students.emptyFilters')} />
       ) : (
         <View style={styles.list}>
-          {visible.map((s) => (
-            <StudentRow
-              key={s.id}
-              student={s}
-              debt={debtFor(s)}
-              onPress={() => router.push({ pathname: '/student/[id]', params: { id: s.id } })}
-            />
-          ))}
+          {visible.map((s) => {
+            const model = studentById.get(s.id);
+            if (!model) return null;
+            return (
+              <StudentRow
+                key={s.id}
+                model={model}
+                item={s}
+                subject={subjectByStudent.get(s.id) ?? null}
+                now={now}
+                onPress={() => router.push({ pathname: '/student/[id]', params: { id: s.id } })}
+              />
+            );
+          })}
         </View>
       )}
 
-      {sortOpen && (
-        <SortSheet
-          visible={sortOpen}
-          current={sort}
-          onPick={setSort}
-          onClose={() => setSortOpen(false)}
-        />
-      )}
-
+      {sortOpen && <SortSheet visible={sortOpen} current={sort} onPick={setSort} onClose={() => setSortOpen(false)} />}
     </Screen>
   );
 }
 
+/** «следующее сегодня/завтра, 16:00» from the next-lesson instant, or null. */
+function useNextLessonLabel(): (nextAt: number | null, now: number) => string | null {
+  const t = useT();
+  return (nextAt, now) => {
+    if (nextAt === null) return null;
+    const today = dayBounds(now).start;
+    const day = new Date(nextAt);
+    const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate()).getTime();
+    const when =
+      dayStart === today
+        ? t('students.today')
+        : dayStart === today + 86_400_000
+          ? t('students.tomorrow')
+          : `${day.getDate()} ${t(`monthGen.${day.getMonth()}` as StringKey)}`;
+    return `${t('students.nextLesson')} ${when}, ${hhmm(nextAt)}`;
+  };
+}
+
+/** A students-list row (spec 06 §6.1): avatar, name, «Предмет · следующее…», debt/status badge. */
 function StudentRow({
-  student,
-  debt,
+  model,
+  item,
+  subject,
+  now,
   onPress,
 }: {
-  student: StudentModel;
-  debt: number;
+  model: StudentModel;
+  item: StudentListItem;
+  subject: string | null;
+  now: number;
   onPress: () => void;
 }) {
   const t = useT();
   const { colors } = useTheme();
-  const hasDebt = debt > 0;
-  const cat = catColors[student.category] ?? catColors.slate;
+  const nextLabel = useNextLessonLabel();
+  const hasDebt = item.debt > 0;
+  const isArchived = item.status === 'archived';
+  const isPaused = item.status === 'paused';
+
+  // Secondary line: «Предмет · следующее …» — subject and/or next-lesson, else status.
+  const next = nextLabel(item.nextLessonAt, now);
+  const parts = [subject, next].filter(Boolean);
+  const secondary = parts.length > 0 ? parts.join(' · ') : t(STATUS_LABEL[item.status]);
 
   return (
-    <Card onPress={onPress} leftStrip={cat.accent} style={styles.row}>
-      <CatAvatar
-        initials={student.initials}
-        cat={student.category}
-        payTone={hasDebt ? 'debt' : undefined}
-      />
+    <Card onPress={onPress} style={styles.row}>
+      <CatAvatar initials={model.initials} cat={model.category} payTone={hasDebt ? 'debt' : undefined} />
       <View style={styles.rowBody}>
-        <Text style={[styles.name, { color: colors.heading }]} numberOfLines={1}>
-          {student.name}
-        </Text>
-        <Text style={[styles.status, { color: colors.muted }]} numberOfLines={1}>
-          {t(STATUS_LABEL[student.status])}
-        </Text>
+        <Text style={[styles.name, { color: colors.heading }]} numberOfLines={1}>{model.name}</Text>
+        <Text style={[styles.secondary, { color: colors.muted }]} numberOfLines={1}>{secondary}</Text>
       </View>
-      {hasDebt && (
-        <View style={styles.debtBadge}>
-          <Text style={[styles.debtLabel, { color: colors.danger }]}>{t('finance.debt')}</Text>
-          <Text style={[styles.debtValue, { color: colors.danger }]}>{formatRub(debt)}</Text>
-        </View>
-      )}
+      {/* Right badge: debt «N ₽» takes priority; else a status chip for paused/archived. */}
+      {hasDebt ? (
+        <Chip tone="danger">{formatRub(item.debt)}</Chip>
+      ) : isArchived || isPaused ? (
+        <Chip>{t(STATUS_LABEL[item.status])}</Chip>
+      ) : null}
       <Icon name="chevronRight" size={18} sw={2} stroke={colors.label3} />
     </Card>
+  );
+}
+
+/** A centred empty state with an optional action button (spec 06 §6.2). */
+function EmptyBlock({
+  icon,
+  title,
+  body,
+  actionLabel,
+  onAction,
+}: {
+  icon: 'users' | 'search' | 'filter';
+  title: string;
+  body: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  const { colors, radius } = useTheme();
+  return (
+    <View style={styles.emptyBlock}>
+      <View style={[styles.emptyIcon, { backgroundColor: colors.stoneLight }]}>
+        <Icon name={icon} size={26} sw={1.6} stroke={colors.stoneInactive} />
+      </View>
+      <Text style={[styles.emptyTitle, { color: colors.heading }]}>{title}</Text>
+      <Text style={[styles.emptyBody, { color: colors.muted }]}>{body}</Text>
+      {actionLabel && onAction ? (
+        <Pressable
+          onPress={onAction}
+          style={({ pressed }) => [styles.emptyAction, { backgroundColor: colors.primary, borderRadius: radius.field }, pressed && styles.pressed]}>
+          <Text style={[styles.emptyActionLabel, { color: colors.onTint }]}>{actionLabel}</Text>
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 
@@ -263,8 +292,8 @@ function SortSheet({
   onClose,
 }: {
   visible: boolean;
-  current: SortKey;
-  onPick: (k: SortKey) => void;
+  current: StudentSort;
+  onPick: (k: StudentSort) => void;
   onClose: () => void;
 }) {
   const t = useT();
@@ -306,27 +335,25 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   searchInput: { flex: 1, fontSize: 15, padding: 0 },
-  sortBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
+  sortBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, borderWidth: StyleSheet.hairlineWidth },
   sortLabel: { fontSize: 13.5, fontWeight: '600', maxWidth: 110 },
 
   count: { fontSize: 12.5, fontWeight: '500', marginTop: -4 },
 
   list: { gap: 10 },
-  emptyWrap: { paddingTop: 24 },
 
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
-  rowBody: { flex: 1, gap: 2 },
+  rowBody: { flex: 1, minWidth: 0, gap: 2 },
   name: { fontSize: 16, fontWeight: '600', letterSpacing: -0.2 },
-  status: { fontSize: 13 },
-  debtBadge: { alignItems: 'flex-end', gap: 1 },
-  debtLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.3 },
-  debtValue: { fontSize: 14, fontWeight: '700' },
+  secondary: { fontSize: 13 },
+
+  // empty states
+  emptyBlock: { alignItems: 'center', gap: 10, paddingTop: 40, paddingHorizontal: 24 },
+  emptyIcon: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
+  emptyTitle: { fontSize: 16.5, fontWeight: '700', letterSpacing: -0.2, textAlign: 'center', marginTop: 4 },
+  emptyBody: { fontSize: 14, fontWeight: '500', textAlign: 'center', lineHeight: 20 },
+  emptyAction: { paddingHorizontal: 20, paddingVertical: 12, marginTop: 6 },
+  emptyActionLabel: { fontSize: 15, fontWeight: '600' },
 
   sortOption: {
     flexDirection: 'row',
@@ -336,4 +363,5 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   sortOptionLabel: { fontSize: 16, fontWeight: '500' },
+  pressed: { opacity: 0.85 },
 });

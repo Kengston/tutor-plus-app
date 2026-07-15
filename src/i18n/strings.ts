@@ -188,15 +188,35 @@ export const messages = {
   'filter.paused': 'Пауза',
   'filter.archived': 'Архив',
   'filter.debtors': 'Есть долг',
+  'filter.hasLessons': 'Есть занятия',
+  'filter.hasLessons_client': 'Есть встречи',
   'sort.label': 'Сортировка',
   'sort.name': 'Имя',
   'sort.added': 'Дата добавления',
   'sort.status': 'Статус',
   'sort.debt': 'Долг',
-  'students.search': 'Поиск учеников',
-  'students.search_client': 'Поиск клиентов',
+  'students.search': 'Поиск по ученикам',
+  'students.search_client': 'Поиск по клиентам',
   'students.archive': 'Архивировать',
   'students.emptyFiltered': 'Никого не найдено',
+
+  // ── Students list (spec 06 §6.1–6.2, UI-v2 S8) ────────────────────────────
+  'students.found': 'Найдено',                       // «Найдено: N»
+  'students.nextLesson': 'следующее',                 // «следующее сегодня, 16:00»
+  'students.today': 'сегодня',
+  'students.tomorrow': 'завтра',
+  'students.emptyTitle': 'Пока нет учеников',
+  'students.emptyTitle_client': 'Пока нет клиентов',
+  'students.emptyBody': 'Добавьте первого ученика — расписание, оплаты и заметки будут собраны здесь',
+  'students.emptyBody_client': 'Добавьте первого клиента — расписание, оплаты и заметки будут собраны здесь',
+  'students.addFirst': 'Добавить ученика',
+  'students.addFirst_client': 'Добавить клиента',
+  'students.emptyFilters': 'По выбранным фильтрам никого нет. Измените параметры или сбросьте фильтры',
+  'students.searchEmpty': 'Ничего не найдено',
+  'students.searchEmptyBy': 'По запросу',            // «По запросу «…» нет учеников»
+  'students.searchEmptyNo': 'нет учеников',          // dual-mode tail of the search-empty body
+  'students.searchEmptyNo_client': 'нет клиентов',
+  'students.clearSearch': 'Очистить поиск',
 
   // ── Payment tri-state (display) ──────────────────────────────────────────
   'pay.paid': 'Оплачено',

@@ -150,6 +150,23 @@ export function useStudentSubjects(studentId: string): SubjectModel[] {
   return all.filter((s) => ids.has(s.id));
 }
 
+/** All M:N joins (reactive) → the whole `studentId → subjectIds` mapping for the list. */
+export function useStudentPrimarySubject(): Map<string, string> {
+  const joins = useObservable<StudentSubjectModel[]>(() => studentSubjectsC().query().observe(), [], []);
+  const subjects = useSubjects();
+  return useMemo(() => {
+    const nameById = new Map(subjects.map((s) => [s.id, s.name]));
+    // First subject per student (join order) — the card's «Предмет» prefix.
+    const primary = new Map<string, string>();
+    for (const j of joins) {
+      if (primary.has(j.studentId)) continue;
+      const name = nameById.get(j.subjectId);
+      if (name) primary.set(j.studentId, name);
+    }
+    return primary;
+  }, [joins, subjects]);
+}
+
 /** A student's schedule slots (reactive), earliest weekday/time first — the slot editor. */
 export function useStudentSlots(studentId: string): ScheduleSlotModel[] {
   return useObservable(
