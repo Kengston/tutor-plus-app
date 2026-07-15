@@ -241,6 +241,17 @@ export const messages = {
   'form.namePlaceholder': 'Имя ученика',
   'form.namePlaceholder_client': 'Имя клиента',
   'form.schedulePlaceholder': 'Напр. Пн, Ср · 16:00',
+
+  // ── Schedule slots editor (ADR-0016, UI-v2 S6) ────────────────────────────
+  'slots.title': 'Расписание',
+  'slots.empty': 'Регулярных занятий пока нет',
+  'slots.empty_client': 'Регулярных встреч пока нет',
+  'slots.add': 'Добавить слот',
+  'slots.edit': 'Изменить слот',
+  'slots.weekday': 'День недели',
+  'slots.time': 'Время',
+  'slots.close': 'Закрыть слот',
+  'slots.manage': 'Настроить расписание',
   'form.subjectsHint': 'Выберите предметы',
   'form.subjectsHint_client': 'Выберите направления',
   'form.addSubject': 'Добавить предмет',

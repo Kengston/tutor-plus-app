@@ -17,6 +17,7 @@ import {
   LessonModel,
   NotificationReadModel,
   ProfileModel,
+  ScheduleSlotModel,
   StudentModel,
   StudentSubjectModel,
   SubjectModel,
@@ -42,8 +43,10 @@ const subjectsC = () => database.get<SubjectModel>('subjects');
 const lessonsC = () => database.get<LessonModel>('lessons');
 const txnsC = () => database.get<TransactionModel>('transactions');
 const studentSubjectsC = () => database.get<StudentSubjectModel>('student_subjects');
+const slotsC = () => database.get<ScheduleSlotModel>('schedule_slots');
 
 const STUDENT_COLS = ['name', 'initials', 'category', 'status', 'format', 'rate', 'schedule', 'phone'];
+const SLOT_COLS = ['student_id', 'weekday', 'time_min', 'duration_min', 'format', 'price', 'subject_id', 'active_from', 'active_to'];
 const LESSON_COLS = [
   'student_id', 'subject_id', 'topic', 'starts_at', 'duration_min', 'format', 'price', 'link', 'lifecycle_status',
 ];
@@ -138,6 +141,18 @@ export function useStudentSubjects(studentId: string): SubjectModel[] {
   const all = useSubjects();
   const ids = new Set(joins.map((j) => j.subjectId));
   return all.filter((s) => ids.has(s.id));
+}
+
+/** A student's schedule slots (reactive), earliest weekday/time first — the slot editor. */
+export function useStudentSlots(studentId: string): ScheduleSlotModel[] {
+  return useObservable(
+    () =>
+      slotsC()
+        .query(Q.where('student_id', studentId), Q.sortBy('weekday', Q.asc), Q.sortBy('time_min', Q.asc))
+        .observeWithColumns(SLOT_COLS),
+    [studentId],
+    [],
+  );
 }
 
 /** All lessons for a student (reactive), newest first. */

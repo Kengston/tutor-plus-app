@@ -27,6 +27,12 @@ export class LessonModel extends Model {
   @field('price') price!: number;
   /** Meeting URL (delta v2.1 §3.1) — see domain/lesson-link for visibility rules. */
   @field('link') link!: string | null;
+  /** Series link (ADR-0016): the slot this lesson was materialized from (null = standalone). */
+  @field('slot_id') slotId!: string | null;
+  /** Local-midnight ms of the intended occurrence — the (slot_id, slot_date) idempotency key. */
+  @field('slot_date') slotDate!: number | null;
+  /** Set when a materialized lesson is manually edited — the generator won't touch it. */
+  @field('modified') modified!: boolean;
   @field('lifecycle_status') lifecycleStatus!: LifecycleStatus;
   @field('cancel_reason') cancelReason!: string | null;
   @field('comment') comment!: string | null;

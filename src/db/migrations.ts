@@ -8,6 +8,13 @@
  *
  * v3 (UI-v2 S1, undo): add `transactions.reverses_id` — compensating-row link
  * (`domain/undo`). Existing rows get `null` (= a normal, non-reversal record).
+ *
+ * v4 (UI-v2 S3): add `lessons.link` (meeting URL).
+ *
+ * v5 (UI-v2 S6, ADR-0016): add `schedule_slots` + `lessons.slot_id`/`slot_date`/`modified`.
+ * Existing lessons become standalone (`slot_id=null`, `modified=false`); a launch-time
+ * backfill (`db/slots.ensureSlotsFromSchedule`) seeds slots from the legacy `schedule`
+ * strings. `students.schedule` is kept (no drop-column in WatermelonDB) but superseded.
  */
 import { schemaMigrations, createTable, addColumns } from '@nozbe/watermelondb/Schema/migrations';
 
@@ -58,6 +65,35 @@ export const migrations = schemaMigrations({
         addColumns({
           table: 'lessons',
           columns: [{ name: 'link', type: 'string', isOptional: true }],
+        }),
+      ],
+    },
+    {
+      toVersion: 5,
+      steps: [
+        addColumns({
+          table: 'lessons',
+          columns: [
+            { name: 'slot_id', type: 'string', isOptional: true, isIndexed: true },
+            { name: 'slot_date', type: 'number', isOptional: true },
+            { name: 'modified', type: 'boolean' },
+          ],
+        }),
+        createTable({
+          name: 'schedule_slots',
+          columns: [
+            { name: 'student_id', type: 'string', isIndexed: true },
+            { name: 'weekday', type: 'number' },
+            { name: 'time_min', type: 'number' },
+            { name: 'duration_min', type: 'number' },
+            { name: 'format', type: 'string' },
+            { name: 'price', type: 'number' },
+            { name: 'subject_id', type: 'string', isOptional: true },
+            { name: 'active_from', type: 'number' },
+            { name: 'active_to', type: 'number', isOptional: true },
+            { name: 'created_at', type: 'number' },
+            { name: 'updated_at', type: 'number' },
+          ],
         }),
       ],
     },

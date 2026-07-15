@@ -8,6 +8,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { seedIfEmpty } from '@/db/seed';
+import { ensureSlotsFromSchedule, materializeSchedule } from '@/db/slots';
 import { DualModeProvider, useT } from '@/i18n';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { ProfileGate, ReminderSync } from '@/lib/profile';
@@ -16,8 +17,12 @@ import { ThemeProvider as TutorThemeProvider, useTheme, useThemeMode } from '@/t
 
 export default function RootLayout() {
   useEffect(() => {
-    // Seed dev data once on first launch (no-op if data exists). Phase 1: web/LokiJS.
-    seedIfEmpty().catch((e) => console.error('[db] seed failed', e));
+    // Seed dev data once, then (ADR-0016) back-fill schedule slots from legacy strings
+    // and materialize the rolling window of series lessons. All three are idempotent.
+    seedIfEmpty()
+      .then(ensureSlotsFromSchedule)
+      .then(materializeSchedule)
+      .catch((e) => console.error('[db] launch bootstrap failed', e));
   }, []);
 
   return (

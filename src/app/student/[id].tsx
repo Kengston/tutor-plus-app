@@ -16,10 +16,11 @@ import {
   useAllTransactions,
   useStudent,
   useStudentLessons,
+  useStudentSlots,
   useStudentSubjects,
   useStudentTransactions,
 } from '@/db/hooks';
-import type { LessonModel } from '@/db/models';
+import type { LessonModel, ScheduleSlotModel } from '@/db/models';
 import { setStudentStatus } from '@/db/mutations';
 import { debtOf, payStatusOf } from '@/domain/aggregates';
 import type { LessonFormat, PayStatus, StudentStatus } from '@/domain/types';
@@ -28,6 +29,36 @@ import { formatRub } from '@/lib/format';
 import { hhmm, nowMs } from '@/lib/time';
 import { useTheme } from '@/theme';
 import { CatAvatar, Chip, Dot, Icon, Sheet, type DotTone } from '@/ui';
+
+/** «16:00» from a slot's minutes-since-midnight. */
+function slotTimeLabel(timeMin: number): string {
+  const h = Math.floor(timeMin / 60);
+  const m = timeMin % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+/** Summarize active slots as «Пн, Ср · 16:00» groups (weekdays sharing a time), Mon-first. */
+function summarizeSlots(slots: ScheduleSlotModel[], now: number, t: (k: StringKey) => string): string {
+  const active = slots.filter((s) => s.activeTo === null || s.activeTo > now);
+  if (active.length === 0) return '';
+  const byTime = new Map<number, number[]>();
+  for (const s of active) {
+    const arr = byTime.get(s.timeMin);
+    if (arr) arr.push(s.weekday);
+    else byTime.set(s.timeMin, [s.weekday]);
+  }
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  return [...byTime.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([timeMin, wds]) => {
+      const days = order
+        .filter((w) => wds.includes(w))
+        .map((w) => t(`wd.${w}` as StringKey))
+        .join(', ');
+      return `${days} · ${slotTimeLabel(timeMin)}`;
+    })
+    .join('\n');
+}
 
 /** Student status → display key (typed so TS validates every member). */
 const STATUS_KEY: Record<StudentStatus, StringKey> = {
@@ -59,6 +90,7 @@ export default function StudentCardScreen() {
   const subjects = useStudentSubjects(id);
   const transactions = useStudentTransactions(id);
   const lessons = useStudentLessons(id);
+  const slots = useStudentSlots(id);
   const allTxns = useAllTransactions();
 
   const [contactOpen, setContactOpen] = useState(false);
@@ -92,6 +124,7 @@ export default function StudentCardScreen() {
 
   const goEdit = () => router.push({ pathname: '/student/edit/[id]', params: { id } });
   const goSchedule = () => router.push({ pathname: '/lesson/new', params: { studentId: id } });
+  const goSlots = () => router.push({ pathname: '/student/schedule/[id]', params: { id } });
   const openLesson = (lessonId: string) =>
     router.push({ pathname: '/lesson/[id]', params: { id: lessonId } });
 
@@ -177,10 +210,14 @@ export default function StudentCardScreen() {
           <DataRow label={t('lesson.rate')}>
             <Text style={[styles.value, { color: colors.body }]}>{formatRub(student.rate)}</Text>
           </DataRow>
+          {/* Schedule = editable slots (ADR-0016): show the slot summary, tap to manage. */}
           <DataRow label={t('field.schedule')}>
-            <Text style={[styles.value, { color: colors.body }]}>
-              {student.schedule || t('common.none')}
-            </Text>
+            <Pressable onPress={goSlots} accessibilityRole="button" accessibilityLabel={t('slots.manage')} style={styles.scheduleValue}>
+              <Text style={[styles.value, { color: colors.body }]}>
+                {summarizeSlots(slots, now, t) || t('common.none')}
+              </Text>
+              <Icon name="chevronRight" size={16} stroke={colors.stoneInactive} />
+            </Pressable>
           </DataRow>
           <DataRow label={t('field.phone')}>
             <Text style={[styles.value, { color: colors.body }]}>
@@ -400,6 +437,7 @@ const styles = StyleSheet.create({
   dataRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 13, gap: 12 },
   dataLabel: { width: 92, fontSize: 13.5, fontWeight: '500', paddingTop: 1 },
   dataValue: { flex: 1, alignItems: 'flex-end' },
+  scheduleValue: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
   value: { fontSize: 14.5, fontWeight: '500', textAlign: 'right' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' },
 

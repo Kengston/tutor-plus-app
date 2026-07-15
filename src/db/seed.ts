@@ -153,6 +153,10 @@ export async function seedIfEmpty(): Promise<void> {
         m.format = spec.fmt;
         m.price = spec.price;
         m.link = spec.link ?? null;
+        // Seed lessons are standalone (not slot-materialized) — ADR-0016.
+        m.slotId = null;
+        m.slotDate = null;
+        m.modified = false;
         m.lifecycleStatus = spec.life;
       });
       if (spec.pay) {

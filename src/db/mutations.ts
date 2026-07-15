@@ -118,6 +118,10 @@ export async function createLesson(input: LessonInput): Promise<LessonModel> {
       l.format = input.format;
       l.price = input.price;
       l.link = input.link?.trim() || null;
+      // Standalone lesson (ADR-0016): not tied to a slot, never regenerated.
+      l.slotId = null;
+      l.slotDate = null;
+      l.modified = false;
       l.lifecycleStatus = 'upcoming';
     }),
   );
@@ -210,6 +214,8 @@ export async function rescheduleLesson(lesson: LessonModel, startsAt: number): P
     await lesson.update((l) => {
       l.startsAt = startsAt;
       l.lifecycleStatus = 'upcoming';
+      // Manual reschedule detaches a materialized lesson from regeneration (ADR-0016).
+      l.modified = true;
     });
   });
 }

@@ -52,6 +52,31 @@ export interface Subject {
   createdAt: number;
 }
 
+/**
+ * A recurring slot in a student's weekly schedule = a series (ADR-0016). Replaces the
+ * free-form `Student.schedule` string; lessons are MATERIALIZED from active slots into a
+ * rolling window (`domain/schedule-slots`). `weekday`/`timeMin` are local wall-clock;
+ * `duration`/`format`/`price`/`subject` default from the student but are overridable here.
+ * `activeFrom`/`activeTo` are the watershed dates for scope edits (following/all, slice #25).
+ */
+export interface ScheduleSlot {
+  id: string;
+  studentId: string;
+  /** 0=Sun … 6=Sat (JS getDay convention). */
+  weekday: number;
+  /** Minutes from local midnight (16:00 → 960). */
+  timeMin: number;
+  durationMin: Duration;
+  format: LessonFormat;
+  price: number;
+  subjectId: string | null;
+  /** Local-midnight ms — the slot generates lessons from this day (inclusive). */
+  activeFrom: number;
+  /** Local-midnight ms — generation stops at this day (exclusive); null = open-ended. */
+  activeTo: number | null;
+  createdAt: number;
+}
+
 /** A scheduled event. `payStatus` is derived from linked transactions (ADR-0008). */
 export interface Lesson {
   id: string;

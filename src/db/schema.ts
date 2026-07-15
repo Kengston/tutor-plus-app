@@ -16,11 +16,16 @@
  *
  * v4 (UI-v2 S3, delta v2.1 §3.1): `lessons.link` — meeting URL on the lesson;
  * «Подключиться»/«Открыть встречу» show only for online lessons with a link.
+ *
+ * v5 (UI-v2 S6, ADR-0016): `+schedule_slots` (a student's recurring series) and
+ * `lessons.slot_id`/`slot_date`/`modified` — lessons materialized from slots into a
+ * rolling window; (slot_id, slot_date) is the idempotency key, `modified` marks a
+ * manually edited occurrence the generator must not touch.
  */
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export const schema = appSchema({
-  version: 4,
+  version: 5,
   tables: [
     tableSchema({
       name: 'students',
@@ -56,9 +61,30 @@ export const schema = appSchema({
         { name: 'format', type: 'string' },
         { name: 'price', type: 'number' },
         { name: 'link', type: 'string', isOptional: true },
+        { name: 'slot_id', type: 'string', isOptional: true, isIndexed: true },
+        { name: 'slot_date', type: 'number', isOptional: true },
+        { name: 'modified', type: 'boolean' },
         { name: 'lifecycle_status', type: 'string', isIndexed: true },
         { name: 'cancel_reason', type: 'string', isOptional: true },
         { name: 'comment', type: 'string', isOptional: true },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+    // Recurring schedule slots — a student's series (ADR-0016). Lessons are materialized
+    // from active slots; wall-clock (weekday/time_min) resolves in the device tz.
+    tableSchema({
+      name: 'schedule_slots',
+      columns: [
+        { name: 'student_id', type: 'string', isIndexed: true },
+        { name: 'weekday', type: 'number' }, // 0=Sun … 6=Sat
+        { name: 'time_min', type: 'number' }, // minutes from local midnight
+        { name: 'duration_min', type: 'number' },
+        { name: 'format', type: 'string' },
+        { name: 'price', type: 'number' },
+        { name: 'subject_id', type: 'string', isOptional: true },
+        { name: 'active_from', type: 'number' },
+        { name: 'active_to', type: 'number', isOptional: true },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
       ],
