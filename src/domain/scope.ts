@@ -1,0 +1,82 @@
+/**
+ * Series scope operations (UI-v2 S7, ADR-0016 §3–4): which lessons a scope-cancel or
+ * scope-reschedule affects, honoring the two hard invariants — the PAST is untouched
+ * (only occurrences on/after the watershed day are affected) and PROTECTED occurrences
+ * (conducted, already cancelled, or carrying a money operation) are never modified.
+ * Pure — no persistence/React/i18n, unit-tested (vitest).
+ */
+import type { LifecycleStatus } from './types';
+
+/** The three scope choices offered by the ScopeSheet. */
+export type Scope = 'one' | 'following' | 'all';
+
+/** Minimal lesson slice the scope logic reasons about. */
+export interface ScopeLessonSlice {
+  id: string;
+  slotId: string | null;
+  /** Local-midnight ms of the occurrence (the watershed axis). */
+  slotDate: number | null;
+  lifecycleStatus: LifecycleStatus;
+}
+
+/**
+ * A lesson is PROTECTED from scope edits when it is conducted or already cancelled, or
+ * when it carries a money operation (`protectedIds`) — money and history stay intact
+ * (ADR-0008/0009). Standalone «Проведено» from the prototype «включая прошедшие» is out
+ * of scope for #25 (cancel never touches the past).
+ */
+function isProtected(l: ScopeLessonSlice, protectedIds: ReadonlySet<string>): boolean {
+  return l.lifecycleStatus === 'done' || l.lifecycleStatus === 'cancelled' || protectedIds.has(l.id);
+}
+
+/**
+ * Ids of a slot's sibling lessons to affect for a scope operation whose watershed is
+ * `fromDate` (local-midnight ms): every non-protected occurrence of the SAME slot on or
+ * after `fromDate`. Callers map the scope to a watershed — `following` → the anchor's
+ * day, `all` → today — and handle `one` separately (just the anchor). Deterministic;
+ * order follows `siblings`.
+ */
+export function seriesLessonsFrom(
+  siblings: readonly ScopeLessonSlice[],
+  slotId: string,
+  fromDate: number,
+  protectedIds: ReadonlySet<string>,
+): string[] {
+  const out: string[] = [];
+  for (const l of siblings) {
+    if (l.slotId !== slotId) continue;
+    if (l.slotDate == null || l.slotDate < fromDate) continue;
+    if (isProtected(l, protectedIds)) continue;
+    out.push(l.id);
+  }
+  return out;
+}
+
+/**
+ * The full set of lesson ids a scope op affects, given the anchor lesson. `one` → just the
+ * anchor (when not protected). `following` → the anchor's day forward. `all` → `today`
+ * forward (the whole remaining series). The anchor is always included in following/all
+ * because its own day is ≥ the watershed. Returns [] if the anchor is standalone/protected.
+ */
+export function scopeAffectedLessons(params: {
+  anchor: ScopeLessonSlice;
+  siblings: readonly ScopeLessonSlice[];
+  scope: Scope;
+  today: number;
+  protectedIds: ReadonlySet<string>;
+}): string[] {
+  const { anchor, siblings, scope, today, protectedIds } = params;
+  if (anchor.slotId == null || isProtected(anchor, protectedIds)) {
+    // A standalone or protected anchor: only «one» acts, and only if it is cancellable.
+    return anchor.slotId == null && !isProtected(anchor, protectedIds) ? [anchor.id] : [];
+  }
+  if (scope === 'one') return [anchor.id];
+  const fromDate = scope === 'all' ? today : (anchor.slotDate ?? today);
+  const ids = seriesLessonsFrom(siblings, anchor.slotId, fromDate, protectedIds);
+  // Force-include the anchor ONLY when its own day is on/after the watershed — for «all»
+  // (watershed = today) a past-but-still-«upcoming» anchor must stay untouched (the past
+  // is inviolable, ADR-0016 §4); `seriesLessonsFrom` already excluded it below `fromDate`.
+  const anchorInWindow = anchor.slotDate != null && anchor.slotDate >= fromDate;
+  if (anchorInWindow && !ids.includes(anchor.id)) return [anchor.id, ...ids];
+  return ids;
+}

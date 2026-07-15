@@ -27,15 +27,22 @@ import {
 /** Minimal structural shape of a WatermelonDB/rxjs observable (avoids an rxjs import). */
 type Observableish<T> = { subscribe: (next: (value: T) => void) => { unsubscribe: () => void } };
 
-/** Subscribe to an observable, re-subscribing when `deps` change. */
+/**
+ * Subscribe to an observable, re-subscribing when `deps` change. Each emission is stored
+ * in a FRESH box `{ v }`, not `setState(value)` — a single-record observable
+ * (`findAndObserve`) re-emits the SAME cached model instance mutated in place, so
+ * `setState(value)` would hit React's `Object.is` bail-out and never re-render (a lesson
+ * detail would freeze after an in-place edit). Boxing gives every emission a new reference,
+ * so record and list hooks alike re-render (list observables already emit fresh arrays).
+ */
 export function useObservable<T>(factory: () => Observableish<T>, deps: unknown[], initial: T): T {
-  const [value, setValue] = useState<T>(initial);
+  const [box, setBox] = useState<{ v: T }>(() => ({ v: initial }));
   useEffect(() => {
-    const sub = factory().subscribe(setValue);
+    const sub = factory().subscribe((value) => setBox({ v: value }));
     return () => sub.unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
-  return value;
+  return box.v;
 }
 
 const studentsC = () => database.get<StudentModel>('students');

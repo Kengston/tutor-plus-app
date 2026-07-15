@@ -271,12 +271,42 @@ export const messages = {
   'action.cancel': 'Отменить',
   'action.undo': 'Вернуть',
 
+  // ── Series scope sheet (ADR-0016, UI-v2 S7; prototype ScopeSheet) ─────────
+  'scope.cancelTitle': 'Что отменить',
+  'scope.editTitle': 'Применить изменения',
+  'scope.cancel.one': 'Только это занятие',
+  'scope.cancel.one_client': 'Только эту встречу',
+  'scope.cancel.oneSub': 'Остальные занятия серии останутся в расписании.',
+  'scope.cancel.oneSub_client': 'Остальные встречи серии останутся в расписании.',
+  'scope.cancel.following': 'Это и следующие',
+  'scope.cancel.followingSub': 'Отменятся это и все будущие занятия серии.',
+  'scope.cancel.followingSub_client': 'Отменятся это и все будущие встречи серии.',
+  'scope.cancel.all': 'Всю серию',
+  'scope.cancel.allSub': 'Регулярные занятия будут отменены полностью.',
+  'scope.cancel.allSub_client': 'Регулярные встречи будут отменены полностью.',
+  'scope.edit.one': 'Только к этому занятию',
+  'scope.edit.one_client': 'Только к этой встрече',
+  'scope.edit.oneSub': 'Остальные занятия серии не изменятся.',
+  'scope.edit.oneSub_client': 'Остальные встречи серии не изменятся.',
+  'scope.edit.following': 'К этому и следующим',
+  'scope.edit.followingSub': 'Изменятся это и все будущие занятия серии.',
+  'scope.edit.followingSub_client': 'Изменятся это и все будущие встречи серии.',
+  'scope.edit.all': 'Ко всей серии',
+  'scope.edit.allSub': 'Изменятся все регулярные занятия серии.',
+  'scope.edit.allSub_client': 'Изменятся все регулярные встречи серии.',
+  // Cancel-reason prompt
+  'cancel.reasonTitle': 'Причина отмены',
+  'cancel.reasonPlaceholder': 'Необязательно',
+  'cancel.confirm': 'Отменить занятие',
+  'cancel.confirm_client': 'Отменить встречу',
+
   // ── Snackbar confirmations (spec 00 §подтверждения, 04-today) ────────────
   'snack.lessonDone': 'Урок проведён',
   'snack.lessonDone_client': 'Встреча проведена',
   'snack.lessonCancelled': 'Урок отменён',
   'snack.lessonCancelled_client': 'Встреча отменена',
   'snack.paymentRecorded': 'Оплата отмечена',
+  'snack.rescheduled': 'Расписание обновлено',
   'snack.undone': 'Отменено',
 
   // ── Quick actions (FAB on «Сегодня», spec 04-today) ──────────────────────

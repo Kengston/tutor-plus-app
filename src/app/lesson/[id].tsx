@@ -1,21 +1,23 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { type ReactNode, useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DateTimePickerSheet } from '@/components/DateTimePickerSheet';
 import { EmptyState } from '@/components/EmptyState';
+import { ScopeSheetBody } from '@/components/ScopeSheet';
 import { useLesson, useLessonTransactions, useStudent } from '@/db/hooks';
 import {
-  cancelLesson,
   markLessonConducted,
   recordLessonPayment,
   rescheduleLesson,
   restoreLessonLifecycle,
   reverseTransaction,
 } from '@/db/mutations';
+import { isSeriesLesson, scopeCancel, scopeReschedule } from '@/db/scope';
 import { payStatusOf } from '@/domain/aggregates';
 import { canJoinOnline, meetHost } from '@/domain/lesson-link';
+import type { Scope } from '@/domain/scope';
 import { type PayStatus, type TxnType } from '@/domain/types';
 import { lifecycleSnapshot } from '@/domain/undo';
 import { useT } from '@/i18n';
@@ -51,11 +53,19 @@ export default function LessonCardScreen() {
 
   const [rescheduling, setRescheduling] = useState(false);
   const [payingOpen, setPayingOpen] = useState(false);
+  // Scope flow state: cancel → (series? scope) → reason; reschedule → date → (series? scope).
+  const [cancelScopeOpen, setCancelScopeOpen] = useState(false);
+  const [reasonOpen, setReasonOpen] = useState(false);
+  const [reason, setReason] = useState('');
+  const [pendingCancelScope, setPendingCancelScope] = useState<Scope>('one');
+  const [pendingStartsAt, setPendingStartsAt] = useState<number | null>(null);
+  const [rescheduleScopeOpen, setRescheduleScopeOpen] = useState(false);
   const snack = useSnack();
 
+  const series = lesson ? isSeriesLesson(lesson) : false;
   const conducted = lesson?.lifecycleStatus === 'done';
 
-  // «Готово»/«Отменить» + undo: snapshot BEFORE the mutation, «Вернуть» restores it.
+  // «Готово» + undo: snapshot BEFORE the mutation, «Вернуть» restores it.
   const conductWithUndo = () => {
     if (!lesson) return;
     const snap = lifecycleSnapshot(lesson);
@@ -66,15 +76,54 @@ export default function LessonCardScreen() {
       });
     });
   };
-  const cancelWithUndo = () => {
+
+  // Cancel: a series lesson first asks the scope, then the reason; a standalone lesson
+  // goes straight to the reason. `scopeCancel` handles «one» as a single-lesson cancel.
+  const onCancelPress = () => {
     if (!lesson) return;
-    const snap = lifecycleSnapshot(lesson);
-    void cancelLesson(lesson).then(() => {
-      snack.show(t('snack.lessonCancelled'), {
-        actionLabel: t('action.undo'),
-        onAction: () => void restoreLessonLifecycle(lesson, snap),
-      });
+    setReason('');
+    if (series) setCancelScopeOpen(true);
+    else {
+      setPendingCancelScope('one');
+      setReasonOpen(true);
+    }
+  };
+  const onCancelScopePick = (scope: Scope) => {
+    setPendingCancelScope(scope);
+    setCancelScopeOpen(false);
+    setReasonOpen(true);
+  };
+  const confirmCancel = () => {
+    if (!lesson) return;
+    setReasonOpen(false);
+    void scopeCancel(lesson, pendingCancelScope, reason.trim()).then(({ undo }) => {
+      snack.show(t('snack.lessonCancelled'), { actionLabel: t('action.undo'), onAction: () => void undo() });
     });
+    // Return to the schedule after the action (prototype pattern) — the cancelled lesson
+    // leaves the timeline, and the detail is a transient action screen.
+    router.back();
+  };
+
+  // Reschedule: pick the new time, then a series lesson asks the scope; a standalone one
+  // moves directly.
+  const onReschedulePicked = (ms: number) => {
+    if (!lesson) return;
+    if (series) {
+      setPendingStartsAt(ms);
+      setRescheduleScopeOpen(true);
+    } else {
+      void rescheduleLesson(lesson, ms);
+      router.back();
+    }
+  };
+  const onRescheduleScopePick = (scope: Scope) => {
+    setRescheduleScopeOpen(false);
+    if (!lesson || pendingStartsAt === null) return;
+    void scopeReschedule(lesson, scope, pendingStartsAt).then(({ undo }) => {
+      snack.show(t('snack.rescheduled'), { actionLabel: t('action.undo'), onAction: () => void undo() });
+    });
+    // Return to the schedule, which reflects the new time (prototype pattern).
+    router.back();
   };
   // Money undo (ADR-0002): «Отменить» appends the COMPENSATING row — never deletes.
   const recordPaymentWithUndo = (type: Exclude<TxnType, 'expected'>) => {
@@ -140,6 +189,13 @@ export default function LessonCardScreen() {
                 </View>
               </View>
             </Field>
+            {/* Cancel reason (S7) — shown once a cancelled lesson carries one. */}
+            {lesson.lifecycleStatus === 'cancelled' && lesson.cancelReason ? (
+              <>
+                <Hairline />
+                <Field label={t('cancel.reasonTitle')} value={lesson.cancelReason} />
+              </>
+            ) : null}
           </Card>
 
           <View style={styles.actions}>
@@ -198,7 +254,7 @@ export default function LessonCardScreen() {
               </Pressable>
 
               <Pressable
-                onPress={cancelWithUndo}
+                onPress={onCancelPress}
                 style={({ pressed }) => [
                   styles.action,
                   styles.actionGhost,
@@ -216,8 +272,40 @@ export default function LessonCardScreen() {
             initial={lesson.startsAt}
             title={t('action.reschedule')}
             onClose={() => setRescheduling(false)}
-            onPick={(ms) => rescheduleLesson(lesson, ms)}
+            onPick={onReschedulePicked}
           />
+
+          {/* Series scope sheets (ADR-0016 §3): cancel or reschedule this / following / all. */}
+          {cancelScopeOpen ? (
+            <Sheet title={t('scope.cancelTitle')} onClose={() => setCancelScopeOpen(false)}>
+              <ScopeSheetBody mode="cancel" onPick={onCancelScopePick} />
+            </Sheet>
+          ) : null}
+          {rescheduleScopeOpen ? (
+            <Sheet title={t('scope.editTitle')} onClose={() => setRescheduleScopeOpen(false)}>
+              <ScopeSheetBody mode="edit" onPick={onRescheduleScopePick} />
+            </Sheet>
+          ) : null}
+
+          {/* Cancel-reason prompt (the reason is stored and shown in the details). */}
+          {reasonOpen ? (
+            <Sheet title={t('cancel.reasonTitle')} onClose={() => setReasonOpen(false)}>
+              <View style={styles.reasonSheet}>
+                <TextInput
+                  value={reason}
+                  onChangeText={setReason}
+                  placeholder={t('cancel.reasonPlaceholder')}
+                  placeholderTextColor={colors.muted}
+                  style={[styles.reasonInput, { borderRadius: radius.control, color: colors.heading, backgroundColor: colors.stoneLight, borderColor: colors.hairline }]}
+                />
+                <Pressable
+                  onPress={confirmCancel}
+                  style={({ pressed }) => [styles.reasonConfirm, { backgroundColor: colors.danger, borderRadius: radius.field }, pressed && styles.pressed]}>
+                  <Text style={[styles.reasonConfirmLabel, { color: colors.onTint }]}>{t('cancel.confirm')}</Text>
+                </Pressable>
+              </View>
+            </Sheet>
+          ) : null}
 
           {payingOpen ? (
             <Sheet title={t('lesson.recordPayment')} onClose={() => setPayingOpen(false)}>
@@ -330,6 +418,10 @@ const styles = StyleSheet.create({
   },
   actionGhost: { flex: 1 },
   actionLabel: { fontSize: 15, fontWeight: '600' },
+  reasonSheet: { gap: 12 },
+  reasonInput: { borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15 },
+  reasonConfirm: { paddingVertical: 15, alignItems: 'center' },
+  reasonConfirmLabel: { fontSize: 15.5, fontWeight: '600' },
   paySheet: { gap: 10 },
   payChoice: {
     flexDirection: 'row',
