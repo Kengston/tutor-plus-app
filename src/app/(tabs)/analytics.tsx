@@ -22,15 +22,16 @@ import { Screen } from '@/components/Screen';
 import { useAllLessons, useAllTransactions, useStudents, useSubjects } from '@/db/hooks';
 import type { LessonModel } from '@/db/models';
 import {
+  activeStudentsInPeriod,
   avgCheckInPeriod,
   cancellationsInPeriod,
   debtors,
+  dynamicsHighlight,
   entriesInPeriod,
   financeEntries,
   incomeByFormat,
   incomeByStudent,
   incomeInPeriod,
-  lessonsByBucket,
   lessonsConductedInPeriod,
   metricDelta,
   overviewInsights,
@@ -39,16 +40,15 @@ import {
   topDirections,
   type OverviewInsight,
 } from '@/domain/aggregates';
-import { plural, useT, type StringKey } from '@/i18n';
+import { useT, type StringKey } from '@/i18n';
 import { downloadCsv, toCsv } from '@/lib/csv';
 import { formatNumberRu, formatRub } from '@/lib/format';
 import {
   currentMonth,
   monthOf,
   monthStarts,
+  periodQuarters,
   shiftPeriod,
-  weekOf,
-  weekStarts,
   type Period,
 } from '@/lib/period';
 import { nowMs } from '@/lib/time';
@@ -59,6 +59,7 @@ import {
   Donut,
   Icon,
   KpiStat,
+  LineCompareChart,
   MultiBarChart,
   SectionLabel,
   Segmented,
@@ -136,7 +137,6 @@ export default function AnalyticsScreen() {
 
   // ── Big-metric inputs (all DERIVED) ──
   const debtTotal = useMemo(() => debtors(txns).reduce((sum, d) => sum + d.amount, 0), [txns]);
-  const conductedCount = lessonsConductedInPeriod(lessons, period);
   const incomeNow = incomeInPeriod(txns, period);
 
   // ── Coverage: empty when the period has NO paid txns AND NO lessons in it ──
@@ -212,22 +212,10 @@ export default function AnalyticsScreen() {
         </View>
       ) : (
         <>
-          {/* Big metric — animated. */}
+          {/* Big metric — animated (Обзор only; Динамика owns its metric headline inside). */}
           {tab === 'overview' ? (
             <CountUp value={incomeNow} format={(v) => formatRub(v)} style={StyleSheet.flatten([styles.metric, { color: colors.heading }])} />
-          ) : (
-            <CountUp
-              value={conductedCount}
-              format={(v) =>
-                `${formatNumberRu(v)} ${plural(Math.round(v), {
-                  one: t('unit.lessons.one'),
-                  few: t('unit.lessons.few'),
-                  many: t('unit.lessons.many'),
-                })}`
-              }
-              style={StyleSheet.flatten([styles.metric, { color: colors.heading }])}
-            />
-          )}
+          ) : null}
 
           {tab === 'overview' ? (
             <OverviewBody
@@ -238,7 +226,7 @@ export default function AnalyticsScreen() {
               studentName={studentName}
             />
           ) : (
-            <DynamicsBody lessons={lessons} period={period} />
+            <DynamicsBody lessons={lessons} txns={txns} period={period} />
           )}
         </>
       )}
@@ -342,7 +330,8 @@ function OverviewBody({
   // so without an explicit pick there is no baseline → «Нет данных для сравнения», not a 0% self-compare.
   const hasBaseline = compareCustom != null || period.type !== 'custom';
   const delta = metricDelta(incomeInPeriod(txns, period), hasBaseline ? incomeInPeriod(txns, comparePeriod) : 0);
-  const compareLabel = compareCustom ? periodLabelOf(compareCustom) : t('analytics.comparePrev');
+  // Name the ACTUAL comparison period (concrete «Июнь 2026», not the generic «Предыдущий период»).
+  const compareLabel = hasBaseline ? periodLabelOf(comparePeriod) : t('common.none');
 
   // (e) «Выводы» — rule-based, composed from the pure generator ([] → correct empty state).
   const insights = useMemo(() => overviewInsights(txns, period, comparePeriod), [txns, period, comparePeriod]);
@@ -449,48 +438,190 @@ function OverviewBody({
 
 // ── ДИНАМИКА ───────────────────────────────────────────────────────────────────
 
+/** The three Dynamics metrics (spec 08 §8.2) — a stable key; labels/formatting at render. */
+type DynMetric = 'lessons' | 'income' | 'students';
+
 function DynamicsBody({
   lessons,
+  txns,
   period,
 }: {
-  lessons: Parameters<typeof lessonsByBucket>[0];
+  lessons: LessonModel[];
+  txns: Parameters<typeof topDirections>[1];
   period: Period;
 }) {
   const t = useT();
+  const { colors, radius } = useTheme();
+  const periodLabelOf = usePeriodLabel();
 
-  // Weekly CONDUCTED-LESSON bars (matches the «Уроки» headline + «Уроки по неделям» section);
-  // keep the last ~6 weeks when there are many. Tooltip is a lesson count, not money.
-  const weekBars = useMemo<BarDatum[]>(() => {
-    let weeks = weekStarts(period.start, period.end);
-    if (weeks.length > 6) weeks = weeks.slice(weeks.length - 6);
-    const vals = lessonsByBucket(lessons, weeks, (ms) => weekOf(ms).start);
-    const max = Math.max(1, ...vals);
-    return weeks.map((anchor, i) => ({
-      label: String(new Date(anchor).getDate()), // start day-number — DATA, not UI copy
-      v: vals[i] / max,
-      value: `${formatNumberRu(vals[i])} ${plural(vals[i], {
-        one: t('unit.lessons.one'),
-        few: t('unit.lessons.few'),
-        many: t('unit.lessons.many'),
-      })}`,
-      on: i === weeks.length - 1,
-    }));
-  }, [lessons, period, t]);
+  const [metric, setMetric] = useState<DynMetric>('lessons');
 
-  // Comparison on conducted-lesson COUNTS vs the previous period of the same type.
-  const prev = shiftPeriod(period, -1);
-  const delta = metricDelta(lessonsConductedInPeriod(lessons, period), lessonsConductedInPeriod(lessons, prev));
+  // Comparison period — same selectable pattern as Обзор (custom main range has no default baseline).
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [compareCustom, setCompareCustom] = useState<Period | null>(null);
+  const comparePeriod = compareCustom ?? shiftPeriod(period, -1);
+  const hasBaseline = compareCustom != null || period.type !== 'custom';
+
+  // One evaluator for «metric over a period» — reused for totals AND the 4 chart sub-ranges.
+  const metricInPeriod = (m: DynMetric, p: Period): number =>
+    m === 'income' ? incomeInPeriod(txns, p) : m === 'lessons' ? lessonsConductedInPeriod(lessons, p) : activeStudentsInPeriod(lessons, p);
+
+  const totals: Record<DynMetric, number> = {
+    lessons: metricInPeriod('lessons', period),
+    income: metricInPeriod('income', period),
+    students: metricInPeriod('students', period),
+  };
+  const prevTotal = hasBaseline ? metricInPeriod(metric, comparePeriod) : 0;
+  const delta = metricDelta(totals[metric], prevTotal);
+
+  // Line-chart series: the same metric over 4 aligned sub-ranges of each period (spec §8.2).
+  const quarters = periodQuarters(period);
+  const cur = quarters.map((q) => metricInPeriod(metric, q));
+  const prev = hasBaseline ? periodQuarters(comparePeriod).map((q) => metricInPeriod(metric, q)) : null;
+  // Sub-range labels follow the MAIN period's type: month/week/custom → day ranges («1–7»,
+  // day-aligned so they never overlap); year → calendar-quarter month ranges («Янв–Мар»).
+  // These feed the axis, the point tooltip header AND the «ГЛАВНОЕ ЗА ПЕРИОД» text.
+  const qLabel = (q: Period): string => {
+    if (q.end <= q.start) return String(new Date(q.start).getDate()); // degenerate <4-day chunk
+    if (period.type === 'year') {
+      const a = t(`month.${new Date(q.start).getMonth()}` as StringKey).slice(0, 3);
+      const b = t(`month.${new Date(q.end - 1).getMonth()}` as StringKey).slice(0, 3);
+      return a === b ? a : `${a}–${b}`;
+    }
+    const d1 = new Date(q.start).getDate();
+    const d2 = new Date(q.end - 1).getDate();
+    return d1 === d2 ? String(d1) : `${d1}–${d2}`;
+  };
+  const labels = quarters.map(qLabel);
+
+  const isMoney = metric === 'income';
+  const fmt = (n: number) => (isMoney ? formatRub(n) : formatNumberRu(n));
+  const fmtAxis = (n: number) => (isMoney ? shortRub(Math.round(n)).replace(' ₽', '') : String(Math.round(n)));
+
+  const METRIC_LABEL: Record<DynMetric, string> = {
+    lessons: t('dyn.mLessons'),
+    income: t('dyn.mIncome'),
+    students: t('dyn.mStudents'),
+  };
+
+  // «ГЛАВНОЕ ЗА ПЕРИОД» — the sub-range with the largest divergence (null → empty state).
+  const highlight = prev ? dynamicsHighlight(cur, prev) : null;
+
+  // Name the ACTUAL comparison period (spec §8.2 — «Сравнение с апрелем 2026», легенда «Май / Апрель»),
+  // not the generic «Предыдущий период»; no baseline (custom main, nothing picked) → «—».
+  const compareLabel = hasBaseline ? periodLabelOf(comparePeriod) : t('common.none');
+  const good = delta.dir === 'up' || delta.dir === 'flat';
 
   return (
     <View style={styles.body}>
+      {/* Metric selector — each segment shows its label + total; active is raised. */}
+      <View style={[styles.dynSelector, { backgroundColor: colors.stoneLight, borderRadius: radius.field }]}>
+        {(['lessons', 'income', 'students'] as const).map((m) => {
+          const on = m === metric;
+          return (
+            <Pressable
+              key={m}
+              onPress={() => setMetric(m)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+              style={({ pressed }) => [
+                styles.dynSegment,
+                { borderRadius: radius.field - 4 },
+                on && { backgroundColor: colors.surface },
+                pressed && styles.pressed,
+              ]}>
+              <Text style={[styles.dynSegLabel, { color: on ? colors.heading : colors.muted }]} numberOfLines={1}>
+                {METRIC_LABEL[m]}
+              </Text>
+              <Text style={[styles.dynSegValue, { color: colors.heading }]} numberOfLines={1}>
+                {m === 'income' ? formatRub(totals[m]) : formatNumberRu(totals[m])}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {/* Headline: selected metric value + delta badge + plain-words comparison line. */}
+      <Card style={styles.dynHeadCard}>
+        <View style={styles.dynHeadRow}>
+          <Text style={[styles.dynHeadValue, { color: colors.heading }]}>{fmt(totals[metric])}</Text>
+          {delta.pct !== null ? (
+            <View style={[styles.comparePill, { backgroundColor: good ? colors.accentSoft : colors.dangerLight }]}>
+              <Text style={[styles.comparePillText, { color: good ? colors.heading : colors.danger }]}>
+                {`${delta.pct > 0 ? '+' : ''}${delta.pct}%`}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+        {delta.pct !== null ? (
+          <Text style={[styles.dynHeadSub, { color: colors.muted }]}>
+            {`${t('dyn.by')} ${isMoney ? formatRub(Math.abs(delta.abs)) : formatNumberRu(Math.abs(delta.abs))} ${
+              delta.abs >= 0 ? t('dyn.deltaMore') : t('dyn.deltaLess')
+            } — ${t('dyn.was')} ${fmt(prevTotal)}`}
+          </Text>
+        ) : (
+          <View style={styles.compareInfoRow}>
+            <Icon name="info" size={15} sw={1.8} stroke={colors.muted} />
+            <Text style={[styles.compareInfoText, { color: colors.muted }]}>{t('analytics.noCompare')}</Text>
+          </View>
+        )}
+
+        {/* Compare-period selector (opens the shared PeriodSheet). */}
+        <Pressable
+          onPress={() => setCompareOpen(true)}
+          accessibilityRole="button"
+          hitSlop={6}
+          style={({ pressed }) => [styles.dynCompareRow, pressed && styles.pressed]}>
+          <Text style={[styles.dynCompareText, { color: colors.muted }]} numberOfLines={1}>
+            {`${t('analytics.comparePick')}: ${compareLabel}`}
+          </Text>
+          <Icon name="chevronDown" size={13} sw={1.9} stroke={colors.primary} />
+        </Pressable>
+
+        {/* Comparative line chart — solid current / dashed comparison; `key` resets the
+            tapped point when the metric switches (values change meaning). */}
+        <LineCompareChart
+          key={metric}
+          labels={labels}
+          current={cur}
+          compare={prev}
+          height={168}
+          formatValue={fmt}
+          formatAxis={fmtAxis}
+          legendCurrent={periodLabelOf(period)}
+          legendCompare={hasBaseline ? compareLabel : undefined}
+          diffLabel={t('dyn.diff')}
+        />
+      </Card>
+
+      {/* «ГЛАВНОЕ ЗА ПЕРИОД» — auto-highlight from the same series (or a correct empty state). */}
       <View>
-        <SectionLabel>{t('analytics.byWeeks')}</SectionLabel>
-        <Card style={styles.chartCard}>
-          <MultiBarChart data={weekBars} height={150} />
+        <SectionLabel>{t('dyn.highlight')}</SectionLabel>
+        <Card style={styles.insightsCard}>
+          {highlight ? (
+            <View style={styles.insRow}>
+              <View style={[styles.insIcon, { backgroundColor: colors.accentSoft }]}>
+                <Icon name="sparkle" size={14} sw={1.8} stroke={colors.heading} />
+              </View>
+              <Text style={[styles.insText, { color: colors.body }]}>
+                {`${highlight.dir === 'up' ? t('dyn.hlGrowth') : t('dyn.hlDecline')} ${labels[highlight.quarter]}: ${t('dyn.hlBy')} ${
+                  isMoney ? formatRub(highlight.diff) : formatNumberRu(highlight.diff)
+                } ${highlight.dir === 'up' ? t('dyn.hlMoreTail') : t('dyn.hlLessTail')}`}
+              </Text>
+            </View>
+          ) : (
+            <Text style={[styles.insEmpty, { color: colors.muted }]}>{t('dyn.hlEmpty')}</Text>
+          )}
         </Card>
       </View>
-      {/* Comparison skipped for custom ranges (no well-defined previous period). */}
-      {period.type !== 'custom' ? <ComparisonCard delta={delta} /> : null}
+
+      {/* Compare-period picker (arbitrary period via the shared sheet). */}
+      <PeriodSheet
+        visible={compareOpen}
+        period={comparePeriod}
+        onClose={() => setCompareOpen(false)}
+        onApply={(p) => setCompareCustom(p)}
+      />
     </View>
   );
 }
@@ -851,6 +982,18 @@ const styles = StyleSheet.create({
   compareVs: { fontSize: 13, fontWeight: '500' },
   compareInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   compareInfoText: { fontSize: 14, fontWeight: '500' },
+
+  // Динамика: metric selector + headline + compare row
+  dynSelector: { flexDirection: 'row', gap: 4, padding: 4 },
+  dynSegment: { flex: 1, minWidth: 0, alignItems: 'center', paddingVertical: 9, paddingHorizontal: 6, gap: 4 },
+  dynSegLabel: { fontSize: 11.5, fontWeight: '500' },
+  dynSegValue: { fontSize: 17, fontWeight: '700', letterSpacing: -0.4, fontVariant: ['tabular-nums'] },
+  dynHeadCard: { paddingVertical: 16, paddingHorizontal: 16 },
+  dynHeadRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  dynHeadValue: { fontSize: 26, fontWeight: '700', letterSpacing: -0.6, fontVariant: ['tabular-nums'] },
+  dynHeadSub: { fontSize: 13, marginTop: 7, lineHeight: 18 },
+  dynCompareRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 12, marginBottom: 10 },
+  dynCompareText: { fontSize: 12.5, fontWeight: '500' },
 
   // insights (Выводы)
   insightsCard: { paddingVertical: 4 },

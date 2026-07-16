@@ -366,6 +366,44 @@ export function cancellationsInPeriod(lessons: readonly LessonSlice[], period: P
   return n;
 }
 
+/** Distinct students with a CONDUCTED lesson in period — the Dynamics «Ученики» metric
+ *  (consistent with «Занятия» = conducted count, spec 08 §8.2). */
+export function activeStudentsInPeriod(
+  lessons: readonly Pick<LessonSlice, 'studentId' | 'lifecycleStatus' | 'startsAt'>[],
+  period: Period,
+): number {
+  const ids = new Set<string>();
+  for (const l of lessons) {
+    if (l.lifecycleStatus === 'done' && periodContains(period, l.startsAt)) ids.add(l.studentId);
+  }
+  return ids.size;
+}
+
+/**
+ * «ГЛАВНОЕ ЗА ПЕРИОД» (spec 08 §8.2) — the sub-range where the current period diverged most
+ * from the comparison (largest |cur−prev|). Pure and conservative: `null` when the series are
+ * empty, equal, or the baseline is all-zero (nothing meaningful to say) — the screen then
+ * shows a correct empty state. `quarter` indexes the periodQuarters sub-range.
+ */
+export function dynamicsHighlight(
+  cur: readonly number[],
+  prev: readonly number[],
+): { quarter: number; diff: number; dir: 'up' | 'down' } | null {
+  if (cur.length === 0 || prev.every((v) => v === 0)) return null;
+  let best = -1;
+  let bestAbs = 0;
+  for (let i = 0; i < cur.length; i += 1) {
+    const d = Math.abs(cur[i] - (prev[i] ?? 0));
+    if (d > bestAbs) {
+      bestAbs = d;
+      best = i;
+    }
+  }
+  if (best < 0) return null; // all quarters equal — no divergence to highlight
+  const diff = cur[best] - (prev[best] ?? 0);
+  return { quarter: best, diff: Math.abs(diff), dir: diff >= 0 ? 'up' : 'down' };
+}
+
 /** Average payment in period = received / count(paid) (rounded; 0 if none). */
 export function avgCheckInPeriod(transactions: readonly PaidTxnSlice[], period: Period): number {
   let sum = 0;

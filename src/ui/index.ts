@@ -13,6 +13,7 @@ export * from './Ring';
 export * from './DayLane';
 export * from './Donut';
 export * from './MultiBarChart';
+export * from './LineCompareChart';
 export * from './CountUp';
 export * from './SwipeRow';
 export * from './Sheet';

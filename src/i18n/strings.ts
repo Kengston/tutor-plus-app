@@ -555,6 +555,27 @@ export const messages = {
   'analytics.comparePick': 'Период сравнения',
   'analytics.comparePrev': 'Предыдущий период',
   'analytics.vsCompare': 'по сравнению с выбранным периодом',
+
+  // ── Динамика: метрики + график + «Главное за период» (UI-v2 S12, spec 08 §8.2) ──
+  'dyn.mLessons': 'Занятия',
+  'dyn.mLessons_client': 'Встречи',
+  'dyn.mIncome': 'Доход',
+  'dyn.mStudents': 'Ученики',
+  'dyn.mStudents_client': 'Клиенты',
+  'dyn.diff': 'Разница',
+  // Headline subtitle fragments: «На 3 больше, чем за период сравнения — было 45»
+  'dyn.by': 'На',
+  'dyn.deltaMore': 'больше, чем за период сравнения',
+  'dyn.deltaLess': 'меньше, чем за период сравнения',
+  'dyn.was': 'было',
+  // «Главное за период» — auto-highlight fragments
+  'dyn.highlight': 'Главное за период',
+  'dyn.hlGrowth': 'Основной рост пришёлся на отрезок',
+  'dyn.hlDecline': 'Основное снижение пришлось на отрезок',
+  'dyn.hlMoreTail': 'больше, чем за тот же отрезок сравнения',
+  'dyn.hlLessTail': 'меньше, чем за тот же отрезок сравнения',
+  'dyn.hlBy': 'на',
+  'dyn.hlEmpty': 'Недостаточно данных для вывода за период',
   'analytics.compareBtn': 'Сравнить',
   'analytics.currentPeriod': 'текущий период',
   'analytics.pastPeriod': 'прошлый период',
