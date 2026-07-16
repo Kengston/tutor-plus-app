@@ -7,7 +7,7 @@
  * only owns presentation state (period / active tab / search query) and routes drill-downs
  * (a lesson-sourced row opens the lesson; a standalone op opens the operation detail).
  */
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -52,6 +52,20 @@ export default function FinanceScreen() {
   const [periodOpen, setPeriodOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [infoOpen, setInfoOpen] = useState(false); // ⓘ tap-to-reveal on «Фактически получено»
+
+  // Deep-link entry (`?tab=debts` — «Все задолженности в финансах», spec 08 §8.3). Applied once
+  // per param PAIR via the render-time state-adjustment idiom (mirrors schedule.tsx) so the user
+  // can freely switch tabs afterwards without the stale param snapping back; the sender attaches
+  // a `t` nonce so repeated drill-ins re-apply even when the tab value is the same.
+  const params = useLocalSearchParams<{ tab?: string; t?: string }>();
+  const paramsKey = `${params.tab ?? ''}|${params.t ?? ''}`;
+  const [appliedTabParam, setAppliedTabParam] = useState('|');
+  if (paramsKey !== '|' && paramsKey !== appliedTabParam) {
+    setAppliedTabParam(paramsKey);
+    if (params.tab === 'all' || params.tab === 'paid' || params.tab === 'debts' || params.tab === 'expected') {
+      setTab(params.tab);
+    }
+  }
 
   // ── Reactive data (whole ledger + lessons + expectations; students/subjects for names) ──
   const lessons = useAllLessons();

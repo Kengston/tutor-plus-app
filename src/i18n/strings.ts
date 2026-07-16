@@ -526,7 +526,6 @@ export const messages = {
   'analytics.income': 'Доход',
   'analytics.lessons': 'Уроки',
   'analytics.lessons_client': 'Встречи',
-  'analytics.debt': 'Долг',
   'analytics.kpiLessons': 'Уроков',
   'analytics.kpiLessons_client': 'Встреч',
   'analytics.kpiCancels': 'Отмены',
@@ -576,6 +575,22 @@ export const messages = {
   'dyn.hlLessTail': 'меньше, чем за тот же отрезок сравнения',
   'dyn.hlBy': 'на',
   'dyn.hlEmpty': 'Недостаточно данных для вывода за период',
+
+  // ── Задолженности: aging + плитки + «Требуют внимания» (UI-v2 S13, spec 08 §8.3) ──
+  'debt.awaiting': 'Ожидают оплаты',
+  'debt.toPrev': 'к предыдущему периоду',
+  'debt.withDebtTail': 'с долгом',
+  'debt.overdueTile': 'просрочено',
+  'debt.aging': 'По сроку',
+  'debt.agingFresh': 'Ещё не просрочено',
+  'debt.aging14': 'Просрочено до 14 дней',
+  'debt.aging14plus': 'Больше 14 дней',
+  'debt.attention': 'Требуют внимания',
+  'debt.allInFinance': 'Все задолженности в финансах',
+
+  // ── Экспорт: предпросмотр отчёта (UI-v2 S13, spec 08 §8.4) ────────────────
+  'export.preview': 'Предпросмотр',
+  'export.structure': 'Структура',
   'analytics.compareBtn': 'Сравнить',
   'analytics.currentPeriod': 'текущий период',
   'analytics.pastPeriod': 'прошлый период',
@@ -594,8 +609,6 @@ export const messages = {
   // ── Аналитика: пусто / частично / задолженности ──────────────────────────
   'analytics.noDataHint': 'За выбранный период нет данных для аналитики. Выберите другой период.',
   'analytics.partial': 'Данные есть не за весь период',
-  'analytics.debtors': 'Ученики с долгом',
-  'analytics.debtors_client': 'Клиенты с долгом',
   'analytics.noDebts': 'Активных задолженностей нет',
   'analytics.allPaid': 'Все оплаты получены',
   'analytics.debtTitle': 'Задолженность',

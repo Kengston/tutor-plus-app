@@ -25,6 +25,8 @@ import {
   activeStudentsInPeriod,
   avgCheckInPeriod,
   cancellationsInPeriod,
+  debtAgingBuckets,
+  debtAsOf,
   debtors,
   dynamicsHighlight,
   entriesInPeriod,
@@ -38,9 +40,10 @@ import {
   paidByBucket,
   subjectTotals,
   topDirections,
+  unsettledDebts,
   type OverviewInsight,
 } from '@/domain/aggregates';
-import { useT, type StringKey } from '@/i18n';
+import { plural, useT, type StringKey } from '@/i18n';
 import { downloadCsv, toCsv } from '@/lib/csv';
 import { formatNumberRu, formatRub } from '@/lib/format';
 import {
@@ -123,13 +126,13 @@ export default function AnalyticsScreen() {
   const periodLabelOf = usePeriodLabel();
   const periodLabel = periodLabelOf(period);
 
-  // Per-tab eyebrow (label before « · <period>»).
+  // Per-tab eyebrow (label before « · <period>»); Задолженности use the spec's «Ожидают оплаты».
   const eyebrow =
     tab === 'overview'
       ? t('analytics.income')
       : tab === 'dynamics'
         ? t('analytics.lessons')
-        : t('analytics.debt');
+        : t('debt.awaiting');
 
   // Debt is point-in-time (whole-ledger, ADR-0012) — the period selector does NOT scope it,
   // so on the Задолженности tab we drop the period suffix/chevron and don't open the sheet.
@@ -193,8 +196,14 @@ export default function AnalyticsScreen() {
           <CountUp value={debtTotal} format={(v) => formatRub(v)} style={StyleSheet.flatten([styles.metric, { color: colors.danger }])} />
           <DebtsBody
             txns={txns}
+            period={period}
             studentName={studentName}
             onOpen={(id) => router.push({ pathname: '/student/[id]', params: { id } })}
+            onOpenFinance={() =>
+              // `t` nonce → the param pair changes every push, so finance's applied-once
+              // deep-link idiom re-fires even after the user switched tabs (review fix S13).
+              router.push({ pathname: '/finance', params: { tab: 'debts', t: String(Date.now()) } })
+            }
           />
         </>
       ) : !hasData ? (
@@ -630,18 +639,33 @@ function DynamicsBody({
 
 function DebtsBody({
   txns,
+  period,
   studentName,
   onOpen,
+  onOpenFinance,
 }: {
-  txns: Parameters<typeof debtors>[0];
+  txns: Parameters<typeof unsettledDebts>[0];
+  period: Period;
   studentName: (id: string) => string;
   onOpen: (studentId: string) => void;
+  onOpenFinance: () => void;
 }) {
   const t = useT();
-  const { colors } = useTheme();
+  const { colors, radius } = useTheme();
+  const now = nowMs();
 
   const ds = debtors(txns);
   const maxDebt = Math.max(1, ...ds.map((d) => d.amount));
+
+  // Delta «к предыдущему периоду» — debt now vs the ledger replayed to the period's start.
+  const debtNow = ds.reduce((s, d) => s + d.amount, 0);
+  const deltaAbs = debtNow - debtAsOf(txns, period.start);
+
+  // Aging over unsettled positions (spec §8.3): fresh / до 14 дней / больше 14.
+  const positions = unsettledDebts(txns);
+  const aging = debtAgingBuckets(positions, now);
+  const overdueCount = aging.d14.count + aging.over14.count;
+  const agingMax = Math.max(1, aging.fresh.amount, aging.d14.amount, aging.over14.amount);
 
   if (ds.length === 0) {
     return (
@@ -654,10 +678,85 @@ function DebtsBody({
     );
   }
 
+  const agingRows: { key: string; label: string; bucket: { amount: number; count: number }; dot: string }[] = [
+    { key: 'fresh', label: t('debt.agingFresh'), bucket: aging.fresh, dot: colors.stoneInactive },
+    { key: 'd14', label: t('debt.aging14'), bucket: aging.d14, dot: colors.warning },
+    { key: 'over14', label: t('debt.aging14plus'), bucket: aging.over14, dot: colors.danger },
+  ];
+
   return (
     <View style={styles.body}>
+      {/* Delta badge — debt going DOWN is good (paid-green), up is danger. */}
+      {deltaAbs !== 0 ? (
+        <View style={styles.debtDeltaRow}>
+          <View style={[styles.comparePill, { backgroundColor: deltaAbs < 0 ? colors.accentSoft : colors.dangerLight }]}>
+            <Text style={[styles.comparePillText, { color: deltaAbs < 0 ? colors.heading : colors.danger }]}>
+              {`${deltaAbs < 0 ? '−' : '+'}${formatRub(Math.abs(deltaAbs))}`}
+            </Text>
+          </View>
+          <Text style={[styles.compareVs, { color: colors.muted }]}>{t('debt.toPrev')}</Text>
+        </View>
+      ) : null}
+
+      {/* Drill tiles: «N учеников с долгом ›» + «N просрочено ›» (both land on Финансы · Долги). */}
+      <View style={styles.debtTiles}>
+        <Pressable
+          onPress={onOpenFinance}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.debtTile, { backgroundColor: colors.surface, borderRadius: radius.card }, pressed && styles.pressed]}>
+          <Text style={[styles.debtTileValue, { color: colors.heading }]}>{formatNumberRu(ds.length)}</Text>
+          <View style={styles.debtTileLabelRow}>
+            <Text numberOfLines={1} style={[styles.debtTileLabel, { color: colors.muted }]}>
+              {`${plural(ds.length, { one: t('unit.students.one'), few: t('unit.students.few'), many: t('unit.students.many') })} ${t('debt.withDebtTail')}`}
+            </Text>
+            <Icon name="chevronRight" size={14} stroke={colors.stoneInactive} />
+          </View>
+        </Pressable>
+        <Pressable
+          onPress={onOpenFinance}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.debtTile, { backgroundColor: colors.surface, borderRadius: radius.card }, pressed && styles.pressed]}>
+          <Text style={[styles.debtTileValue, { color: overdueCount > 0 ? colors.danger : colors.heading }]}>
+            {formatNumberRu(overdueCount)}
+          </Text>
+          <View style={styles.debtTileLabelRow}>
+            <Text numberOfLines={1} style={[styles.debtTileLabel, { color: colors.muted }]}>{t('debt.overdueTile')}</Text>
+            <Icon name="chevronRight" size={14} stroke={colors.stoneInactive} />
+          </View>
+        </Pressable>
+      </View>
+
+      {/* «По сроку» — aging buckets, each with a coloured dot, a scale and the bucket sum. */}
       <View>
-        <SectionLabel>{t('analytics.debtors')}</SectionLabel>
+        <SectionLabel>{t('debt.aging')}</SectionLabel>
+        <Card style={styles.listCard}>
+          {agingRows.map((r, i) => (
+            <View key={r.key}>
+              {i > 0 ? <View style={[styles.insSep, { backgroundColor: colors.hairline }]} /> : null}
+              <View style={styles.barRow}>
+                <View style={styles.barRowHead}>
+                  <View style={styles.agingLabelWrap}>
+                    <View style={[styles.legendDot, { backgroundColor: r.dot }]} />
+                    <Text numberOfLines={1} style={[styles.debtorName, { color: colors.heading }]}>{r.label}</Text>
+                  </View>
+                  <Text style={[styles.debtorAmount, { color: r.bucket.amount > 0 ? colors.heading : colors.muted }]}>
+                    {formatRub(r.bucket.amount)}
+                  </Text>
+                </View>
+                <View style={[styles.progressTrack, { backgroundColor: colors.stoneLight }]}>
+                  <View
+                    style={[styles.progressFill, { width: `${(r.bucket.amount / agingMax) * 100}%`, backgroundColor: r.dot }]}
+                  />
+                </View>
+              </View>
+            </View>
+          ))}
+        </Card>
+      </View>
+
+      {/* «Требуют внимания» — debtors ranked by amount; a row opens the student. */}
+      <View>
+        <SectionLabel>{t('debt.attention')}</SectionLabel>
         <Card style={styles.listCard}>
           {ds.map((d) => (
             <Pressable
@@ -679,6 +778,15 @@ function DebtsBody({
               </View>
             </Pressable>
           ))}
+          {/* Cross-link to the Finance ledger, filtered to debts. */}
+          <View style={[styles.insSep, { backgroundColor: colors.hairline }]} />
+          <Pressable
+            onPress={onOpenFinance}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.debtFinanceLink, pressed && styles.pressed]}>
+            <Text style={[styles.debtFinanceLinkText, { color: colors.primaryDeep }]}>{t('debt.allInFinance')}</Text>
+            <Icon name="chevronRight" size={15} sw={2} stroke={colors.primaryDeep} />
+          </Pressable>
         </Card>
       </View>
     </View>
@@ -853,6 +961,28 @@ function ExportSheet({
         <SectionToggle label={t('export.debts')} on={sections.debts} onPress={() => toggle('debts')} />
       </Card>
 
+      {/* Предпросмотр (spec 08 §8.4) — the report's four sections summarised BEFORE download. */}
+      <Text style={[styles.exportLabel, { color: colors.muted }]}>{t('export.preview')}</Text>
+      <Card style={styles.sectionsCard}>
+        <PreviewRow label={t('export.income')} value={formatRub(incomeInPeriod(txns, period))} />
+        <View style={[styles.sectionsSep, { backgroundColor: colors.hairline }]} />
+        <PreviewRow label={t('export.lessons')} value={formatNumberRu(lessonsConductedInPeriod(lessons, period))} />
+        <View style={[styles.sectionsSep, { backgroundColor: colors.hairline }]} />
+        <PreviewRow
+          label={t('export.structure')}
+          value={(() => {
+            const top = subjectTotals(txns, period)[0];
+            const total = subjectTotals(txns, period).reduce((s, x) => s + x.amount, 0);
+            return top && total > 0 ? `${subjectName(top.subjectId)} · ${Math.round((top.amount / total) * 100)}%` : t('common.none');
+          })()}
+        />
+        <View style={[styles.sectionsSep, { backgroundColor: colors.hairline }]} />
+        <PreviewRow
+          label={t('export.debts')}
+          value={formatRub(debtors(txns).reduce((s, d) => s + d.amount, 0))}
+        />
+      </Card>
+
       {done ? <Text style={[styles.exportDone, { color: colors.paid }]}>{t('export.done')}</Text> : null}
 
       <Pressable
@@ -866,6 +996,17 @@ function ExportSheet({
         <Text style={[styles.generateText, { color: colors.onTint }]}>{t('export.generate')}</Text>
       </Pressable>
     </Sheet>
+  );
+}
+
+/** A read-only «Предпросмотр» row — section name + its headline number (spec 08 §8.4). */
+function PreviewRow({ label, value }: { label: string; value: string }) {
+  const { colors } = useTheme();
+  return (
+    <View style={styles.sectionRow}>
+      <Text style={[styles.sectionLabel, { color: colors.muted }]}>{label}</Text>
+      <Text numberOfLines={1} style={[styles.previewValue, { color: colors.heading }]}>{value}</Text>
+    </View>
   );
 }
 
@@ -956,6 +1097,18 @@ const styles = StyleSheet.create({
   debtorName: { flex: 1, fontSize: 15, fontWeight: '500' },
   debtorAmountWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   debtorAmount: { fontSize: 15, fontWeight: '500', fontVariant: ['tabular-nums'] },
+
+  // Задолженности: delta + tiles + aging + finance link
+  debtDeltaRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: -6 },
+  debtTiles: { flexDirection: 'row', gap: 12 },
+  debtTile: { flex: 1, paddingVertical: 14, paddingHorizontal: 14, gap: 4 },
+  debtTileValue: { fontSize: 22, fontWeight: '700', letterSpacing: -0.4, fontVariant: ['tabular-nums'] },
+  debtTileLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 4 },
+  debtTileLabel: { flex: 1, fontSize: 12.5, fontWeight: '500' },
+  agingLabelWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 },
+  debtFinanceLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 13 },
+  debtFinanceLinkText: { fontSize: 14, fontWeight: '600' },
+  previewValue: { fontSize: 14.5, fontWeight: '600', flexShrink: 1, textAlign: 'right', fontVariant: ['tabular-nums'] },
 
   // empty debts
   emptyDebtCard: { paddingVertical: 32, paddingHorizontal: 24, alignItems: 'center' },

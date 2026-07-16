@@ -148,6 +148,106 @@ export function hasDebt(transactions: readonly DebtTxnSlice[]): boolean {
   return debtOf(transactions) > 0;
 }
 
+type StudentTxnSlice = DebtTxnSlice & Pick<TxnSlice, 'studentId' | 'occurredAt'>;
+
+/** Outstanding debt as of an instant — the ledger replayed up to `asOfMs` (exclusive), netted
+ *  PER STUDENT exactly like `debtors()`/the hero total (one student's standalone income must not
+ *  cancel another's debt — review fix S13). Powers the «к предыдущему периоду» delta. */
+export function debtAsOf(transactions: readonly StudentTxnSlice[], asOfMs: number): number {
+  const past = transactions.filter((t) => t.occurredAt < asOfMs);
+  return debtors(past).reduce((s, d) => s + d.amount, 0);
+}
+
+const DAY_MS = 86_400_000;
+
+/** One unsettled debt position — the aging unit (spec 08 §8.3). */
+export interface UnsettledDebt {
+  studentId: string;
+  amount: number;
+  /** When the debt arose (its txn instant) — the aging clock starts here. */
+  occurredAt: number;
+}
+
+/** Per-student netting core of `unsettledDebts` — one student's txns in, their open positions out. */
+function unsettledDebtsOfStudent(transactions: readonly StudentTxnSlice[]): UnsettledDebt[] {
+  const paidLessons = new Set<string>();
+  let standalonePaid = 0;
+  for (const t of transactions) {
+    if (t.type !== 'paid') continue;
+    if (t.lessonId != null) paidLessons.add(t.lessonId);
+    else standalonePaid += t.amount;
+  }
+
+  const out: UnsettledDebt[] = [];
+  const standalone: UnsettledDebt[] = [];
+  for (const t of transactions) {
+    if (t.type !== 'debt') continue;
+    const pos = { studentId: t.studentId, amount: t.amount, occurredAt: t.occurredAt };
+    if (t.lessonId != null) {
+      if (!paidLessons.has(t.lessonId)) out.push(pos);
+    } else {
+      standalone.push(pos);
+    }
+  }
+
+  // FIFO offset: the student's standalone payments consume their OLDEST standalone debts first.
+  standalone.sort((a, b) => a.occurredAt - b.occurredAt);
+  let credit = standalonePaid;
+  for (const d of standalone) {
+    if (credit >= d.amount) {
+      credit -= d.amount;
+      continue; // fully covered
+    }
+    out.push(credit > 0 ? { ...d, amount: d.amount - credit } : d);
+    credit = 0;
+  }
+
+  return out;
+}
+
+/**
+ * Unsettled debt positions with their origin instants (spec 08 §8.3 «агрегаты получают дату
+ * происхождения долга»), netted PER STUDENT — mirrors `debtors()`, the tab's canonical total
+ * (`debtOf`'s contract is one student's txns; pooling credit across students would let one
+ * student's income erase another's debt — review fix S13). Per student: a lesson-anchored debt
+ * drops once its lesson has ANY `paid` txn; standalone debts are offset by that student's
+ * standalone payments OLDEST-FIRST (FIFO). Σ amounts === Σ `debtors()` by construction.
+ */
+export function unsettledDebts(transactions: readonly StudentTxnSlice[]): UnsettledDebt[] {
+  const byStudent = new Map<string, StudentTxnSlice[]>();
+  for (const t of transactions) {
+    const arr = byStudent.get(t.studentId);
+    if (arr) arr.push(t);
+    else byStudent.set(t.studentId, [t]);
+  }
+  const out: UnsettledDebt[] = [];
+  for (const list of byStudent.values()) out.push(...unsettledDebtsOfStudent(list));
+  return out;
+}
+
+/** Default grace before a debt counts as overdue (spec §8.3 «Ещё не просрочено» bucket). */
+export const DEBT_GRACE_DAYS = 7;
+
+/** Aging buckets over unsettled debts (spec 08 §8.3 «По сроку»): age ≤ grace → «ещё не
+ *  просрочено»; grace < age ≤ 14 дней → «до 14 дней»; > 14 дней → «больше 14» (a 15-day
+ *  debt lands here). Whole days via floor — a debt turns overdue only once a full day passes. */
+export function debtAgingBuckets(
+  entries: readonly Pick<UnsettledDebt, 'amount' | 'occurredAt'>[],
+  nowMs: number,
+  graceDays: number = DEBT_GRACE_DAYS,
+): { fresh: { amount: number; count: number }; d14: { amount: number; count: number }; over14: { amount: number; count: number } } {
+  const fresh = { amount: 0, count: 0 };
+  const d14 = { amount: 0, count: 0 };
+  const over14 = { amount: 0, count: 0 };
+  for (const e of entries) {
+    const age = Math.floor((nowMs - e.occurredAt) / DAY_MS);
+    const b = age <= graceDays ? fresh : age <= 14 ? d14 : over14;
+    b.amount += e.amount;
+    b.count += 1;
+  }
+  return { fresh, d14, over14 };
+}
+
 /** Outstanding debt per student over the WHOLE ledger — for the Analytics debtors list. */
 export function debtors(
   transactions: readonly (DebtTxnSlice & Pick<TxnSlice, 'studentId'>)[],
