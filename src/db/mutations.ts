@@ -405,6 +405,9 @@ export interface ProfilePatch {
   /** v8: master switch + debts split (spec 09 §9.3). */
   notifEnabled?: boolean;
   notifDebts?: boolean;
+  /** v9 (spec 10 §10.2): contact + working days (CSV of getDay indices). */
+  phone?: string | null;
+  workDays?: string | null;
   pushGranted?: boolean;
 }
 
@@ -424,6 +427,8 @@ export async function updateProfile(profile: ProfileModel, patch: ProfilePatch):
       if (patch.notifSummary !== undefined) p.notifSummary = patch.notifSummary;
       if (patch.notifEnabled !== undefined) p.notifEnabled = patch.notifEnabled;
       if (patch.notifDebts !== undefined) p.notifDebts = patch.notifDebts;
+      if (patch.phone !== undefined) p.phone = patch.phone;
+      if (patch.workDays !== undefined) p.workDays = patch.workDays;
       if (patch.pushGranted !== undefined) p.pushGranted = patch.pushGranted;
     });
   });

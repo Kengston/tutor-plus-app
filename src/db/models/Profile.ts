@@ -28,6 +28,9 @@ export class ProfileModel extends Model {
   /** v8 master switch + debts split (spec 09 §9.3) — NULLABLE: null (migrated rows) reads as TRUE. */
   @field('notif_enabled') notifEnabled!: boolean | null;
   @field('notif_debts') notifDebts!: boolean | null;
+  /** v9 (spec 10 §10.2): contact + working days (CSV of getDay indices; null reads as Пн–Пт). */
+  @field('phone') phone!: string | null;
+  @field('work_days') workDays!: string | null;
   /** OS notification permission granted (Web Notifications on web; expo-notifications on native). */
   @field('push_granted') pushGranted!: boolean;
   @readonly @date('created_at') createdAt!: Date;

@@ -150,5 +150,18 @@ export const migrations = schemaMigrations({
         }),
       ],
     },
+    {
+      toVersion: 9,
+      steps: [
+        addColumns({
+          table: 'profiles',
+          columns: [
+            // «Телефон / мессенджер» + рабочие дни (CSV of getDay indices; null → Пн–Пт).
+            { name: 'phone', type: 'string', isOptional: true },
+            { name: 'work_days', type: 'string', isOptional: true },
+          ],
+        }),
+      ],
+    },
   ],
 });

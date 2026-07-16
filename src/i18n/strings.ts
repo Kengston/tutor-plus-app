@@ -700,10 +700,6 @@ export const messages = {
 
   // ── Настройки: секции ────────────────────────────────────────────────────
   'settings.notifications': 'Уведомления',
-  'settings.mode': 'Режим',
-  'settings.modeHint': 'Как называть тех, с кем вы работаете',
-  'settings.profile': 'Профиль',
-  'settings.profileName': 'Имя',
   'settings.activity': 'Вид деятельности',
   'settings.tz': 'Часовой пояс',
 
@@ -724,16 +720,11 @@ export const messages = {
   'activity.trainer': 'Тренер',
 
   // ── Настройки: напоминания (lead-time + тумблеры) ────────────────────────
-  'settings.reminderLead': 'Напоминать заранее',
   'lead.10': 'За 10 минут',
   'lead.20': 'За 20 минут',
   'lead.60': 'За 1 час',
   'lead.1440': 'За 1 день',
-  'settings.notifLessons': 'Напоминания о занятиях',
-  'settings.notifLessons_client': 'Напоминания о встречах',
-  'settings.notifPayment': 'Оплаты и долги',
   'settings.notifSchedule': 'Изменения расписания',
-  'settings.notifSummary': 'Дневная сводка',
 
   // ── Настройки: push-разрешение ───────────────────────────────────────────
   'settings.push': 'Push-уведомления',
@@ -742,10 +733,49 @@ export const messages = {
   'settings.pushDenied': 'Уведомления отключены — включите их в настройках браузера',
 
   // ── Настройки: отложенные секции (заглушки Ф4/Ф5) ────────────────────────
-  'settings.account': 'Аккаунт и безопасность',
   'settings.backup': 'Резервная копия',
-  'settings.support': 'Помощь и поддержка',
   'settings.soon': 'Скоро',
+
+  // ── Настройки: структура разделов (UI-v2 S15, spec 10 §10.1) ──────────────
+  'set.editProfile': 'Редактировать профиль',
+  'set.profileAccount': 'Профиль и аккаунт',
+  'set.security': 'Вход и безопасность',
+  'set.work': 'Работа',
+  'set.scheduleRow': 'Расписание',
+  'set.notifRow': 'Уведомления',
+  'set.on': 'Вкл',
+  'set.off': 'Выкл',
+  'set.payment': 'Оплата и валюта',
+  'set.currency': 'Валюта',
+  'set.currencyRub': 'Рубль · ₽',
+  'set.currencyHint': 'Другие валюты появятся вместе с синхронизацией',
+  'set.themeRow': 'Тема оформления',
+  'set.dataSupport': 'Данные и поддержка',
+  'set.export': 'Экспорт',
+  'set.help': 'Помощь',
+  'set.documents': 'Документы',
+  'set.signOut': 'Выйти из аккаунта',
+  'set.deleteAccount': 'Удалить аккаунт',
+  'set.deleteConfirm': 'Аккаунт и все данные будут удалены. Это действие необратимо',
+  'set.delete': 'Удалить',
+
+  // ── Настройки: редактирование профиля (spec 10 §10.2) ─────────────────────
+  'set.editTitle': 'Профиль',
+  'set.nameField': 'Имя и фамилия',
+  'set.whoYouLead': 'Кого вы ведёте',
+  'set.whoHint': 'Названия разделов изменятся. Все существующие данные сохранятся',
+  'set.phoneMessenger': 'Телефон / мессенджер',
+  'activity.other': 'Другое',
+
+  // ── Настройки: вход и безопасность (каркас, spec 10 §10.2) ────────────────
+  'set.changePassword': 'Изменить пароль',
+  'set.connectedLogins': 'Подключенные способы входа',
+  'set.notConnected': 'Не подключено',
+  'set.signOutAll': 'Выйти на всех устройствах',
+
+  // ── Настройки: рабочие дни ────────────────────────────────────────────────
+  'set.workDays': 'Рабочие дни',
+  'set.workDaysHint': 'Свободные окна и сводки считаются по рабочим дням',
 } as const;
 
 export type Mode = 'tutor' | 'client';

@@ -1,10 +1,12 @@
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useProfile } from '@/db/hooks';
 import { updateProfile } from '@/db/mutations';
 import { useT, type StringKey } from '@/i18n';
+import { scheduler } from '@/lib/notifications';
 import { useTheme } from '@/theme';
 import { Card, Icon, SectionLabel, Segmented } from '@/ui';
 
@@ -27,14 +29,30 @@ const LEADS: { key: number; label: StringKey }[] = [
 export default function NotificationSettingsScreen() {
   const router = useRouter();
   const t = useT();
-  const { colors } = useTheme();
+  const { colors, radius } = useTheme();
   const profile = useProfile();
+
+  // Tracks a denied push request so we can surface the «отключены» hint (vs. the neutral CTA).
+  // Re-homed from the old flat settings screen (review fix S15 — the split had dropped the app's
+  // ONLY UI path to OS notification permission).
+  const [pushAttemptedDenied, setPushAttemptedDenied] = useState(false);
 
   if (!profile) return null; // profile row is get-or-created on launch (ProfileGate)
 
   // Null (migrated v8 rows) reads as TRUE — mirror reminderPrefsOf's rule.
   const enabled = profile.notifEnabled !== false;
   const debts = profile.notifDebts !== false;
+
+  /** Request OS notification permission; on grant flip the persisted flag. */
+  const requestPush = async () => {
+    const granted = await scheduler.requestPermission();
+    if (granted) {
+      setPushAttemptedDenied(false);
+      void updateProfile(profile, { pushGranted: true });
+    } else {
+      setPushAttemptedDenied(true);
+    }
+  };
 
   return (
     <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
@@ -98,6 +116,32 @@ export default function NotificationSettingsScreen() {
               onToggle={() => void updateProfile(profile, { notifSummary: !profile.notifSummary })}
             />
           </Card>
+
+          {/* Push permission — request + state (re-homed from the old flat settings screen). */}
+          <SectionLabel>{t('settings.push')}</SectionLabel>
+          {profile.pushGranted ? (
+            <View style={[styles.pushState, { backgroundColor: colors.surface, borderColor: colors.hairline, borderRadius: radius.row }]}>
+              <Icon name="check" size={18} sw={1.9} stroke={colors.paid} />
+              <Text style={[styles.pushStateLabel, { color: colors.heading }]}>{t('settings.pushGranted')}</Text>
+            </View>
+          ) : (
+            <>
+              <Pressable
+                onPress={() => void requestPush()}
+                accessibilityRole="button"
+                style={({ pressed }) => [
+                  styles.pushBtn,
+                  { backgroundColor: colors.primary, borderRadius: radius.field },
+                  pressed && styles.pressed,
+                ]}>
+                <Icon name="bell" size={18} sw={1.8} stroke={colors.onTint} />
+                <Text style={[styles.pushBtnLabel, { color: colors.onTint }]}>{t('settings.pushRequest')}</Text>
+              </Pressable>
+              {pushAttemptedDenied ? (
+                <Text style={[styles.pushDenied, { color: colors.muted }]}>{t('settings.pushDenied')}</Text>
+              ) : null}
+            </>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -187,5 +231,21 @@ const styles = StyleSheet.create({
   thumbOff: { alignSelf: 'flex-start', marginLeft: 3 },
 
   hairline: { height: StyleSheet.hairlineWidth },
+
+  // push permission (mirrors the old flat settings screen)
+  pushBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, marginTop: 4 },
+  pushBtnLabel: { fontSize: 15, fontWeight: '600' },
+  pushState: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 14,
+    marginTop: 4,
+  },
+  pushStateLabel: { fontSize: 15, fontWeight: '600' },
+  pushDenied: { fontSize: 13, fontWeight: '500', textAlign: 'center', marginTop: 8, paddingHorizontal: 8 },
+
   pressed: { opacity: 0.85 },
 });

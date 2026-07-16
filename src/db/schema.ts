@@ -31,11 +31,14 @@
  * v8 (UI-v2 S14, spec 09 §9.3): `profiles.notif_enabled` (master switch) + `profiles.notif_debts`
  * (debts separated from payments). NULLABLE on purpose: addColumns backfills existing rows with
  * null, and `reminderPrefsOf` reads null as TRUE — a migrated user's feed stays on.
+ *
+ * v9 (UI-v2 S15, spec 10 §10.2): `profiles.phone` («Телефон / мессенджер») + `profiles.work_days`
+ * (CSV of JS getDay indices; null reads as Пн–Пт). Both nullable — additive, no data change.
  */
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export const schema = appSchema({
-  version: 8,
+  version: 9,
   tables: [
     tableSchema({
       name: 'students',
@@ -140,6 +143,9 @@ export const schema = appSchema({
         // v8: master switch + debts-vs-payments split. Nullable — null reads as TRUE (see header).
         { name: 'notif_enabled', type: 'boolean', isOptional: true },
         { name: 'notif_debts', type: 'boolean', isOptional: true },
+        // v9: contact + working days («Пн–Пт» when null). Nullable — additive backfill.
+        { name: 'phone', type: 'string', isOptional: true },
+        { name: 'work_days', type: 'string', isOptional: true },
         { name: 'push_granted', type: 'boolean' },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
