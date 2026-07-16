@@ -347,7 +347,9 @@ function YourDayCard({
           {lessons.map((l, i) => (
             <View key={l.id} style={styles.tlSlot}>
               {i === nextIdx ? (
-                <Text style={[styles.tlCaption, { color: colors.muted }]} numberOfLines={1}>
+                // No numberOfLines: on web it ellipsizes to the 20px slot width («с...»);
+                // the fixed-width caption is MEANT to overhang the slot, centred on the dot.
+                <Text style={[styles.tlCaption, { color: colors.muted }]}>
                   {t('today.nextAt')} {hhmm(s.nextAt as number)}
                 </Text>
               ) : null}
