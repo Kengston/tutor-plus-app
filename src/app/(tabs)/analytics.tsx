@@ -20,19 +20,24 @@ import { EmptyState } from '@/components/EmptyState';
 import { PeriodSheet } from '@/components/PeriodSheet';
 import { Screen } from '@/components/Screen';
 import { useAllLessons, useAllTransactions, useStudents, useSubjects } from '@/db/hooks';
+import type { LessonModel } from '@/db/models';
 import {
   avgCheckInPeriod,
   cancellationsInPeriod,
   debtors,
   entriesInPeriod,
   financeEntries,
+  incomeByFormat,
+  incomeByStudent,
   incomeInPeriod,
   lessonsByBucket,
   lessonsConductedInPeriod,
   metricDelta,
+  overviewInsights,
   paidByBucket,
   subjectTotals,
   topDirections,
+  type OverviewInsight,
 } from '@/domain/aggregates';
 import { plural, useT, type StringKey } from '@/i18n';
 import { downloadCsv, toCsv } from '@/lib/csv';
@@ -78,6 +83,11 @@ function localYmd(ms: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/** Compact income label for a bar top: «18к ₽» for thousands, else the plain amount (spec 08 §8.1). */
+function shortRub(n: number): string {
+  return n >= 1000 ? `${Math.round(n / 1000)}к ₽` : `${n} ₽`;
+}
+
 export default function AnalyticsScreen() {
   const t = useT();
   const { colors, radius } = useTheme();
@@ -108,32 +118,9 @@ export default function AnalyticsScreen() {
     return (id: string | null) => (id != null ? (m.get(id) ?? t('common.none')) : t('common.none'));
   }, [subjects, t]);
 
-  // RU «8 июня» day-month from an instant — for week/custom period ranges (genitive months).
-  const dayMonth = useMemo(
-    () => (ms: number) => {
-      const d = new Date(ms);
-      return `${d.getDate()} ${t(`monthGen.${d.getMonth()}` as StringKey)}`;
-    },
-    [t],
-  );
-
-  // Human label for the current period — month name+year / year / week-range / custom-range.
-  const periodLabel = useMemo(() => {
-    const start = new Date(period.start);
-    switch (period.type) {
-      case 'month':
-        return `${t(`month.${start.getMonth()}` as StringKey)} ${start.getFullYear()}`;
-      case 'year':
-        return String(start.getFullYear());
-      case 'week':
-      case 'custom':
-      default: {
-        // `end` is exclusive (next-midnight) → step back one day for the inclusive last day.
-        const last = new Date(period.end - 1);
-        return `${dayMonth(period.start)} – ${dayMonth(last.getTime())} ${last.getFullYear()}`;
-      }
-    }
-  }, [period, t, dayMonth]);
+  // Human period label — reused for the current period AND the Обзор comparison period.
+  const periodLabelOf = usePeriodLabel();
+  const periodLabel = periodLabelOf(period);
 
   // Per-tab eyebrow (label before « · <period>»).
   const eyebrow =
@@ -243,7 +230,13 @@ export default function AnalyticsScreen() {
           )}
 
           {tab === 'overview' ? (
-            <OverviewBody lessons={lessons} txns={txns} period={period} subjectName={subjectName} />
+            <OverviewBody
+              lessons={lessons}
+              txns={txns}
+              period={period}
+              subjectName={subjectName}
+              studentName={studentName}
+            />
           ) : (
             <DynamicsBody lessons={lessons} period={period} />
           )}
@@ -278,21 +271,23 @@ function OverviewBody({
   txns,
   period,
   subjectName,
+  studentName,
 }: {
-  lessons: Parameters<typeof topDirections>[0];
+  lessons: LessonModel[];
   txns: Parameters<typeof topDirections>[1];
   period: Period;
   subjectName: (id: string | null) => string;
+  studentName: (id: string) => string;
 }) {
   const t = useT();
   const { colors } = useTheme();
+  const periodLabelOf = usePeriodLabel();
 
-  // (a) Income month-bars: 6 month anchors ending at the period's month.
+  // (a) Income month-bars: 6 month anchors ending at the period's month. Values are shown
+  //     persistently (spec 08 §8.1) and the current month is accented; «calm» keeps the rest neutral.
   const monthBars = useMemo<BarDatum[]>(() => {
     const start = new Date(period.start);
-    const y = start.getFullYear();
-    const m = start.getMonth();
-    const from = monthOf(new Date(y, m - 5, 1).getTime()).start; // 6-month window (incl. current)
+    const from = monthOf(new Date(start.getFullYear(), start.getMonth() - 5, 1).getTime()).start; // 6-month window (incl. current)
     const months = monthStarts(from, period.start);
     const vals = paidByBucket(txns, months, (ms) => monthOf(ms).start);
     const max = Math.max(1, ...vals); // avoid /0; flat-zero bars render empty
@@ -300,6 +295,7 @@ function OverviewBody({
       label: t(`month.${new Date(anchor).getMonth()}` as StringKey).slice(0, 3),
       v: vals[i] / max,
       value: formatRub(vals[i]),
+      top: shortRub(vals[i]),
       on: i === months.length - 1,
     }));
   }, [txns, period, t]);
@@ -309,32 +305,60 @@ function OverviewBody({
   const cancels = cancellationsInPeriod(lessons, period);
   const avgCheck = avgCheckInPeriod(txns, period);
 
-  // (c) Donut — income share per subject.
-  const totals = subjectTotals(txns, period);
-  const totalAmount = totals.reduce((s, x) => s + x.amount, 0);
-  const segments = useMemo<DonutSegment[]>(
+  // (c) «Структура дохода» — three interchangeable cuts of the SAME period income.
+  const dirLabel = t('analytics.byDirections');
+  const stuLabel = t('analytics.byStudents');
+  const fmtLabel = t('analytics.byFormat');
+  const [dim, setDim] = useState<'dir' | 'stu' | 'fmt'>('dir');
+  const dimTabs = [dirLabel, stuLabel, fmtLabel];
+  const activeDimLabel = dim === 'dir' ? dirLabel : dim === 'stu' ? stuLabel : fmtLabel;
+
+  const structRows = useMemo<{ key: string; name: string; amount: number }[]>(() => {
+    if (dim === 'stu') {
+      return incomeByStudent(txns, period).map((x) => ({ key: x.studentId, name: studentName(x.studentId), amount: x.amount }));
+    }
+    if (dim === 'fmt') {
+      return incomeByFormat(lessons, txns, period).map((x) => ({ key: x.format, name: t(`format.${x.format}` as StringKey), amount: x.amount }));
+    }
+    return subjectTotals(txns, period).map((x) => ({ key: String(x.subjectId), name: subjectName(x.subjectId), amount: x.amount }));
+  }, [dim, txns, lessons, period, subjectName, studentName, t]);
+  const structTotal = structRows.reduce((s, r) => s + r.amount, 0);
+  const structSegments = useMemo<DonutSegment[]>(
     () =>
-      totals.map((x, i) => ({
-        label: subjectName(x.subjectId),
-        pct: totalAmount > 0 ? Math.round((x.amount / totalAmount) * 100) : 0,
+      structRows.map((r, i) => ({
+        label: r.name,
+        pct: structTotal > 0 ? Math.round((r.amount / structTotal) * 100) : 0,
         color: chartColors[i % 6],
       })),
-    [totals, totalAmount, subjectName],
+    [structRows, structTotal],
   );
 
-  // (d) Top directions (ranked by income); thin bars relative to the max amount.
-  const directions = topDirections(lessons, txns, period);
-  const maxAmount = Math.max(1, ...directions.map((d) => d.amount));
+  // (d) Comparison vs a SELECTABLE period (default: the previous period of the same type).
+  //     `comparePeriod` is derived, so it tracks the main period until an explicit one is picked.
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [compareCustom, setCompareCustom] = useState<Period | null>(null);
+  const comparePeriod = compareCustom ?? shiftPeriod(period, -1);
+  // A custom main range has NO well-defined "previous period" (shiftPeriod returns it unchanged),
+  // so without an explicit pick there is no baseline → «Нет данных для сравнения», not a 0% self-compare.
+  const hasBaseline = compareCustom != null || period.type !== 'custom';
+  const delta = metricDelta(incomeInPeriod(txns, period), hasBaseline ? incomeInPeriod(txns, comparePeriod) : 0);
+  const compareLabel = compareCustom ? periodLabelOf(compareCustom) : t('analytics.comparePrev');
 
-  // (e) Comparison vs the previous period of the same type.
-  const prev = shiftPeriod(period, -1);
-  const delta = metricDelta(incomeInPeriod(txns, period), incomeInPeriod(txns, prev));
+  // (e) «Выводы» — rule-based, composed from the pure generator ([] → correct empty state).
+  const insights = useMemo(() => overviewInsights(txns, period, comparePeriod), [txns, period, comparePeriod]);
+  const insightText = (ins: OverviewInsight): string => {
+    if (ins.kind === 'topDirection') {
+      return `${subjectName(ins.subjectId)} — ${t('analytics.insMainDir')}: ${ins.pct}% ${t('analytics.insOfIncome')}`;
+    }
+    const verb = ins.dir === 'up' ? t('analytics.insIncomeGrew') : t('analytics.insIncomeFell');
+    return `${verb} ${ins.pct}% ${t('analytics.insVsCompare')}`;
+  };
 
   return (
     <View style={styles.body}>
-      {/* (a) income month-bars */}
+      {/* (a) income month-bars — persistent values + accented current month */}
       <Card style={styles.chartCard}>
-        <MultiBarChart data={monthBars} height={134} />
+        <MultiBarChart data={monthBars} height={134} alwaysValue calm />
       </Card>
 
       {/* (b) KPI row — KpiStat.value is typed string|number (frozen kit), so we pass the
@@ -347,65 +371,78 @@ function OverviewBody({
         <KpiStat label={t('analytics.kpiAvgCheck')} value={formatNumberRu(avgCheck)} />
       </Card>
 
-      {/* (c) donut shares + legend */}
+      {/* (c) «Структура дохода» — sub-tabbed donut + rows (направления / ученики / формат) */}
       <View>
-        <SectionLabel>{t('analytics.shares')}</SectionLabel>
+        <SectionLabel>{t('analytics.structure')}</SectionLabel>
+        <Segmented
+          tabs={dimTabs}
+          active={activeDimLabel}
+          onChange={(label) => setDim(label === stuLabel ? 'stu' : label === fmtLabel ? 'fmt' : 'dir')}
+        />
         <Card style={styles.donutCard}>
           <Donut
-            segments={segments}
+            segments={structSegments}
             size={118}
             thickness={20}
             center={
               <View style={styles.donutCenter}>
-                <Text style={[styles.donutCount, { color: colors.heading }]}>{String(segments.length)}</Text>
-                <Text style={[styles.donutUnit, { color: colors.muted }]}>
-                  {plural(segments.length, {
-                    one: t('unit.directions.one'),
-                    few: t('unit.directions.few'),
-                    many: t('unit.directions.many'),
-                  })}
+                <Text numberOfLines={1} style={[styles.donutTotal, { color: colors.heading }]}>
+                  {formatRub(structTotal)}
                 </Text>
               </View>
             }
           />
           <View style={styles.legend}>
-            {segments.map((s, i) => (
-              <View key={i} style={styles.legendRow}>
-                <View style={[styles.legendDot, { backgroundColor: s.color }]} />
-                <Text numberOfLines={1} style={[styles.legendLabel, { color: colors.body }]}>
-                  {s.label}
-                </Text>
-                <Text style={[styles.legendPct, { color: colors.heading }]}>{`${s.pct}%`}</Text>
-              </View>
-            ))}
+            {structRows.length === 0 ? (
+              <Text style={[styles.legendLabel, { color: colors.muted }]}>{t('analytics.empty')}</Text>
+            ) : (
+              structRows.map((r, i) => (
+                <View key={r.key} style={styles.legendRow}>
+                  <View style={[styles.legendDot, { backgroundColor: chartColors[i % 6] }]} />
+                  <Text numberOfLines={1} style={[styles.legendLabel, { color: colors.body }]}>
+                    {r.name}
+                  </Text>
+                  <Text style={[styles.legendPct, { color: colors.muted }]}>{`${structSegments[i]?.pct ?? 0}%`}</Text>
+                  <Text style={[styles.legendAmount, { color: colors.heading }]}>{formatRub(r.amount)}</Text>
+                </View>
+              ))
+            )}
           </View>
         </Card>
       </View>
 
-      {/* (d) top directions */}
+      {/* (d) comparison with a selectable period */}
+      <ComparisonCard delta={delta} compareLabel={compareLabel} onPickCompare={() => setCompareOpen(true)} />
+
+      {/* (e) «Выводы» — rule-based auto-insights (or a correct empty state) */}
       <View>
-        <SectionLabel>{t('analytics.top')}</SectionLabel>
-        <Card style={styles.listCard}>
-          {directions.map((d, i) => (
-            <View key={String(d.subjectId)} style={styles.barRow}>
-              <View style={styles.barRowHead}>
-                <Text numberOfLines={1} style={[styles.barRowName, { color: colors.heading }]}>
-                  {subjectName(d.subjectId)}
-                </Text>
-                <Text style={[styles.barRowAmount, { color: colors.body }]}>{formatRub(d.amount)}</Text>
+        <SectionLabel>{t('analytics.insights')}</SectionLabel>
+        <Card style={styles.insightsCard}>
+          {insights.length === 0 ? (
+            <Text style={[styles.insEmpty, { color: colors.muted }]}>{t('analytics.insEmpty')}</Text>
+          ) : (
+            insights.map((ins, i) => (
+              <View key={i}>
+                {i > 0 ? <View style={[styles.insSep, { backgroundColor: colors.hairline }]} /> : null}
+                <View style={styles.insRow}>
+                  <View style={[styles.insIcon, { backgroundColor: colors.accentSoft }]}>
+                    <Icon name="sparkle" size={14} sw={1.8} stroke={colors.heading} />
+                  </View>
+                  <Text style={[styles.insText, { color: colors.body }]}>{insightText(ins)}</Text>
+                </View>
               </View>
-              <View style={[styles.progressTrack, { backgroundColor: colors.stoneLight }]}>
-                <View
-                  style={[styles.progressFill, { width: `${(d.amount / maxAmount) * 100}%`, backgroundColor: chartColors[i % 6] }]}
-                />
-              </View>
-            </View>
-          ))}
+            ))
+          )}
         </Card>
       </View>
 
-      {/* (e) comparison — skipped for custom ranges (no well-defined previous period). */}
-      {period.type !== 'custom' ? <ComparisonCard delta={delta} /> : null}
+      {/* Compare-period picker — arbitrary period, not just the adjacent one (spec 08 §8.1). */}
+      <PeriodSheet
+        visible={compareOpen}
+        period={comparePeriod}
+        onClose={() => setCompareOpen(false)}
+        onApply={(p) => setCompareCustom(p)}
+      />
     </View>
   );
 }
@@ -519,16 +556,43 @@ function DebtsBody({
 
 // ── Comparison card (shared by Обзор + Динамика) ──────────────────────────────
 
-function ComparisonCard({ delta }: { delta: ReturnType<typeof metricDelta> }) {
+function ComparisonCard({
+  delta,
+  compareLabel,
+  onPickCompare,
+}: {
+  delta: ReturnType<typeof metricDelta>;
+  /** When set (with `onPickCompare`), the card shows a tappable compare-period selector (Обзор). */
+  compareLabel?: string;
+  onPickCompare?: () => void;
+}) {
   const t = useT();
   const { colors } = useTheme();
+  const hasPicker = compareLabel != null && onPickCompare != null;
 
-  // No baseline (previous period was 0) → nothing to compare against.
+  // Compare-period selector row (Обзор only) — lets the user pick ANY comparison period.
+  const selector = hasPicker ? (
+    <Pressable
+      onPress={onPickCompare}
+      accessibilityRole="button"
+      style={({ pressed }) => [styles.compareSelector, { borderBottomColor: colors.hairline }, pressed && styles.pressed]}>
+      <Text style={[styles.compareSelectorLabel, { color: colors.muted }]}>{t('analytics.comparePick')}</Text>
+      <View style={styles.compareSelectorValue}>
+        <Text style={[styles.compareSelectorText, { color: colors.heading }]} numberOfLines={1}>
+          {compareLabel}
+        </Text>
+        <Icon name="chevronDown" size={15} sw={1.9} stroke={colors.primary} />
+      </View>
+    </Pressable>
+  ) : null;
+
+  // No baseline (comparison period had no income) → nothing to compare against.
   if (delta.pct === null) {
     return (
       <View>
         <SectionLabel>{t('analytics.comparison')}</SectionLabel>
         <Card style={styles.compareCard}>
+          {selector}
           <View style={styles.compareInfoRow}>
             <Icon name="info" size={16} sw={1.8} stroke={colors.muted} />
             <Text style={[styles.compareInfoText, { color: colors.muted }]}>{t('analytics.noCompare')}</Text>
@@ -545,13 +609,16 @@ function ComparisonCard({ delta }: { delta: ReturnType<typeof metricDelta> }) {
     <View>
       <SectionLabel>{t('analytics.comparison')}</SectionLabel>
       <Card style={styles.compareCard}>
+        {selector}
         <View style={styles.compareResultRow}>
           <View style={[styles.comparePill, { backgroundColor: good ? colors.accentSoft : colors.dangerLight }]}>
             <Text style={[styles.comparePillText, { color: good ? colors.heading : colors.danger }]}>
               {`${sign}${delta.pct}%`}
             </Text>
           </View>
-          <Text style={[styles.compareVs, { color: colors.muted }]}>{t('analytics.vsPrev')}</Text>
+          <Text style={[styles.compareVs, { color: colors.muted }]}>
+            {hasPicker ? t('analytics.vsCompare') : t('analytics.vsPrev')}
+          </Text>
         </View>
       </Card>
     </View>
@@ -692,6 +759,26 @@ function SectionToggle({ label, on, onPress }: { label: string; on: boolean; onP
   );
 }
 
+/**
+ * RU human label for a period — «Май 2026» / «2026» / «8 – 14 июня 2026». Reused for the
+ * current period AND the Обзор comparison period (so both read the same way).
+ */
+function usePeriodLabel(): (p: Period) => string {
+  const t = useT();
+  return (p: Period) => {
+    const start = new Date(p.start);
+    if (p.type === 'month') return `${t(`month.${start.getMonth()}` as StringKey)} ${start.getFullYear()}`;
+    if (p.type === 'year') return String(start.getFullYear());
+    // week / custom — inclusive day range («end» is exclusive next-midnight → last day = end − 1).
+    const last = new Date(p.end - 1);
+    const dm = (ms: number) => {
+      const d = new Date(ms);
+      return `${d.getDate()} ${t(`monthGen.${d.getMonth()}` as StringKey)}`;
+    };
+    return `${dm(p.start)} – ${dm(last.getTime())} ${last.getFullYear()}`;
+  };
+}
+
 const styles = StyleSheet.create({
   // top row
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 2, marginTop: 2 },
@@ -716,23 +803,21 @@ const styles = StyleSheet.create({
   kpiCard: { flexDirection: 'row', paddingVertical: 14, paddingHorizontal: 4 },
   kpiSep: { width: StyleSheet.hairlineWidth, marginVertical: 2 },
 
-  // donut
+  // donut (Структура дохода) — donut + legend rows (dot · name · pct · amount)
   donutCard: { flexDirection: 'row', alignItems: 'center', gap: 18, padding: 16 },
-  donutCenter: { alignItems: 'center' },
-  donutCount: { fontSize: 19, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  donutUnit: { fontSize: 11 },
+  donutCenter: { alignItems: 'center', paddingHorizontal: 4 },
+  donutTotal: { fontSize: 15, fontWeight: '600', fontVariant: ['tabular-nums'] },
   legend: { flex: 1, gap: 9 },
   legendRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   legendDot: { width: 10, height: 10, borderRadius: 3 },
   legendLabel: { flex: 1, fontSize: 13 },
-  legendPct: { fontSize: 13, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  legendPct: { fontSize: 12.5, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  legendAmount: { fontSize: 13, fontWeight: '600', fontVariant: ['tabular-nums'] },
 
-  // bar rows (top directions + debtors)
+  // bar rows (debtors)
   listCard: { paddingVertical: 4 },
   barRow: { paddingVertical: 13, paddingHorizontal: 14 },
   barRowHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8, gap: 10 },
-  barRowName: { flex: 1, fontSize: 14.5, fontWeight: '600' },
-  barRowAmount: { fontSize: 14, fontWeight: '600', fontVariant: ['tabular-nums'] },
   progressTrack: { height: 7, borderRadius: 5, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 5 },
 
@@ -748,12 +833,32 @@ const styles = StyleSheet.create({
 
   // comparison
   compareCard: { paddingVertical: 13, paddingHorizontal: 14 },
+  compareSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    paddingBottom: 12,
+    marginBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  compareSelectorLabel: { fontSize: 14, fontWeight: '500' },
+  compareSelectorValue: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1 },
+  compareSelectorText: { fontSize: 15, fontWeight: '600', flexShrink: 1 },
   compareResultRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
   comparePill: { paddingVertical: 4, paddingHorizontal: 11, borderRadius: 999 },
   comparePillText: { fontSize: 15, fontWeight: '600', fontVariant: ['tabular-nums'] },
   compareVs: { fontSize: 13, fontWeight: '500' },
   compareInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   compareInfoText: { fontSize: 14, fontWeight: '500' },
+
+  // insights (Выводы)
+  insightsCard: { paddingVertical: 4 },
+  insEmpty: { fontSize: 14, fontWeight: '500', paddingVertical: 14, paddingHorizontal: 14, textAlign: 'center' },
+  insSep: { height: StyleSheet.hairlineWidth, marginLeft: 48 },
+  insRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 11, paddingVertical: 13, paddingHorizontal: 14 },
+  insIcon: { width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+  insText: { flex: 1, fontSize: 14, lineHeight: 20 },
 
   // export sheet
   exportLabel: { fontSize: 13, fontWeight: '500', marginBottom: 10, marginTop: 4 },

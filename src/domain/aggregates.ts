@@ -18,6 +18,7 @@ import { periodContains, type Period } from '@/lib/period';
 import type {
   ExpectationStatus,
   FinanceEntry,
+  LessonFormat,
   LifecycleStatus,
   PayMethod,
   PayStatus,
@@ -460,4 +461,90 @@ export function metricDelta(
   const abs = current - previous;
   const pct = previous === 0 ? null : Math.round((abs / previous) * 100);
   return { abs, pct, dir: abs > 0 ? 'up' : abs < 0 ? 'down' : 'flat' };
+}
+
+// ── «Структура дохода» breakdowns (UI-v2 S11, spec 08 §8.1) ──────────────────
+// The Overview donut has three interchangeable cuts of the SAME period income:
+// Направления (subjectTotals, above), Ученики (per-student), Формат (per lesson-format).
+
+/** Income per student — Σ `paid` amount whose `occurredAt` ∈ period, sorted desc («Ученики»). */
+export function incomeByStudent(
+  transactions: readonly Pick<TxnSlice, 'type' | 'amount' | 'occurredAt' | 'studentId'>[],
+  period: Period,
+): { studentId: string; amount: number }[] {
+  const acc = new Map<string, number>();
+  for (const t of transactions) {
+    if (t.type !== 'paid' || !periodContains(period, t.occurredAt)) continue;
+    acc.set(t.studentId, (acc.get(t.studentId) ?? 0) + t.amount);
+  }
+  const out = [...acc].map(([studentId, amount]) => ({ studentId, amount }));
+  out.sort((a, b) => b.amount - a.amount);
+  return out;
+}
+
+/**
+ * Income per lesson-format (online / inperson) — `paid` txns joined to their lesson's format,
+ * in period, sorted desc («Формат»). A standalone paid op (no `lessonId`) has no format, so it is
+ * excluded (the cut is about how sessions were held, not general income).
+ */
+export function incomeByFormat(
+  lessons: readonly { id: string; format: LessonFormat }[],
+  transactions: readonly Pick<TxnSlice, 'type' | 'amount' | 'occurredAt' | 'lessonId'>[],
+  period: Period,
+): { format: LessonFormat; amount: number }[] {
+  const fmtOf = new Map<string, LessonFormat>();
+  for (const l of lessons) fmtOf.set(l.id, l.format);
+  const acc = new Map<LessonFormat, number>();
+  for (const t of transactions) {
+    if (t.type !== 'paid' || t.lessonId == null || !periodContains(period, t.occurredAt)) continue;
+    const f = fmtOf.get(t.lessonId);
+    if (f === undefined) continue;
+    acc.set(f, (acc.get(f) ?? 0) + t.amount);
+  }
+  const out = [...acc].map(([format, amount]) => ({ format, amount }));
+  out.sort((a, b) => b.amount - a.amount);
+  return out;
+}
+
+// ── «Выводы» — rule-based Overview insights (UI-v2 S11, spec 08 §8.1) ─────────
+
+/**
+ * A structured Overview insight (the screen composes the localized sentence — the generator
+ * stays lexicon-free, ADR-0006). `topDirection` = the dominant income direction + its share;
+ * `incomeDelta` = income change vs the comparison period.
+ */
+export type OverviewInsight =
+  | { kind: 'topDirection'; subjectId: string | null; pct: number }
+  | { kind: 'incomeDelta'; pct: number; dir: 'up' | 'down' };
+
+/**
+ * Rule-based «Выводы» for the Overview — PURE, derived from the aggregates (no LLM, spec 08 §8.1).
+ * Deliberately conservative: emits an item only when the data genuinely supports it (a dominant
+ * direction with income; an income change against a NON-empty comparison baseline). Thin/empty
+ * data → `[]`, so the screen shows a correct empty state instead of a meaningless line.
+ */
+export function overviewInsights(
+  transactions: readonly PaidTxnSlice[],
+  period: Period,
+  comparePeriod: Period,
+): OverviewInsight[] {
+  const out: OverviewInsight[] = [];
+
+  // (1) Dominant direction by income share (subjectTotals is already income-desc).
+  const totals = subjectTotals(transactions, period);
+  const total = totals.reduce((s, x) => s + x.amount, 0);
+  if (total > 0 && totals[0] && totals[0].amount > 0) {
+    out.push({ kind: 'topDirection', subjectId: totals[0].subjectId, pct: Math.round((totals[0].amount / total) * 100) });
+  }
+
+  // (2) Income change vs the comparison period — only when the baseline had income (else no %).
+  const baseline = incomeInPeriod(transactions, comparePeriod);
+  if (baseline > 0) {
+    const d = metricDelta(incomeInPeriod(transactions, period), baseline);
+    if (d.pct !== null && d.pct !== 0) {
+      out.push({ kind: 'incomeDelta', pct: Math.abs(d.pct), dir: d.dir === 'down' ? 'down' : 'up' });
+    }
+  }
+
+  return out;
 }

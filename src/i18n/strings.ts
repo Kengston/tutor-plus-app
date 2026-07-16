@@ -536,6 +536,25 @@ export const messages = {
   'analytics.top': 'Топ направлений',
   'analytics.byWeeks': 'Уроки по неделям',
   'analytics.byWeeks_client': 'Встречи по неделям',
+
+  // ── Обзор: «Структура дохода» под-вкладки + «Выводы» (UI-v2 S11, spec 08 §8.1) ──
+  'analytics.structure': 'Структура дохода',
+  'analytics.byDirections': 'Направления',
+  'analytics.byStudents': 'Ученики',
+  'analytics.byStudents_client': 'Клиенты',
+  'analytics.byFormat': 'Формат',
+  'analytics.insights': 'Выводы',
+  'analytics.insEmpty': 'Пока недостаточно данных для выводов',
+  // Insight fragments — composed with a name/percent in the screen (generator stays lexicon-free).
+  'analytics.insMainDir': 'основное направление',
+  'analytics.insOfIncome': 'дохода за период',
+  'analytics.insIncomeGrew': 'Доход вырос на',
+  'analytics.insIncomeFell': 'Доход снизился на',
+  'analytics.insVsCompare': 'относительно периода сравнения',
+  // Comparison-period picker
+  'analytics.comparePick': 'Период сравнения',
+  'analytics.comparePrev': 'Предыдущий период',
+  'analytics.vsCompare': 'по сравнению с выбранным периодом',
   'analytics.compareBtn': 'Сравнить',
   'analytics.currentPeriod': 'текущий период',
   'analytics.pastPeriod': 'прошлый период',
