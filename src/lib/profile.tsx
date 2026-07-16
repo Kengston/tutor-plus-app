@@ -30,15 +30,21 @@ interface ProfilePrefsLike {
   notifPayment: boolean;
   notifSchedule: boolean;
   notifSummary: boolean;
+  /** v8 nullable columns — null (pre-v8 rows) reads as TRUE (see schema.ts header). */
+  notifEnabled: boolean | null;
+  notifDebts: boolean | null;
   pushGranted: boolean;
 }
 
 /** Profile row → `ReminderPrefs` (the shape the feed builder + scheduler consume). */
 export function reminderPrefsOf(p: ProfilePrefsLike): ReminderPrefs {
   return {
+    // Only an EXPLICIT false disables — null (migrated v8 backfill) must keep the feed on.
+    enabled: p.notifEnabled !== false,
     leadMin: p.reminderLeadMin,
     lessons: p.notifLessons,
     payment: p.notifPayment,
+    debts: p.notifDebts !== false,
     schedule: p.notifSchedule,
     summary: p.notifSummary,
     pushGranted: p.pushGranted,
@@ -47,9 +53,11 @@ export function reminderPrefsOf(p: ProfilePrefsLike): ReminderPrefs {
 
 /** Fallback prefs while the profile row is loading (everything on, 1-hour lead). */
 export const DEFAULT_REMINDER_PREFS: ReminderPrefs = {
+  enabled: true,
   leadMin: 60,
   lessons: true,
   payment: true,
+  debts: true,
   schedule: true,
   summary: true,
   pushGranted: false,
@@ -115,7 +123,9 @@ export function ReminderSync() {
     void scheduler.sync(reminders).catch((e) => {
       console.error('[reminders] sync failed', e);
     });
-  }, [lessons, students, profile, t]);
+    // Field-level deps: the profile model mutates in place (same instance each emission) — the
+    // master switch / lead-time change must re-plan OS reminders on an already-mounted app.
+  }, [lessons, students, profile, profile?.notifEnabled, profile?.notifLessons, profile?.reminderLeadMin, t]);
 
   return null;
 }

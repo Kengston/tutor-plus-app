@@ -66,14 +66,17 @@ function dateKey(ms: number): string {
 }
 
 /**
- * Build the notification feed (newest first). Each toggle in `prefs` gates its category:
+ * Build the notification feed (newest first). `prefs.enabled` is the MASTER switch (spec 09
+ * §9.3) — off silences the whole feed regardless of the per-category toggles:
  *  - `lessons`  → `reminder` for an upcoming lesson once its lead-time window is reached
- *  - `payment`  → `payment` / `debt` for ledger rows
+ *  - `payment`  → `payment` for paid ledger rows
+ *  - `debts`    → `debt` rows — SEPARATE from payments (spec 09 §9.3 «Уведомлять о долгах»)
  *  - `schedule` → `cancelled` for a cancelled lesson (anchored to its scheduled time)
  *  - `summary`  → one `daily-summary` for today after `SUMMARY_HOUR`
  */
 export function buildFeed(input: FeedInput): NotificationItem[] {
   const { lessons, transactions, students, prefs, reads, now } = input;
+  if (!prefs.enabled) return []; // master switch — «Включить уведомления» off
   const { start: todayStart, end: todayEnd } = dayBounds(now);
   const horizon = now - HORIZON_MS;
 
@@ -107,11 +110,12 @@ export function buildFeed(input: FeedInput): NotificationItem[] {
     }
   }
 
-  // 2. Payment / debt — append-only ledger rows within the horizon.
-  if (prefs.payment) {
+  // 2. Payment / debt — append-only ledger rows within the horizon. Two INDEPENDENT toggles
+  //    (spec 09 §9.3): `payment` gates paid rows, `debts` gates debt rows.
+  if (prefs.payment || prefs.debts) {
     for (const t of transactions) {
       if (t.occurredAt < horizon) continue;
-      if (t.type !== 'paid' && t.type !== 'debt') continue;
+      if (t.type === 'paid' ? !prefs.payment : t.type === 'debt' ? !prefs.debts : true) continue;
       const stu = byId.get(t.studentId);
       push({
         id: `${t.type}:${t.id}`,

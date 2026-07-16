@@ -357,6 +357,8 @@ export const PROFILE_DEFAULTS = {
   notifPayment: true,
   notifSchedule: true,
   notifSummary: true,
+  notifEnabled: true,
+  notifDebts: true,
   pushGranted: false,
 };
 
@@ -382,6 +384,8 @@ export async function ensureProfile(): Promise<ProfileModel> {
       p.notifPayment = PROFILE_DEFAULTS.notifPayment;
       p.notifSchedule = PROFILE_DEFAULTS.notifSchedule;
       p.notifSummary = PROFILE_DEFAULTS.notifSummary;
+      p.notifEnabled = PROFILE_DEFAULTS.notifEnabled;
+      p.notifDebts = PROFILE_DEFAULTS.notifDebts;
       p.pushGranted = PROFILE_DEFAULTS.pushGranted;
     });
   });
@@ -398,6 +402,9 @@ export interface ProfilePatch {
   notifPayment?: boolean;
   notifSchedule?: boolean;
   notifSummary?: boolean;
+  /** v8: master switch + debts split (spec 09 §9.3). */
+  notifEnabled?: boolean;
+  notifDebts?: boolean;
   pushGranted?: boolean;
 }
 
@@ -415,6 +422,8 @@ export async function updateProfile(profile: ProfileModel, patch: ProfilePatch):
       if (patch.notifPayment !== undefined) p.notifPayment = patch.notifPayment;
       if (patch.notifSchedule !== undefined) p.notifSchedule = patch.notifSchedule;
       if (patch.notifSummary !== undefined) p.notifSummary = patch.notifSummary;
+      if (patch.notifEnabled !== undefined) p.notifEnabled = patch.notifEnabled;
+      if (patch.notifDebts !== undefined) p.notifDebts = patch.notifDebts;
       if (patch.pushGranted !== undefined) p.pushGranted = patch.pushGranted;
     });
   });

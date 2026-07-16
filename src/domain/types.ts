@@ -217,12 +217,17 @@ export type ThemeChoice = 'system' | 'light' | 'dark';
  * The four toggles map 1:1 to the feed filter categories.
  */
 export interface ReminderPrefs {
+  /** «Включить уведомления» — the master switch (spec 09 §9.3): off silences the whole feed
+   *  AND the OS scheduler, regardless of the per-category toggles below. */
+  enabled: boolean;
   /** Lead-time minutes: 10 | 20 | 60 | 1440. */
   leadMin: number;
   /** «Занятия» — upcoming-lesson reminders. */
   lessons: boolean;
-  /** «Оплата» — payment + debt events. */
+  /** «Оплата» — payment events (paid rows). */
   payment: boolean;
+  /** «Уведомлять о долгах» — debt events, SEPARATE from payments (spec 09 §9.3). */
+  debts: boolean;
   /** «Расписание» — cancellations / schedule changes. */
   schedule: boolean;
   /** «Система» — daily summary. */

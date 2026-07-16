@@ -20,6 +20,9 @@
  *
  * v7 (UI-v2 S10, ADR-0015): add `expectations` (money promised without a lesson, «Ожидается»).
  * Additive — no data change; existing ledger/aggregates are untouched.
+ *
+ * v8 (UI-v2 S14, spec 09 §9.3): add `profiles.notif_enabled` + `profiles.notif_debts` —
+ * NULLABLE, and null reads as TRUE in `reminderPrefsOf`, so migrating never silences the feed.
  */
 import { schemaMigrations, createTable, addColumns } from '@nozbe/watermelondb/Schema/migrations';
 
@@ -129,6 +132,20 @@ export const migrations = schemaMigrations({
             { name: 'status', type: 'string', isIndexed: true },
             { name: 'created_at', type: 'number' },
             { name: 'updated_at', type: 'number' },
+          ],
+        }),
+      ],
+    },
+    {
+      toVersion: 8,
+      steps: [
+        addColumns({
+          table: 'profiles',
+          columns: [
+            // Nullable: existing rows backfill to null, which reminderPrefsOf reads as TRUE —
+            // the migration must not silence a user's feed (spec 09 §9.3 master switch).
+            { name: 'notif_enabled', type: 'boolean', isOptional: true },
+            { name: 'notif_debts', type: 'boolean', isOptional: true },
           ],
         }),
       ],

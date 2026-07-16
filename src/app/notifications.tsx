@@ -20,26 +20,29 @@ import { buildFeed, NOTIFICATION_CATEGORIES } from '@/domain/notifications';
 import type { NotificationCategory, NotificationItem, NotificationKind } from '@/domain/types';
 import { useNow } from '@/hooks/use-now';
 import { plural, useT } from '@/i18n';
-import { formatRub, initialsOf } from '@/lib/format';
+import { formatRub } from '@/lib/format';
 import { DEFAULT_REMINDER_PREFS, reminderPrefsOf } from '@/lib/profile';
 import { hhmm, minutesUntil } from '@/lib/time';
 import { useTheme } from '@/theme';
-import { CatAvatar, Icon, SectionLabel, Segmented, SwipeRow, type IconName } from '@/ui';
+import { Icon, SectionLabel, Segmented, Sheet, SwipeRow, type IconName } from '@/ui';
 
 /** Filter axis incl. the «Все» pseudo-category that clears the type filter. */
 type Filter = 'all' | NotificationCategory;
+
+/** Read-state tabs (spec 09 §9.1): Все / Непрочитанные / Прочитанные. */
+type ReadTab = 'all' | 'unread' | 'read';
 
 /** Time-bucket order — the sections render today → yesterday → earlier. */
 const GROUP_ORDER = ['today', 'yesterday', 'earlier'] as const;
 type Group = (typeof GROUP_ORDER)[number];
 
-/** Per-kind fallback icon (used when an item has no student / category to show an avatar). */
-const KIND_ICON: Record<NotificationKind, IconName> = {
-  reminder: 'clock',
+/** Event-type icon by CATEGORY (spec 09 §9.1: часы — занятие, кошелёк — оплата, календарь —
+ *  расписание); `system` keeps the sparkle. Rows lead with this icon, not an avatar. */
+const CATEGORY_ICON: Record<NotificationCategory, IconName> = {
+  lesson: 'clock',
   payment: 'wallet',
-  debt: 'ruble',
-  cancelled: 'close',
-  summary: 'sparkle',
+  schedule: 'calendar',
+  system: 'sparkle',
 };
 
 /** Lessons phrasing forms (mode-aware) — for the daily-summary subtitle. */
@@ -62,7 +65,7 @@ function dayForms(t: ReturnType<typeof useT>) {
 export default function NotificationsScreen() {
   const router = useRouter();
   const t = useT();
-  const { colors, radius } = useTheme();
+  const { colors } = useTheme();
 
   // ── Build the feed (ADR-0013) — view-model over live data + read-state. ──
   const lessons = useAllLessons();
@@ -70,43 +73,57 @@ export default function NotificationsScreen() {
   const students = useStudents();
   const profile = useProfile();
   const reads = useNotificationReads();
-  // `now` ticks each minute so reminders/summary appear and «через N» refreshes while open;
-  // memoized `prefs` (stable model ref) keeps the feed memo from recomputing every render.
+  // `now` ticks each minute so reminders/summary appear and «через N» refreshes while open.
   const now = useNow();
+  // FIELD-level deps: the profile model mutates IN PLACE (same reference each emission), so
+  // depending on the instance alone would freeze prefs at mount and settings toggles would
+  // never reach an already-mounted feed (see the PROGRESS reactivity note / S7).
   const prefs = useMemo(
     () => (profile ? reminderPrefsOf(profile) : DEFAULT_REMINDER_PREFS),
-    [profile],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      profile,
+      profile?.notifEnabled,
+      profile?.notifDebts,
+      profile?.notifLessons,
+      profile?.notifPayment,
+      profile?.notifSchedule,
+      profile?.notifSummary,
+      profile?.reminderLeadMin,
+      profile?.pushGranted,
+    ],
   );
   const items = useMemo(
     () => buildFeed({ lessons, transactions, students, prefs, reads, now }),
     [lessons, transactions, students, prefs, reads, now],
   );
 
-  // ── Filter state: a category chip (or «Все») + an unread-only toggle. ──
+  // ── Filter state (spec 09 §9.1–9.2): read-state TABS + a modal filter over type/status. ──
   const [filter, setFilter] = useState<Filter>('all');
-  const [unreadOnly, setUnreadOnly] = useState(false);
+  const [readTab, setReadTab] = useState<ReadTab>('all');
+  const [filterOpen, setFilterOpen] = useState(false);
 
-  // Category label ↔ key bridge (Segmented matches by the visible string) — same idiom as Финансы.
-  const FILTER_LABEL: Record<Filter, string> = {
+  // Read-state tab label ↔ key bridge (Segmented matches by the visible string).
+  const READ_LABEL: Record<ReadTab, string> = {
     all: t('notif.filter.all'),
-    lesson: t('notif.filter.lesson'),
-    payment: t('notif.filter.payment'),
-    schedule: t('notif.filter.schedule'),
-    system: t('notif.filter.system'),
+    unread: t('notif.tab.unread'),
+    read: t('notif.tab.read'),
   };
-  const filterTabs = ['all' as Filter, ...NOTIFICATION_CATEGORIES].map((k) => FILTER_LABEL[k]);
-  const onFilterChange = (label: string) => {
-    const next = (['all', ...NOTIFICATION_CATEGORIES] as Filter[]).find((k) => FILTER_LABEL[k] === label);
-    if (next) setFilter(next);
+  const readTabs = (['all', 'unread', 'read'] as ReadTab[]).map((k) => READ_LABEL[k]);
+  const onReadTabChange = (label: string) => {
+    const next = (['all', 'unread', 'read'] as ReadTab[]).find((k) => READ_LABEL[k] === label);
+    if (next) setReadTab(next);
   };
 
-  // Apply both axes: category (unless «Все») and, if toggled, unread-only.
+  // Apply both axes: type (unless «Все») and the read-state tab.
   const filtered = useMemo(
     () =>
       items.filter(
-        (it) => (filter === 'all' || it.category === filter) && (!unreadOnly || it.unread),
+        (it) =>
+          (filter === 'all' || it.category === filter) &&
+          (readTab === 'all' || (readTab === 'unread' ? it.unread : !it.unread)),
       ),
-    [items, filter, unreadOnly],
+    [items, filter, readTab],
   );
 
   // Bucket the filtered rows into the three time groups (empty groups are skipped at render).
@@ -122,14 +139,10 @@ export default function NotificationsScreen() {
     earlier: t('notif.group.earlier'),
   };
 
-  // Drill-down by ref (ADR-0013): lesson card / operation detail / none. Tapping also marks read.
+  // Tap → the notification DETAIL screen (spec 09 §9.2 — not the target directly); also marks read.
   const openItem = (it: NotificationItem) => {
     void markNotificationRead(it.id);
-    if (it.ref.kind === 'lesson') {
-      router.push({ pathname: '/lesson/[id]', params: { id: it.ref.id } });
-    } else if (it.ref.kind === 'transaction') {
-      router.push({ pathname: '/finance/[id]', params: { id: it.ref.id } });
-    }
+    router.push({ pathname: '/notification/[id]', params: { id: it.id } });
   };
 
   return (
@@ -138,38 +151,19 @@ export default function NotificationsScreen() {
         title={t('notif.title')}
         onBack={() => router.back()}
         action={
-          // Acts on the VISIBLE (filtered) set — least surprise when a category/unread filter is active.
+          // Acts on the VISIBLE (filtered) set — least surprise when a type/read filter is active.
           filtered.some((i) => i.unread)
             ? { label: t('notif.markAllRead'), onPress: () => void markAllNotificationsRead(filtered.map((i) => i.id)) }
             : undefined
         }
+        icons={[
+          { name: 'filter', label: t('a11y.notifFilter'), onPress: () => setFilterOpen(true) },
+          { name: 'sliders', label: t('a11y.notifSettings'), onPress: () => router.push('/notification-settings') },
+        ]}
       />
 
-      {/* Category filter — «Все» + one chip per category (scrolls past 4 tabs). */}
-      <Segmented tabs={filterTabs} active={FILTER_LABEL[filter]} onChange={onFilterChange} scroll />
-
-      {/* Unread-only toggle pill. */}
-      <View style={styles.toggleRow}>
-        <Pressable
-          onPress={() => setUnreadOnly((v) => !v)}
-          accessibilityRole="button"
-          accessibilityState={{ selected: unreadOnly }}
-          hitSlop={6}
-          style={({ pressed }) => [
-            styles.toggle,
-            {
-              backgroundColor: unreadOnly ? colors.primaryVlight : colors.surface,
-              borderColor: unreadOnly ? colors.primary : colors.hairline,
-              borderRadius: radius.pill,
-            },
-            pressed && styles.pressed,
-          ]}>
-          {unreadOnly ? <Icon name="check" size={15} sw={2} stroke={colors.primary} /> : null}
-          <Text style={[styles.toggleLabel, { color: unreadOnly ? colors.primary : colors.muted }]}>
-            {t('notif.unreadOnly')}
-          </Text>
-        </Pressable>
-      </View>
+      {/* Read-state tabs (spec 09 §9.1): Все / Непрочитанные / Прочитанные. */}
+      <Segmented tabs={readTabs} active={READ_LABEL[readTab]} onChange={onReadTabChange} />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {items.length === 0 ? (
@@ -191,7 +185,116 @@ export default function NotificationsScreen() {
           ))
         )}
       </ScrollView>
+
+      {/* Modal filter (spec 09 §9.2): «Тип» + «Статус» chips, «Сбросить» / «Применить». */}
+      {filterOpen ? (
+        <FilterSheet
+          filter={filter}
+          readTab={readTab}
+          onApply={(f, r) => {
+            setFilter(f);
+            setReadTab(r);
+            setFilterOpen(false);
+          }}
+          onClose={() => setFilterOpen(false)}
+        />
+      ) : null}
     </SafeAreaView>
+  );
+}
+
+/** Modal filter over type + read-status — DRAFT state commits only on «Применить» (spec 09 §9.2). */
+function FilterSheet({
+  filter,
+  readTab,
+  onApply,
+  onClose,
+}: {
+  filter: Filter;
+  readTab: ReadTab;
+  onApply: (f: Filter, r: ReadTab) => void;
+  onClose: () => void;
+}) {
+  const t = useT();
+  const { colors, radius } = useTheme();
+  const [draftType, setDraftType] = useState<Filter>(filter);
+  const [draftRead, setDraftRead] = useState<ReadTab>(readTab);
+
+  const TYPE_LABEL: Record<Filter, string> = {
+    all: t('notif.filter.all'),
+    lesson: t('notif.filter.lesson'),
+    payment: t('notif.filter.payment'),
+    schedule: t('notif.filter.schedule'),
+    system: t('notif.filter.system'),
+  };
+  const READ_LABEL: Record<ReadTab, string> = {
+    all: t('notif.filter.all'),
+    unread: t('notif.tab.unread'),
+    read: t('notif.tab.read'),
+  };
+
+  const chip = (on: boolean, label: string, onPress: () => void) => (
+    <Pressable
+      key={label}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: on }}
+      style={({ pressed }) => [
+        styles.filterChip,
+        {
+          backgroundColor: on ? colors.primaryVlight : colors.surface,
+          borderColor: on ? colors.primary : colors.hairline,
+          borderRadius: radius.pill,
+        },
+        pressed && styles.pressed,
+      ]}>
+      <Text style={[styles.filterChipLabel, { color: on ? colors.primary : colors.body }]}>{label}</Text>
+    </Pressable>
+  );
+
+  return (
+    <Sheet title={t('common.filter')} onClose={onClose}>
+      <Text style={[styles.filterGroupLabel, { color: colors.muted }]}>{t('notif.filterType')}</Text>
+      <View style={styles.filterChips}>
+        {(['all', ...NOTIFICATION_CATEGORIES] as Filter[]).map((k) =>
+          chip(draftType === k, TYPE_LABEL[k], () => setDraftType(k)),
+        )}
+      </View>
+
+      <Text style={[styles.filterGroupLabel, { color: colors.muted }]}>{t('field.status')}</Text>
+      <View style={styles.filterChips}>
+        {(['all', 'unread', 'read'] as ReadTab[]).map((k) =>
+          chip(draftRead === k, READ_LABEL[k], () => setDraftRead(k)),
+        )}
+      </View>
+
+      <View style={styles.filterActions}>
+        <Pressable
+          onPress={() => {
+            setDraftType('all');
+            setDraftRead('all');
+          }}
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            styles.filterBtn,
+            { backgroundColor: colors.stoneLight, borderRadius: radius.field },
+            pressed && styles.pressed,
+          ]}>
+          <Text style={[styles.filterBtnLabel, { color: colors.body }]}>{t('common.reset')}</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => onApply(draftType, draftRead)}
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            styles.filterBtn,
+            styles.filterBtnPrimary,
+            { backgroundColor: colors.primary, borderRadius: radius.field },
+            pressed && styles.pressed,
+          ]}>
+          <Text style={[styles.filterBtnLabel, { color: colors.onTint }]}>{t('common.apply')}</Text>
+        </Pressable>
+      </View>
+    </Sheet>
   );
 }
 
@@ -236,14 +339,10 @@ function Row({ item, onOpen }: { item: NotificationItem; onOpen: (it: Notificati
           accessibilityLabel={`${TITLE[item.kind]}${subtitle ? `, ${subtitle}` : ''}${item.unread ? `, ${t('a11y.unread')}` : ''}`}
           accessibilityState={{ selected: item.unread }}
           style={styles.row}>
-          {/* Leading: a student avatar when the item carries one, else a per-kind icon. */}
-          {item.studentName && item.studentCategory ? (
-            <CatAvatar initials={initialsOf(item.studentName)} cat={item.studentCategory} size={42} />
-          ) : (
-            <View style={[styles.iconWrap, { backgroundColor: colors.stoneLight }]}>
-              <Icon name={KIND_ICON[item.kind]} size={20} sw={1.8} stroke={colors.body} />
-            </View>
-          )}
+          {/* Leading: the event-type icon by category (spec 09 §9.1 — часы/кошелёк/календарь). */}
+          <View style={[styles.iconWrap, { backgroundColor: colors.stoneLight }]}>
+            <Icon name={CATEGORY_ICON[item.category]} size={20} sw={1.8} stroke={colors.body} />
+          </View>
 
           <View style={styles.rowBody}>
             <Text style={[styles.rowTitle, { color: colors.heading }]} numberOfLines={1}>
@@ -296,15 +395,18 @@ function subtitleOf(item: NotificationItem, t: ReturnType<typeof useT>): string 
   }
 }
 
-/** Compact stack header (this stack has headerShown:false) — mirrors finance/new.tsx, plus a right action. */
+/** Compact stack header (this stack has headerShown:false) — mirrors finance/new.tsx, plus a
+ *  right action and icon buttons (spec 09 §9.1: «Настройки» и «Фильтр» в шапке). */
 function Header({
   title,
   onBack,
   action,
+  icons,
 }: {
   title: string;
   onBack: () => void;
   action?: { label: string; onPress: () => void };
+  icons?: { name: IconName; label: string; onPress: () => void }[];
 }) {
   const t = useT();
   const { colors, radius } = useTheme();
@@ -334,6 +436,17 @@ function Header({
           <Text style={[styles.markAllLabel, { color: colors.primary }]}>{action.label}</Text>
         </Pressable>
       ) : null}
+      {icons?.map((b) => (
+        <Pressable
+          key={b.name}
+          onPress={b.onPress}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={b.label}
+          style={({ pressed }) => [styles.backBtn, { backgroundColor: colors.stoneLight }, pressed && styles.pressed]}>
+          <Icon name={b.name} size={18} sw={1.8} stroke={colors.heading} />
+        </Pressable>
+      ))}
     </View>
   );
 }
@@ -365,17 +478,15 @@ const styles = StyleSheet.create({
   markAll: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 11, paddingVertical: 7 },
   markAllLabel: { fontSize: 13, fontWeight: '600' },
 
-  // unread-only toggle
-  toggleRow: { flexDirection: 'row', paddingHorizontal: 16, paddingTop: 2, paddingBottom: 4 },
-  toggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  toggleLabel: { fontSize: 13, fontWeight: '600' },
+  // modal filter (spec 09 §9.2)
+  filterGroupLabel: { fontSize: 13, fontWeight: '500', marginBottom: 10, marginTop: 4 },
+  filterChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  filterChip: { paddingHorizontal: 13, paddingVertical: 8, borderWidth: StyleSheet.hairlineWidth },
+  filterChipLabel: { fontSize: 13.5, fontWeight: '600' },
+  filterActions: { flexDirection: 'row', gap: 10, marginTop: 6 },
+  filterBtn: { flex: 1, height: 48, alignItems: 'center', justifyContent: 'center' },
+  filterBtnPrimary: { flex: 2 },
+  filterBtnLabel: { fontSize: 15, fontWeight: '600' },
 
   content: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 40, gap: 18 },
   section: { gap: 0 },

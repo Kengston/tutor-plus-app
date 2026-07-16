@@ -25,6 +25,9 @@ export class ProfileModel extends Model {
   @field('notif_payment') notifPayment!: boolean;
   @field('notif_schedule') notifSchedule!: boolean;
   @field('notif_summary') notifSummary!: boolean;
+  /** v8 master switch + debts split (spec 09 §9.3) — NULLABLE: null (migrated rows) reads as TRUE. */
+  @field('notif_enabled') notifEnabled!: boolean | null;
+  @field('notif_debts') notifDebts!: boolean | null;
   /** OS notification permission granted (Web Notifications on web; expo-notifications on native). */
   @field('push_granted') pushGranted!: boolean;
   @readonly @date('created_at') createdAt!: Date;

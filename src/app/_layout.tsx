@@ -100,6 +100,8 @@ function NavigationRoot() {
             <Stack.Screen name="lesson" />
             <Stack.Screen name="finance" />
             <Stack.Screen name="notifications" />
+            <Stack.Screen name="notification" />
+            <Stack.Screen name="notification-settings" />
             <Stack.Screen name="settings" />
             <Stack.Screen name="gallery" options={{ presentation: 'modal', headerShown: true, title: t('a11y.uiKit') }} />
             <Stack.Screen name="+not-found" />

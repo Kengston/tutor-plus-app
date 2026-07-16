@@ -33,12 +33,25 @@ export function AppHeader({ title, subtitle }: { title: string; subtitle?: strin
   const profile = useProfile();
   const reads = useNotificationReads();
 
-  // Stable `prefs` ref (profile is a stable model instance between emissions) so the memo below
-  // actually holds; `now` ticks each minute so a freshly-fired reminder lights the bell promptly.
+  // `now` ticks each minute so a freshly-fired reminder lights the bell promptly. FIELD-level
+  // deps on the prefs memo: the profile model mutates IN PLACE (same instance each emission),
+  // so [profile] alone would freeze prefs at mount and the master switch would never dim the
+  // bell on the mounted home header (review fix S14; see the PROGRESS reactivity note).
   const now = useNow();
   const prefs = useMemo(
     () => (profile ? reminderPrefsOf(profile) : DEFAULT_REMINDER_PREFS),
-    [profile],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      profile,
+      profile?.notifEnabled,
+      profile?.notifDebts,
+      profile?.notifLessons,
+      profile?.notifPayment,
+      profile?.notifSchedule,
+      profile?.notifSummary,
+      profile?.reminderLeadMin,
+      profile?.pushGranted,
+    ],
   );
   const unread = useMemo(
     () => unreadCount(buildFeed({ lessons, transactions, students, prefs, reads, now })),

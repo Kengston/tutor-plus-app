@@ -27,11 +27,15 @@
  * v7 (UI-v2 S10, ADR-0015): `+expectations` — money promised WITHOUT a lesson («Ожидается»),
  * a plain CRUD entity OUTSIDE the append-only ledger. NOT a transaction: never counted in
  * received/debt; «Отметить оплату» appends a `paid` txn and flips `status` open→closed.
+ *
+ * v8 (UI-v2 S14, spec 09 §9.3): `profiles.notif_enabled` (master switch) + `profiles.notif_debts`
+ * (debts separated from payments). NULLABLE on purpose: addColumns backfills existing rows with
+ * null, and `reminderPrefsOf` reads null as TRUE — a migrated user's feed stays on.
  */
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export const schema = appSchema({
-  version: 7,
+  version: 8,
   tables: [
     tableSchema({
       name: 'students',
@@ -133,6 +137,9 @@ export const schema = appSchema({
         { name: 'notif_payment', type: 'boolean' },
         { name: 'notif_schedule', type: 'boolean' },
         { name: 'notif_summary', type: 'boolean' },
+        // v8: master switch + debts-vs-payments split. Nullable — null reads as TRUE (see header).
+        { name: 'notif_enabled', type: 'boolean', isOptional: true },
+        { name: 'notif_debts', type: 'boolean', isOptional: true },
         { name: 'push_granted', type: 'boolean' },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
