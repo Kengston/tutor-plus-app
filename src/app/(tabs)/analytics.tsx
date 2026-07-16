@@ -17,6 +17,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { EmptyState } from '@/components/EmptyState';
+import { HeaderAction } from '@/components/AppHeader';
 import { PeriodSheet } from '@/components/PeriodSheet';
 import { Screen } from '@/components/Screen';
 import { useAllLessons, useAllTransactions, useStudents, useSubjects } from '@/db/hooks';
@@ -158,7 +159,9 @@ export default function AnalyticsScreen() {
   const activeLabel = tab === 'overview' ? overviewLabel : tab === 'dynamics' ? dynamicsLabel : debtsLabel;
 
   return (
-    <Screen title={t('analytics.title')}>
+    <Screen
+      title={t('analytics.title')}
+      actions={<HeaderAction icon="share" label={t('export.title')} onPress={() => setExportOpen(true)} />}>
       <Segmented
         tabs={[overviewLabel, dynamicsLabel, debtsLabel]}
         active={activeLabel}
@@ -167,7 +170,7 @@ export default function AnalyticsScreen() {
         }
       />
 
-      {/* Top row: tappable period (opens the shared PeriodSheet) + Export action. */}
+      {/* Top row: tappable period (opens the shared PeriodSheet); export lives in the header. */}
       <View style={styles.topRow}>
         <Pressable
           onPress={() => setPeriodOpen(true)}
@@ -179,14 +182,6 @@ export default function AnalyticsScreen() {
             {isDebts ? eyebrow : `${eyebrow} · ${periodLabel}`}
           </Text>
           {!isDebts ? <Icon name="chevronDown" size={15} sw={1.9} stroke={colors.primary} /> : null}
-        </Pressable>
-        <Pressable
-          onPress={() => setExportOpen(true)}
-          accessibilityRole="button"
-          accessibilityLabel={t('export.title')}
-          hitSlop={8}
-          style={({ pressed }) => [styles.exportBtn, { backgroundColor: colors.stoneLight }, pressed && styles.pressed]}>
-          <Icon name="share" size={17} sw={1.8} stroke={colors.body} />
         </Pressable>
       </View>
 
@@ -1053,10 +1048,9 @@ function usePeriodLabel(): (p: Period) => string {
 
 const styles = StyleSheet.create({
   // top row
-  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 2, marginTop: 2 },
+  topRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 2, marginTop: 2 },
   periodBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1, paddingVertical: 4 },
   periodText: { fontSize: 13, fontWeight: '500' },
-  exportBtn: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   pressed: { opacity: 0.7 },
 
   // big metric

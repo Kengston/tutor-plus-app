@@ -1,7 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { HeaderAction } from '@/components/AppHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { plural, useT } from '@/i18n';
@@ -17,6 +18,8 @@ import { Card, CatAvatar, Chip, Dot, Fab, Icon, SectionLabel, Segmented, Sheet, 
 import type { StringKey } from '@/i18n';
 
 type ViewKind = 'calendar' | 'list';
+type FormatFacet = 'all' | 'online' | 'inperson';
+type PayFacet = 'all' | PayStatus;
 
 /** Local-midnight ms for the day containing `ms` (calendar bucket key + day-cell id). */
 function startOfDay(ms: number): number {
@@ -44,7 +47,7 @@ const PAY_TONE: Record<PayStatus, DotTone> = { paid: 'green', debt: 'red', expec
 
 export default function ScheduleScreen() {
   const t = useT();
-  const { colors } = useTheme();
+  const { colors, radius } = useTheme();
   const router = useRouter();
 
   const now = nowMs();
@@ -55,6 +58,14 @@ export default function ScheduleScreen() {
   const [selectedDay, setSelectedDay] = useState<number>(() => startOfDay(nowMs()));
   // Month/year picker sheet (spec 05 §5.1: tap on «Май 2026 ⌄»).
   const [pickingMonth, setPickingMonth] = useState(false);
+  // Header search + filter (spec 05: «в шапке — поиск, фильтр»). The query matches the
+  // student name or the topic; the facets narrow by format and payment status. Both apply
+  // to the selected day's set on EITHER tab, so the glance, the feed and the list agree.
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [fmtFacet, setFmtFacet] = useState<FormatFacet>('all');
+  const [payFacet, setPayFacet] = useState<PayFacet>('all');
 
   // Deep-link from «Сегодня» («Все» / tomorrow card): ?view=list&day=<local-midnight ms>.
   // Applied once per NEW param value (prototype's initKey pattern) via the render-time
@@ -144,7 +155,27 @@ export default function ScheduleScreen() {
     () => dayLessons.filter((l) => l.lifecycleStatus !== 'cancelled'),
     [dayLessons],
   );
-  const summary = daySummary(visibleDayLessons);
+
+  // Header search + filter narrow the visible set; everything downstream (glance, feed,
+  // list) reads the SAME narrowed array, preserving the shared-set invariant above.
+  const searching = query.trim().length > 0;
+  const filtersActive = fmtFacet !== 'all' || payFacet !== 'all';
+  const shownDayLessons = useMemo(() => {
+    if (!searching && !filtersActive) return visibleDayLessons;
+    const q = query.trim().toLowerCase();
+    return visibleDayLessons.filter((l) => {
+      if (fmtFacet !== 'all' && l.format !== fmtFacet) return false;
+      if (payFacet !== 'all' && payStatusOf(l.id, txns) !== payFacet) return false;
+      if (q) {
+        const name = studentsById.get(l.studentId)?.name.toLowerCase() ?? '';
+        const topic = l.topic?.toLowerCase() ?? '';
+        if (!name.includes(q) && !topic.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [visibleDayLessons, searching, filtersActive, query, fmtFacet, payFacet, txns, studentsById]);
+
+  const summary = daySummary(shownDayLessons);
   const dayWord =
     selectedDay === todayStart
       ? t('schedule.today')
@@ -173,12 +204,49 @@ export default function ScheduleScreen() {
   return (
     <Screen
       title={t('schedule.header')}
+      actions={
+        <>
+          <HeaderAction
+            icon="search"
+            label={t('common.search')}
+            active={searching || searchOpen}
+            onPress={() => setSearchOpen((v) => !v || searching)}
+          />
+          <HeaderAction
+            icon="filter"
+            label={t('common.filter')}
+            active={filtersActive}
+            onPress={() => setFilterOpen(true)}
+          />
+        </>
+      }
       floatingAction={<Fab onPress={() => router.push('/lesson/new')} />}>
       <Segmented
         tabs={[calLabel, listLabel]}
         active={view === 'calendar' ? calLabel : listLabel}
         onChange={(tab) => setView(tab === calLabel ? 'calendar' : 'list')}
       />
+
+      {/* Search field — summoned from the header action; kept while a query is set. */}
+      {searchOpen || searching ? (
+        <View style={[styles.searchRow, { backgroundColor: colors.surface, borderColor: colors.hairline, borderRadius: radius.control }]}>
+          <Icon name="search" size={18} sw={1.8} stroke={colors.muted} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder={t('schedule.search')}
+            placeholderTextColor={colors.muted}
+            autoFocus
+            autoCorrect={false}
+            style={[styles.searchInput, { color: colors.heading }]}
+          />
+          {query.length > 0 ? (
+            <Pressable onPress={() => setQuery('')} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('a11y.clearSearch')}>
+              <Icon name="close" size={16} sw={2} stroke={colors.muted} />
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
 
       {view === 'calendar' ? (
         <>
@@ -270,11 +338,15 @@ export default function ScheduleScreen() {
 
           <SectionLabel>{t('schedule.day')}</SectionLabel>
           <DayFeed
-            lessons={visibleDayLessons}
+            lessons={shownDayLessons}
             studentsById={studentsById}
             txns={txns}
             onOpen={openLesson}
-            emptyText={t('schedule.dayEmpty')}
+            emptyText={
+              (searching || filtersActive) && visibleDayLessons.length > 0
+                ? t('schedule.searchEmpty')
+                : t('schedule.dayEmpty')
+            }
             formatLabel={(online) => t(online ? 'format.online' : 'format.inperson')}
             payLabel={(p) => t(payKey(p))}
           />
@@ -285,10 +357,10 @@ export default function ScheduleScreen() {
             <Text style={[styles.dayHeadingText, { color: colors.heading }]}>
               {`${new Date(selectedDay).getDate()} ${t(`monthGen.${new Date(selectedDay).getMonth()}` as StringKey)}`}
             </Text>
-            {visibleDayLessons.length > 0 ? (
+            {shownDayLessons.length > 0 ? (
               <Text style={[styles.dayCount, { color: colors.muted }]}>
-                {visibleDayLessons.length}{' '}
-                {plural(visibleDayLessons.length, {
+                {shownDayLessons.length}{' '}
+                {plural(shownDayLessons.length, {
                   one: t('unit.lessons.one'),
                   few: t('unit.lessons.few'),
                   many: t('unit.lessons.many'),
@@ -296,17 +368,43 @@ export default function ScheduleScreen() {
               </Text>
             ) : null}
           </View>
-          <DayTimeline
-            lessons={visibleDayLessons}
-            studentsById={studentsById}
-            txns={txns}
-            now={now}
-            isToday={selectedDay === todayStart}
-            onOpen={openLesson}
-            onNewAt={(startsAt) => router.push({ pathname: '/lesson/new', params: { at: String(startsAt) } })}
-          />
+          {searching || filtersActive ? (
+            <DayFeed
+              lessons={shownDayLessons}
+              studentsById={studentsById}
+              txns={txns}
+              onOpen={openLesson}
+              emptyText={visibleDayLessons.length > 0 ? t('schedule.searchEmpty') : t('schedule.dayEmpty')}
+              formatLabel={(online) => t(online ? 'format.online' : 'format.inperson')}
+              payLabel={(p) => t(payKey(p))}
+            />
+          ) : (
+            <DayTimeline
+              lessons={shownDayLessons}
+              studentsById={studentsById}
+              txns={txns}
+              now={now}
+              isToday={selectedDay === todayStart}
+              onOpen={openLesson}
+              onNewAt={(startsAt) => router.push({ pathname: '/lesson/new', params: { at: String(startsAt) } })}
+            />
+          )}
         </View>
       )}
+
+      {filterOpen ? (
+        <ScheduleFilterSheet
+          fmt={fmtFacet}
+          pay={payFacet}
+          onFmt={setFmtFacet}
+          onPay={setPayFacet}
+          onReset={() => {
+            setFmtFacet('all');
+            setPayFacet('all');
+          }}
+          onClose={() => setFilterOpen(false)}
+        />
+      ) : null}
 
       {pickingMonth ? (
         <MonthPickerSheet
@@ -319,6 +417,87 @@ export default function ScheduleScreen() {
         />
       ) : null}
     </Screen>
+  );
+}
+
+// ── Header filter sheet (spec 05: «фильтр») — format + payment facets ────────
+
+const FMT_FACETS: { key: FormatFacet; label: StringKey }[] = [
+  { key: 'all', label: 'filter.all' },
+  { key: 'online', label: 'format.online' },
+  { key: 'inperson', label: 'format.inperson' },
+];
+const PAY_FACETS: { key: PayFacet; label: StringKey }[] = [
+  { key: 'all', label: 'filter.all' },
+  { key: 'paid', label: 'pay.paid' },
+  { key: 'debt', label: 'pay.debt' },
+  { key: 'expected', label: 'pay.expected' },
+];
+
+function ScheduleFilterSheet({
+  fmt,
+  pay,
+  onFmt,
+  onPay,
+  onReset,
+  onClose,
+}: {
+  fmt: FormatFacet;
+  pay: PayFacet;
+  onFmt: (f: FormatFacet) => void;
+  onPay: (p: PayFacet) => void;
+  onReset: () => void;
+  onClose: () => void;
+}) {
+  const t = useT();
+  const { colors, radius } = useTheme();
+  return (
+    <Sheet title={t('common.filter')} onClose={onClose}>
+      <Text style={[styles.facetLabel, { color: colors.muted }]}>{t('field.format')}</Text>
+      <FacetRow options={FMT_FACETS} current={fmt} onPick={onFmt} />
+      <Text style={[styles.facetLabel, { color: colors.muted }]}>{t('schedule.filterPay')}</Text>
+      <FacetRow options={PAY_FACETS} current={pay} onPick={onPay} />
+      <Pressable
+        onPress={() => {
+          onReset();
+          onClose();
+        }}
+        accessibilityRole="button"
+        style={({ pressed }) => [styles.resetBtn, { backgroundColor: colors.stoneLight, borderRadius: radius.control }, pressed && styles.pressed]}>
+        <Text style={[styles.resetLabel, { color: colors.heading }]}>{t('common.reset')}</Text>
+      </Pressable>
+    </Sheet>
+  );
+}
+
+/** One facet chip row (mirrors the students-list pills). */
+function FacetRow<K extends string>({
+  options,
+  current,
+  onPick,
+}: {
+  options: { key: K; label: StringKey }[];
+  current: K;
+  onPick: (k: K) => void;
+}) {
+  const t = useT();
+  const { colors } = useTheme();
+  return (
+    <View style={styles.facetRow}>
+      {options.map((o) => {
+        const on = o.key === current;
+        return (
+          <Pressable
+            key={o.key}
+            onPress={() => onPick(o.key)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: on }}
+            style={[styles.facetPill, { backgroundColor: on ? colors.primary : colors.stoneLight }]}>
+            <Text style={[styles.facetPillLabel, { color: on ? colors.onTint : colors.body }]}>{t(o.label)}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
@@ -731,6 +910,23 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   monthPick: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+
+  // header search + filter (spec 05, UI-v2 S18)
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    height: 46,
+    paddingHorizontal: 13,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  searchInput: { flex: 1, fontSize: 15, fontWeight: '500', paddingVertical: 0 },
+  facetLabel: { fontSize: 11.5, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 10, marginBottom: 8 },
+  facetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  facetPill: { paddingHorizontal: 13, paddingVertical: 8, borderRadius: 999 },
+  facetPillLabel: { fontSize: 13.5, fontWeight: '600' },
+  resetBtn: { marginTop: 18, height: 48, alignItems: 'center', justifyContent: 'center' },
+  resetLabel: { fontSize: 15, fontWeight: '600' },
   monthNav: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   todayBtn: { paddingHorizontal: 11, paddingVertical: 7, borderRadius: 9 },
   todayLabel: { fontSize: 13, fontWeight: '600' },

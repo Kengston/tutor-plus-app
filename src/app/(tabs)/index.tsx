@@ -146,6 +146,7 @@ export default function TodayScreen() {
     <Screen
       title={greeting}
       subtitle={dateLine}
+      bell
       floatingAction={<Fab onPress={() => setQuickOpen(true)} />}>
       {visibleToday.length === 0 ? (
         // Empty day (spec 04 AC): no placeholder cards — a single empty state.

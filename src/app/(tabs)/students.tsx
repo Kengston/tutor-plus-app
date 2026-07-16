@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { useRouter } from 'expo-router';
 
+import { HeaderAction } from '@/components/AppHeader';
 import { Screen } from '@/components/Screen';
 import { useAllLessons, useAllTransactions, useStudentPrimarySubject, useStudents } from '@/db/hooks';
 import type { LessonModel, StudentModel, TransactionModel } from '@/db/models';
@@ -58,6 +59,9 @@ export default function StudentsScreen() {
   const [sort, setSort] = useState<StudentSort>('name');
   const [query, setQuery] = useState('');
   const [sortOpen, setSortOpen] = useState(false);
+  // Header search toggle (spec 06 header: поиск + сортировка); the field stays while a
+  // query is set so closing the toggle can never hide an APPLIED search.
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const now = nowMs();
 
@@ -90,13 +94,23 @@ export default function StudentsScreen() {
   const searching = query.trim().length > 0;
   // «Найдено: N» while searching/filtering; a plain count otherwise (spec 06 §6.1).
   const countLabel = visible.length > 0 ? `${t('students.found')}: ${visible.length}` : null;
-  const activeSortLabel = t(SORTS.find((s) => s.key === sort)!.label);
 
   const studentById = useMemo(() => new Map(students.map((s) => [s.id, s])), [students]);
 
   return (
     <Screen
       title={t('students.title')}
+      actions={
+        <>
+          <HeaderAction
+            icon="search"
+            label={t('common.search')}
+            active={searching || searchOpen}
+            onPress={() => setSearchOpen((v) => !v || searching)}
+          />
+          <HeaderAction icon="sort" label={t('sort.label')} active={sort !== 'name'} onPress={() => setSortOpen(true)} />
+        </>
+      }
       floatingAction={<Fab onPress={() => router.push('/student/new')} />}>
       {/* Filter pills */}
       <View style={styles.filterRow}>
@@ -117,8 +131,8 @@ export default function StudentsScreen() {
         })}
       </View>
 
-      {/* Search + sort */}
-      <View style={styles.toolRow}>
+      {/* Search field — summoned from the header action (spec 06 header). */}
+      {searchOpen || searching ? (
         <View style={[styles.search, { backgroundColor: colors.surface, borderColor: colors.hairline, borderRadius: radius.control }]}>
           <Icon name="search" size={18} sw={1.8} stroke={colors.muted} />
           <TextInput
@@ -128,6 +142,7 @@ export default function StudentsScreen() {
             placeholderTextColor={colors.muted}
             style={[styles.searchInput, { color: colors.heading }]}
             returnKeyType="search"
+            autoFocus
             autoCorrect={false}
           />
           {query.length > 0 && (
@@ -136,14 +151,7 @@ export default function StudentsScreen() {
             </Pressable>
           )}
         </View>
-        <Pressable
-          onPress={() => setSortOpen(true)}
-          style={[styles.sortBtn, { backgroundColor: colors.surface, borderColor: colors.hairline, borderRadius: radius.control }]}
-          accessibilityLabel={t('sort.label')}>
-          <Icon name="sort" size={18} sw={1.8} stroke={colors.heading} />
-          <Text style={[styles.sortLabel, { color: colors.heading }]} numberOfLines={1}>{activeSortLabel}</Text>
-        </Pressable>
-      </View>
+      ) : null}
 
       {countLabel && <Text style={[styles.count, { color: colors.muted }]}>{countLabel}</Text>}
 
@@ -162,7 +170,10 @@ export default function StudentsScreen() {
           title={t('students.searchEmpty')}
           body={`${t('students.searchEmptyBy')} «${query.trim()}» ${t('students.searchEmptyNo')}`}
           actionLabel={t('students.clearSearch')}
-          onAction={() => setQuery('')}
+          onAction={() => {
+            setQuery('');
+            setSearchOpen(false);
+          }}
         />
       ) : visible.length === 0 ? (
         <EmptyBlock icon="filter" title={t('students.emptyFiltered')} body={t('students.emptyFilters')} />
@@ -324,9 +335,7 @@ const styles = StyleSheet.create({
   pill: { paddingHorizontal: 13, paddingVertical: 7, borderRadius: 999 },
   pillLabel: { fontSize: 13, fontWeight: '600' },
 
-  toolRow: { flexDirection: 'row', gap: 8, alignItems: 'stretch' },
   search: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -335,8 +344,6 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   searchInput: { flex: 1, fontSize: 15, padding: 0 },
-  sortBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, borderWidth: StyleSheet.hairlineWidth },
-  sortLabel: { fontSize: 13.5, fontWeight: '600', maxWidth: 110 },
 
   count: { fontSize: 12.5, fontWeight: '500', marginTop: -4 },
 

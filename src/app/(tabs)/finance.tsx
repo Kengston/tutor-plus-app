@@ -11,6 +11,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { HeaderAction } from '@/components/AppHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { PeriodSheet } from '@/components/PeriodSheet';
 import { Screen } from '@/components/Screen';
@@ -23,7 +24,7 @@ import { formatRub } from '@/lib/format';
 import { currentMonth, shiftPeriod, startOfDay, type Period } from '@/lib/period';
 import { hhmm, nowMs } from '@/lib/time';
 import { useTheme } from '@/theme';
-import { Card, CatAvatar, Fab, Icon, Segmented } from '@/ui';
+import { Card, CatAvatar, Fab, Icon, Segmented, Sheet } from '@/ui';
 
 /** Finance tabs — a stable key drives filtering; the visible label is the i18n string. */
 type FinTab = 'all' | 'paid' | 'debts' | 'expected';
@@ -52,6 +53,10 @@ export default function FinanceScreen() {
   const [periodOpen, setPeriodOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [infoOpen, setInfoOpen] = useState(false); // ⓘ tap-to-reveal on «Фактически получено»
+  // Header actions (spec 07 header: поиск + фильтр): the search field is summoned on demand
+  // (kept while a query is set), the filter sheet drives the SAME `tab` state as the Segmented.
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
 
   // Deep-link entry (`?tab=debts` — «Все задолженности в финансах», spec 08 §8.3). Applied once
   // per param PAIR via the render-time state-adjustment idiom (mirrors schedule.tsx) so the user
@@ -109,6 +114,8 @@ export default function FinanceScreen() {
       return true;
     });
   }, [inPeriod, tab, query, studentsById]);
+
+  const searching = query.trim().length > 0;
 
   // ── Group the filtered rows by local day, newest day first (already time-desc inside) ──
   const groups = useMemo<DayGroup[]>(() => {
@@ -170,6 +177,22 @@ export default function FinanceScreen() {
   return (
     <Screen
       title={t('finance.title')}
+      actions={
+        <>
+          <HeaderAction
+            icon="search"
+            label={t('common.search')}
+            active={searching || searchOpen}
+            onPress={() => setSearchOpen((v) => !v || searching)}
+          />
+          <HeaderAction
+            icon="filter"
+            label={t('common.filter')}
+            active={tab !== 'all'}
+            onPress={() => setFilterOpen(true)}
+          />
+        </>
+      }
       floatingAction={<Fab onPress={() => router.push('/finance/new')} />}>
       {/* 1 · Period navigator — ± stepper (disabled for custom) + tappable label opening the sheet. */}
       <View style={styles.periodBar}>
@@ -236,26 +259,32 @@ export default function FinanceScreen() {
       {/* 3 · Kind tabs. */}
       <Segmented tabs={tabLabels} active={TAB_LABEL[tab]} onChange={onTabChange} />
 
-      {/* 4 · Inline search over operations (by student name). */}
-      <View style={[styles.searchRow, { backgroundColor: colors.stoneLight, borderRadius: radius.field }]}>
-        <Icon name="search" size={19} sw={1.7} stroke={colors.muted} />
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder={t('finance.searchOps')}
-          placeholderTextColor={colors.label3}
-          style={[styles.searchInput, { color: colors.heading }]}
-        />
-        {query.length > 0 ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('a11y.clearSearch')}
-            onPress={() => setQuery('')}
-            hitSlop={8}>
-            <Icon name="close" size={17} sw={1.8} stroke={colors.muted} />
-          </Pressable>
-        ) : null}
-      </View>
+      {/* 4 · Search over operations (by student name) — summoned from the header (spec 07). */}
+      {searchOpen || searching ? (
+        <View style={[styles.searchRow, { backgroundColor: colors.stoneLight, borderRadius: radius.field }]}>
+          <Icon name="search" size={19} sw={1.7} stroke={colors.muted} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder={t('finance.searchOps')}
+            placeholderTextColor={colors.label3}
+            autoFocus
+            style={[styles.searchInput, { color: colors.heading }]}
+          />
+          {query.length > 0 ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('a11y.clearSearch')}
+              onPress={() => setQuery('')}
+              hitSlop={8}>
+              <Icon name="close" size={17} sw={1.8} stroke={colors.muted} />
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+      {searching ? (
+        <Text style={[styles.foundCount, { color: colors.muted }]}>{`${t('finance.found')}: ${filtered.length}`}</Text>
+      ) : null}
 
       {/* 5/6 · Grouped list + empty states. */}
       {allEntries.length === 0 ? (
@@ -265,7 +294,7 @@ export default function FinanceScreen() {
         // There IS data, but the current period/tab slice is empty — say which.
         <Card style={styles.emptySliceCard}>
           <Text style={[styles.emptySliceText, { color: colors.muted }]}>
-            {inPeriod.length === 0 ? t('finance.noOpsPeriod') : t('finance.noOpsTab')}
+            {searching ? t('finance.nothingFound') : inPeriod.length === 0 ? t('finance.noOpsPeriod') : t('finance.noOpsTab')}
           </Text>
         </Card>
       ) : (
@@ -317,7 +346,49 @@ export default function FinanceScreen() {
         onClose={() => setPeriodOpen(false)}
         onApply={(p) => setPeriod(p)}
       />
+
+      {filterOpen ? (
+        <FilterSheet current={tab} labels={TAB_LABEL} onPick={setTab} onClose={() => setFilterOpen(false)} />
+      ) : null}
     </Screen>
+  );
+}
+
+// ── Header filter sheet (spec 07: «фильтр») — kind radio synced with the Segmented. ──
+
+function FilterSheet({
+  current,
+  labels,
+  onPick,
+  onClose,
+}: {
+  current: FinTab;
+  labels: Record<FinTab, string>;
+  onPick: (k: FinTab) => void;
+  onClose: () => void;
+}) {
+  const t = useT();
+  const { colors } = useTheme();
+  return (
+    <Sheet title={t('common.filter')} onClose={onClose}>
+      {(Object.keys(labels) as FinTab[]).map((k) => {
+        const on = k === current;
+        return (
+          <Pressable
+            key={k}
+            accessibilityRole="button"
+            accessibilityState={{ selected: on }}
+            onPress={() => {
+              onPick(k);
+              onClose();
+            }}
+            style={[styles.filterOption, { borderBottomColor: colors.hairline }]}>
+            <Text style={[styles.filterOptionLabel, { color: colors.heading }]}>{labels[k]}</Text>
+            {on ? <Icon name="check" size={20} sw={2} stroke={colors.primary} /> : null}
+          </Pressable>
+        );
+      })}
+    </Sheet>
   );
 }
 
@@ -400,6 +471,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   searchInput: { flex: 1, fontSize: 15, padding: 0 },
+  foundCount: { fontSize: 12.5, fontWeight: '600', paddingHorizontal: 4, marginTop: -6 },
+  filterOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 15,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  filterOptionLabel: { fontSize: 15.5, fontWeight: '500' },
 
   // Empty period/tab slice
   emptySliceCard: { paddingVertical: 40, paddingHorizontal: 24, alignItems: 'center' },
