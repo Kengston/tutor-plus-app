@@ -14,16 +14,16 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { EmptyState } from '@/components/EmptyState';
 import { PeriodSheet } from '@/components/PeriodSheet';
 import { Screen } from '@/components/Screen';
-import { useAllLessons, useAllTransactions, useStudents, useSubjects } from '@/db/hooks';
-import type { LessonModel, StudentModel, SubjectModel } from '@/db/models';
+import { useAllLessons, useAllTransactions, useExpectations, useStudents, useSubjects } from '@/db/hooks';
+import type { StudentModel, SubjectModel } from '@/db/models';
 import { entriesInPeriod, financeEntries, periodSummary } from '@/domain/aggregates';
 import type { FinanceEntry, FinanceEntryKind } from '@/domain/types';
 import { useT, type StringKey } from '@/i18n';
 import { formatRub } from '@/lib/format';
 import { currentMonth, shiftPeriod, startOfDay, type Period } from '@/lib/period';
-import { nowMs } from '@/lib/time';
+import { hhmm, nowMs } from '@/lib/time';
 import { useTheme } from '@/theme';
-import { Card, Fab, Icon, Segmented } from '@/ui';
+import { Card, CatAvatar, Fab, Icon, Segmented } from '@/ui';
 
 /** Finance tabs — a stable key drives filtering; the visible label is the i18n string. */
 type FinTab = 'all' | 'paid' | 'debts' | 'expected';
@@ -34,10 +34,10 @@ interface DayGroup {
   entries: FinanceEntry[];
 }
 
-/** kind → accent colour for the left strip & amount (paid→paid, debt→danger, expected→warning). */
+/** kind → amount colour: paid→paid, debt→danger, expected→NEUTRAL (stone700, spec 07 §7.2). */
 function useKindColor(): (kind: FinanceEntryKind) => string {
   const { colors } = useTheme();
-  return (kind) => (kind === 'paid' ? colors.paid : kind === 'debt' ? colors.danger : colors.warning);
+  return (kind) => (kind === 'paid' ? colors.paid : kind === 'debt' ? colors.danger : colors.stone700);
 }
 
 export default function FinanceScreen() {
@@ -51,10 +51,12 @@ export default function FinanceScreen() {
   const [tab, setTab] = useState<FinTab>('all');
   const [periodOpen, setPeriodOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [infoOpen, setInfoOpen] = useState(false); // ⓘ tap-to-reveal on «Фактически получено»
 
-  // ── Reactive data (whole ledger + lessons; students/subjects for name resolution) ──
+  // ── Reactive data (whole ledger + lessons + expectations; students/subjects for names) ──
   const lessons = useAllLessons();
   const txns = useAllTransactions();
+  const expectations = useExpectations();
   const students = useStudents();
   const subjects = useSubjects();
 
@@ -68,18 +70,15 @@ export default function FinanceScreen() {
     for (const s of subjects) m.set(s.id, s);
     return m;
   }, [subjects]);
-  // Lesson lookup — resolves a lesson-sourced row's meta line (its topic) for the subtitle.
-  const lessonsById = useMemo(() => {
-    const m = new Map<string, LessonModel>();
-    for (const l of lessons) m.set(l.id, l);
-    return m;
-  }, [lessons]);
 
-  // ── View-model: full entry union, then period-scoped (both pure aggregates) ──
-  const allEntries = useMemo(() => financeEntries(lessons, txns), [lessons, txns]);
+  // ── View-model: full entry union (incl. open expectations, ADR-0015), then period-scoped ──
+  const allEntries = useMemo(
+    () => financeEntries(lessons, txns, expectations),
+    [lessons, txns, expectations],
+  );
   const inPeriod = useMemo(() => entriesInPeriod(allEntries, period), [allEntries, period]);
 
-  // Header summary (received flow + in-period debt) over the period slice (ADR-0012).
+  // Header summary (received flow + in-period expected + debt) over the period slice (ADR-0012/0015).
   const summary = useMemo(() => periodSummary(inPeriod), [inPeriod]);
 
   // ── Filter by tab (kind) then by query (case-insensitive student-name contains) ──
@@ -131,21 +130,22 @@ export default function FinanceScreen() {
   const periodLabel = usePeriodLabel();
   const isCustom = period.type === 'custom';
 
-  // Drill-down: lesson-sourced row → the lesson card; standalone op → the operation detail.
+  // Drill-down: lesson row → the lesson card; expectation → its settle detail; else the op detail.
   const openEntry = (e: FinanceEntry) => {
     if (e.source === 'lesson' && e.lessonId) {
       router.push({ pathname: '/lesson/[id]', params: { id: e.lessonId } });
+    } else if (e.source === 'expectation') {
+      router.push({ pathname: '/finance/[id]', params: { id: e.id.replace('expectation:', ''), kind: 'expectation' } });
     } else {
       router.push({ pathname: '/finance/[id]', params: { id: e.id } });
     }
   };
 
-  // Meta subtitle under the name: lesson topic / subject for a lesson row, else the kind word.
-  const metaOf = (e: FinanceEntry): string => {
-    if (e.source === 'lesson' && e.lessonId) {
-      const topic = lessonsById.get(e.lessonId)?.topic?.trim();
-      if (topic) return topic;
-    }
+  // Secondary line under the name (spec 07 §7.2, mockup): a lesson-anchored row (paid
+  // settlement / derived debt|expected — has a real wall-clock instant) shows its time
+  // («10:00»); a standalone op / expectation (date-only) shows the subject or the kind word.
+  const subtitleOf = (e: FinanceEntry): string => {
+    if (e.lessonId != null) return hhmm(e.occurredAt);
     if (e.subjectId) {
       const name = subjectsById.get(e.subjectId)?.name;
       if (name) return name;
@@ -189,17 +189,32 @@ export default function FinanceScreen() {
         </Pressable>
       </View>
 
-      {/* 2 · Summary — received (paid flow) | debt (in-period), split by a thin divider. */}
+      {/* 2 · Summary of three (spec 07 §7.1): «Фактически получено» (big, ⓘ) then «Ожидается» | «Задолженность». */}
       <Card style={styles.summaryCard}>
-        <View style={styles.summaryRow}>
+        <Text style={[styles.summaryReceived, { color: colors.paid }]}>{formatRub(summary.received)}</Text>
+        <View style={styles.receivedCaptionRow}>
+          <Text style={[styles.summaryCaption, { color: colors.muted }]}>{t('finance.receivedFull')}</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('finance.receivedHint')}
+            onPress={() => setInfoOpen((v) => !v)}
+            hitSlop={8}>
+            <Icon name="info" size={15} sw={1.8} stroke={infoOpen ? colors.paid : colors.label3} />
+          </Pressable>
+        </View>
+        {infoOpen ? (
+          <Text style={[styles.receivedHint, { color: colors.muted }]}>{t('finance.receivedHint')}</Text>
+        ) : null}
+
+        <View style={[styles.summarySplit, { borderTopColor: colors.hairline }]}>
           <View style={styles.summaryCol}>
-            <Text style={[styles.summaryCaption, { color: colors.muted }]}>{t('finance.received')}</Text>
-            <Text style={[styles.summaryReceived, { color: colors.paid }]}>{formatRub(summary.received)}</Text>
+            <Text style={[styles.summaryCaption, { color: colors.muted }]}>{t('finance.expected')}</Text>
+            <Text style={[styles.summarySecondary, { color: colors.stone700 }]}>{formatRub(summary.expected)}</Text>
           </View>
           <View style={[styles.summaryDivider, { backgroundColor: colors.hairline }]} />
           <View style={styles.summaryCol}>
-            <Text style={[styles.summaryCaption, { color: colors.muted }]}>{t('finance.debt')}</Text>
-            <Text style={[styles.summaryDebt, { color: colors.danger }]}>{formatRub(summary.debt)}</Text>
+            <Text style={[styles.summaryCaption, { color: colors.muted }]}>{t('finance.debtSummary')}</Text>
+            <Text style={[styles.summarySecondary, { color: colors.danger }]}>{formatRub(summary.debt)}</Text>
           </View>
         </View>
       </Card>
@@ -242,34 +257,40 @@ export default function FinanceScreen() {
       ) : (
         groups.map((g) => (
           <View key={g.day} style={styles.group}>
-            {/* Day header: «Сегодня» for today, else «<day> <month-genitive>». */}
+            {/* Day header (caps via style): «СЕГОДНЯ, 26 МАЯ» for today, else «26 МАЯ». */}
             <Text style={[styles.groupHeader, { color: colors.muted }]}>
-              {g.day === todayStart ? t('group.today') : dateLabel(g.day)}
+              {g.day === todayStart ? `${t('group.today')}, ${dateLabel(g.day)}` : dateLabel(g.day)}
             </Text>
             <Card>
-              {g.entries.map((e, i) => (
-                <View key={e.id}>
-                  {i > 0 ? <View style={[styles.hairline, { backgroundColor: colors.hairline }]} /> : null}
-                  <Pressable
-                    onPress={() => openEntry(e)}
-                    style={({ pressed }) => [styles.opRow, pressed && styles.pressed]}>
-                    {/* Left accent strip coloured by kind. */}
-                    <View style={[styles.opStrip, { backgroundColor: kindColor(e.kind) }]} />
-                    <View style={styles.opBody}>
-                      <Text numberOfLines={1} style={[styles.opName, { color: colors.heading }]}>
-                        {studentsById.get(e.studentId)?.name ?? t('common.none')}
-                      </Text>
-                      <Text numberOfLines={1} style={[styles.opMeta, { color: colors.muted }]}>
-                        {metaOf(e)}
-                      </Text>
-                    </View>
-                    <Text style={[styles.opAmount, { color: kindColor(e.kind) }]}>
-                      {e.kind === 'paid' ? '+' : ''}
-                      {formatRub(e.amount)}
-                    </Text>
-                  </Pressable>
-                </View>
-              ))}
+              {g.entries.map((e, i) => {
+                const student = studentsById.get(e.studentId);
+                return (
+                  <View key={e.id}>
+                    {i > 0 ? <View style={[styles.hairline, { backgroundColor: colors.hairline }]} /> : null}
+                    <Pressable
+                      onPress={() => openEntry(e)}
+                      style={({ pressed }) => [styles.opRow, pressed && styles.pressed]}>
+                      {/* Personal marker (initials + category colour) — spec 07 §7.2. */}
+                      <CatAvatar initials={student?.initials ?? '—'} cat={student?.category ?? 'slate'} size={38} />
+                      <View style={styles.opBody}>
+                        <Text numberOfLines={1} style={[styles.opName, { color: colors.heading }]}>
+                          {student?.name ?? t('common.none')}
+                        </Text>
+                        <Text numberOfLines={1} style={[styles.opMeta, { color: colors.muted }]}>
+                          {subtitleOf(e)}
+                        </Text>
+                      </View>
+                      <View style={styles.opAmountWrap}>
+                        {e.kind === 'paid' ? <Icon name="check" size={14} sw={2.4} stroke={colors.paid} /> : null}
+                        <Text style={[styles.opAmount, { color: kindColor(e.kind) }]}>
+                          {e.kind === 'paid' ? '+' : ''}
+                          {formatRub(e.amount)}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  </View>
+                );
+              })}
             </Card>
           </View>
         ))
@@ -339,13 +360,21 @@ const styles = StyleSheet.create({
   periodLabel: { fontSize: 16, fontWeight: '600', letterSpacing: -0.2 },
   pressed: { opacity: 0.6 },
 
-  // Summary card
-  summaryCard: { paddingVertical: 12, paddingHorizontal: 14 },
-  summaryRow: { flexDirection: 'row', alignItems: 'stretch' },
+  // Summary card — three figures (spec 07 §7.1)
+  summaryCard: { paddingVertical: 16, paddingHorizontal: 16 },
+  summaryReceived: { fontSize: 30, fontWeight: '700', letterSpacing: -0.8, fontVariant: ['tabular-nums'] },
+  receivedCaptionRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 5 },
+  receivedHint: { fontSize: 12.5, marginTop: 6, lineHeight: 17 },
+  summarySplit: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
   summaryCol: { flex: 1 },
-  summaryCaption: { fontSize: 13, fontWeight: '500' },
-  summaryReceived: { fontSize: 22, fontWeight: '600', marginTop: 3, fontVariant: ['tabular-nums'] },
-  summaryDebt: { fontSize: 19, fontWeight: '600', marginTop: 3, fontVariant: ['tabular-nums'] },
+  summaryCaption: { fontSize: 12.5, fontWeight: '500' },
+  summarySecondary: { fontSize: 18, fontWeight: '600', marginTop: 3, fontVariant: ['tabular-nums'] },
   summaryDivider: { width: StyleSheet.hairlineWidth, marginHorizontal: 14, marginVertical: 2 },
 
   // Search
@@ -372,10 +401,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   hairline: { height: StyleSheet.hairlineWidth, marginLeft: 16 },
-  opRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, paddingLeft: 16, paddingRight: 14 },
-  opStrip: { position: 'absolute', left: 0, top: 8, bottom: 8, width: 3, borderRadius: 3 },
+  opRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 14 },
   opBody: { flex: 1, minWidth: 0 },
   opName: { fontSize: 15, fontWeight: '600' },
   opMeta: { fontSize: 13, marginTop: 3 },
-  opAmount: { fontSize: 15, fontWeight: '600', marginLeft: 12, fontVariant: ['tabular-nums'] },
+  opAmountWrap: { flexDirection: 'row', alignItems: 'center', gap: 5, marginLeft: 12 },
+  opAmount: { fontSize: 15, fontWeight: '600', fontVariant: ['tabular-nums'] },
 });

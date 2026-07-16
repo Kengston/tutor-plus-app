@@ -23,11 +23,15 @@
  * manually edited occurrence the generator must not touch.
  *
  * v6 (UI-v2 S9, spec 06 §6.3): `+student_notes` — free-form notes on a student's profile.
+ *
+ * v7 (UI-v2 S10, ADR-0015): `+expectations` — money promised WITHOUT a lesson («Ожидается»),
+ * a plain CRUD entity OUTSIDE the append-only ledger. NOT a transaction: never counted in
+ * received/debt; «Отметить оплату» appends a `paid` txn and flips `status` open→closed.
  */
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export const schema = appSchema({
-  version: 6,
+  version: 7,
   tables: [
     tableSchema({
       name: 'students',
@@ -149,6 +153,20 @@ export const schema = appSchema({
       columns: [
         { name: 'student_id', type: 'string', isIndexed: true },
         { name: 'text', type: 'string' },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+    // Expected payment without a lesson (ADR-0015): participant + amount + due date; `status`
+    // open/closed. A CRUD entity, NOT the append-only ledger — never counted in received/debt.
+    tableSchema({
+      name: 'expectations',
+      columns: [
+        { name: 'student_id', type: 'string', isIndexed: true },
+        { name: 'amount', type: 'number' },
+        { name: 'due_at', type: 'number', isIndexed: true },
+        { name: 'comment', type: 'string', isOptional: true },
+        { name: 'status', type: 'string', isIndexed: true },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
       ],

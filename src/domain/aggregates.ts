@@ -16,6 +16,7 @@
 import { periodContains, type Period } from '@/lib/period';
 
 import type {
+  ExpectationStatus,
   FinanceEntry,
   LifecycleStatus,
   PayMethod,
@@ -41,6 +42,13 @@ type LessonSlice = {
   price: number;
   startsAt: number;
   lifecycleStatus: LifecycleStatus;
+};
+type ExpectationSlice = {
+  id: string;
+  studentId: string;
+  amount: number;
+  dueAt: number;
+  status: ExpectationStatus;
 };
 
 // ── Phase-1 derivations (unchanged contract) ─────────────────────────────────
@@ -178,16 +186,20 @@ function linkedStatusMap(
 }
 
 /**
- * The Finance list as a union of view rows (ADR-0011), newest first:
+ * The Finance list as a union of view rows (ADR-0011/0015), newest first:
  *   1. every `paid` txn               → a paid row (lesson settlements + standalone income)
  *   2. each non-cancelled lesson with derived `debt`/`expected` status → a derived row
  *      (paid lessons are represented by their paid txn in #1)
  *   3. every standalone `debt` txn    → a debt row
- * `expected` rows are never stored — always derived from a lesson with no linked txn.
+ *   4. every OPEN `Expectation`       → an `expected` row (money promised without a lesson,
+ *      ADR-0015; closed ones are settled — their `paid` txn already appears in #1)
+ * An `expected` row is never a ledger txn — it is a derived lesson row (#2) or an open
+ * expectation (#4).
  */
 export function financeEntries(
   lessons: readonly LessonSlice[],
   transactions: readonly TxnSlice[],
+  expectations: readonly ExpectationSlice[] = [],
 ): FinanceEntry[] {
   const entries: FinanceEntry[] = [];
   const linked = linkedStatusMap(transactions);
@@ -241,6 +253,21 @@ export function financeEntries(
     }
   }
 
+  for (const x of expectations) {
+    if (x.status !== 'open') continue; // closed → already settled (its `paid` txn is in #1)
+    entries.push({
+      id: `expectation:${x.id}`,
+      kind: 'expected',
+      studentId: x.studentId,
+      lessonId: null,
+      subjectId: null,
+      amount: x.amount,
+      occurredAt: x.dueAt, // never converts to debt when past-due (ADR-0009/0015)
+      method: null,
+      source: 'expectation',
+    });
+  }
+
   entries.sort((a, b) => b.occurredAt - a.occurredAt);
   return entries;
 }
@@ -250,15 +277,23 @@ export function entriesInPeriod(entries: readonly FinanceEntry[], period: Period
   return entries.filter((e) => periodContains(period, e.occurredAt));
 }
 
-/** Period summary for the Finance header — received (flow) + debt (in-period), ADR-0012. */
-export function periodSummary(entries: readonly FinanceEntry[]): { received: number; debt: number } {
+/**
+ * Period summary for the Finance header (spec 07 §7.1) — the three figures over the period
+ * slice: `received` («Фактически получено» = Σ paid flow), `debt` («Задолженность»), and
+ * `expected` («Ожидается» = derived expected-lessons + open Expectations, ADR-0012/0015).
+ */
+export function periodSummary(
+  entries: readonly FinanceEntry[],
+): { received: number; debt: number; expected: number } {
   let received = 0;
   let debt = 0;
+  let expected = 0;
   for (const e of entries) {
     if (e.kind === 'paid') received += e.amount;
     else if (e.kind === 'debt') debt += e.amount;
+    else expected += e.amount; // 'expected' — expected-lessons + open Expectations
   }
-  return { received, debt };
+  return { received, debt, expected };
 }
 
 // ── Analytics aggregates (ADR-0012) ──────────────────────────────────────────

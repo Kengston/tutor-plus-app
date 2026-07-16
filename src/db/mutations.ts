@@ -6,6 +6,7 @@
  */
 import { Q } from '@nozbe/watermelondb';
 
+import { settleExpectation } from '@/domain/expectations';
 import type { Duration, LessonFormat, PayMethod, StudentStatus, TxnType } from '@/domain/types';
 import { reversalOf, type LessonLifecycleSnapshot } from '@/domain/undo';
 import type { Activity, ClientType } from '@/i18n';
@@ -14,6 +15,7 @@ import type { CatColor, ThemeMode } from '@/theme';
 
 import { database } from '.';
 import {
+  ExpectationModel,
   LessonModel,
   NotificationReadModel,
   ProfileModel,
@@ -262,6 +264,64 @@ export async function createSubject(name: string): Promise<SubjectModel> {
   return database.write(async () => database.get<SubjectModel>('subjects').create((s) => {
     s.name = name;
   }));
+}
+
+// ── Expectations (ADR-0015, UI-v2 S10) ───────────────────────────────────────
+// «Ожидается» money promised without a lesson. A CRUD entity OUTSIDE the append-only ledger:
+// creating one writes NO transaction (so received/debt are untouched); settling appends a
+// real `paid` txn AND flips the expectation closed. Overdue ones never auto-become debt.
+
+export interface ExpectationInput {
+  studentId: string;
+  amount: number;
+  /** Due date — UTC-instant ms; defaults to now. */
+  dueAt?: number;
+  comment?: string | null;
+}
+
+/** Create an expectation (ADR-0015) — NOT a ledger write; the «Ожидается» type in «Новая
+ *  операция» lands here, keeping the money registry append-only. */
+export async function createExpectation(input: ExpectationInput): Promise<ExpectationModel> {
+  return database.write(async () =>
+    database.get<ExpectationModel>('expectations').create((x) => {
+      x.studentId = input.studentId;
+      x.amount = input.amount;
+      x.dueAt = input.dueAt ?? Date.now();
+      x.comment = input.comment ?? null;
+      x.status = 'open';
+    }),
+  );
+}
+
+/**
+ * Settle an expectation (ADR-0015): in ONE writer, APPEND a `paid` txn for the promised money
+ * AND mark the expectation `closed`. The ledger stays append-only (the payment is a new row);
+ * the expectation (not a ledger row) flips open→closed. The settle rule is the pure
+ * `domain/expectations.settleExpectation`.
+ */
+export async function settleExpectationPaid(
+  expectation: ExpectationModel,
+  pay: { method: PayMethod; occurredAt?: number },
+): Promise<void> {
+  const { payment, nextStatus } = settleExpectation(expectation, {
+    method: pay.method,
+    occurredAt: pay.occurredAt ?? Date.now(),
+  });
+  await database.write(async () => {
+    await database.get<TransactionModel>('transactions').create((t) => {
+      t.studentId = payment.studentId;
+      t.lessonId = null;
+      t.amount = payment.amount;
+      t.type = 'paid';
+      t.method = payment.method;
+      t.subjectId = null;
+      t.occurredAt = payment.occurredAt;
+      t.comment = payment.comment;
+    });
+    await expectation.update((x) => {
+      x.status = nextStatus;
+    });
+  });
 }
 
 // ── Student notes (spec 06 §6.3, UI-v2 S9) ───────────────────────────────────

@@ -9,7 +9,7 @@ import type { CatColor } from '@/theme';
 import { dayBounds } from '@/lib/time';
 
 import { database } from '.';
-import { LessonModel, StudentModel, StudentSubjectModel, SubjectModel, TransactionModel } from './models';
+import { ExpectationModel, LessonModel, StudentModel, StudentSubjectModel, SubjectModel, TransactionModel } from './models';
 import type { Duration, LessonFormat, StudentStatus, TxnType } from '@/domain/types';
 
 interface StudentSpec {
@@ -170,6 +170,19 @@ export async function seedIfEmpty(): Promise<void> {
           m.occurredAt = at(spec.day, spec.hour, spec.min ?? 0);
         });
       }
+    }
+
+    // One open expectation (ADR-0015, slice #28) — a package prepayment NOT tied to a lesson,
+    // so «Ожидается» has a non-lesson entry to show and the settle flow can be demoed.
+    const annaId = studentId.get('Анна Котова');
+    if (annaId) {
+      await database.get<ExpectationModel>('expectations').create((x) => {
+        x.studentId = annaId;
+        x.amount = 6000;
+        x.dueAt = at(4, 12); // in ~4 days
+        x.comment = 'Предоплата за пакет из 4 занятий';
+        x.status = 'open';
+      });
     }
   });
 }

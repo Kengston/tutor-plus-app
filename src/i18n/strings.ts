@@ -475,6 +475,12 @@ export const messages = {
   'method.cash': 'Наличные',
   'method.card': 'Карта',
 
+  // ── Финансы: сводка из трёх (spec 07 §7.1) ───────────────────────────────
+  'finance.receivedFull': 'Фактически получено',
+  'finance.receivedHint': 'По внесённым оплатам за выбранный период',
+  'finance.expected': 'Ожидается',
+  'finance.debtSummary': 'Задолженность',
+
   // ── Финансы: список + сводка ─────────────────────────────────────────────
   'finance.tab.all': 'Все',
   'finance.tab.paid': 'Оплачено',
@@ -502,6 +508,7 @@ export const messages = {
   'finance.opType': 'Тип операции',
   'op.paid': 'Оплата',
   'op.debt': 'Долг',
+  'op.expected': 'Ожидается',
   'finance.subject': 'Предмет',
   'finance.subject_client': 'Тема встречи',
   'finance.comment': 'Комментарий',

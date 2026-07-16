@@ -14,6 +14,7 @@ import { withoutReversals } from '@/domain/undo';
 
 import { database } from '.';
 import {
+  ExpectationModel,
   LessonModel,
   NotificationReadModel,
   ProfileModel,
@@ -53,6 +54,7 @@ const txnsC = () => database.get<TransactionModel>('transactions');
 const studentSubjectsC = () => database.get<StudentSubjectModel>('student_subjects');
 const slotsC = () => database.get<ScheduleSlotModel>('schedule_slots');
 const notesC = () => database.get<StudentNoteModel>('student_notes');
+const expectationsC = () => database.get<ExpectationModel>('expectations');
 
 const STUDENT_COLS = ['name', 'initials', 'category', 'status', 'format', 'rate', 'schedule', 'phone'];
 const SLOT_COLS = ['student_id', 'weekday', 'time_min', 'duration_min', 'format', 'price', 'subject_id', 'active_from', 'active_to'];
@@ -138,6 +140,24 @@ export function useStudentTransactions(studentId: string): TransactionModel[] {
     [studentId],
     [],
   );
+}
+
+/** All expectations (reactive), latest due first — the Finance «Ожидается» union (ADR-0015).
+ *  Whole-table (single-practitioner scale); `financeEntries` keeps only the OPEN ones. */
+export function useExpectations(): ExpectationModel[] {
+  return useObservable(
+    () =>
+      expectationsC()
+        .query(Q.sortBy('due_at', Q.desc))
+        .observeWithColumns(['student_id', 'amount', 'due_at', 'comment', 'status']),
+    [],
+    [],
+  );
+}
+
+/** A single expectation (reactive); undefined until loaded — the settle detail (ADR-0015). */
+export function useExpectation(id: string): ExpectationModel | undefined {
+  return useObservable<ExpectationModel | undefined>(() => expectationsC().findAndObserve(id), [id], undefined);
 }
 
 /** Subjects/directions linked to a student via the M:N join (reactive on membership). */

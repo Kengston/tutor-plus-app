@@ -116,11 +116,34 @@ export interface Transaction {
   createdAt: number;
 }
 
+/** Lifecycle of an `Expectation` — a plain mutable flag (ADR-0015; NOT the append-only ledger). */
+export type ExpectationStatus = 'open' | 'closed';
+
 /**
- * A money-relevant row in the Finance list (ADR-0011) — a VIEW-MODEL, not a stored
+ * A promise of money NOT tied to a lesson (prepayment/package: «жду от Маши 5 000 ₽ в
+ * пятницу») — a lightweight CRUD entity OUTSIDE the append-only ledger (ADR-0015). It is
+ * NOT a transaction: it never enters `received`/`debt`/netting. «Отметить оплату» APPENDS a
+ * real `paid` txn and flips `status` open→closed (mutability is fine — this is not the ledger).
+ * An overdue open expectation stays `expected` — it is NEVER auto-converted to debt (ADR-0009).
+ */
+export interface Expectation {
+  id: string;
+  /** Participant — the student/client who owes the promised payment. */
+  studentId: string;
+  amount: number;
+  /** Due date — UTC-instant ms (the day money is expected); the Finance bucket/sort key. */
+  dueAt: number;
+  comment: string | null;
+  status: ExpectationStatus;
+  createdAt: number;
+}
+
+/**
+ * A money-relevant row in the Finance list (ADR-0011/0015) — a VIEW-MODEL, not a stored
  * entity. The list is a union of real `paid` transactions, derived `debt`/`expected`
- * lessons (a lesson's payStatus, not a stored row), and standalone `debt` transactions.
- * `expected` is never stored — it is always a derived lesson row (ADR-0008/0011).
+ * lessons (a lesson's payStatus, not a stored row), standalone `debt` transactions, and
+ * OPEN `Expectation`s (money promised without a lesson, ADR-0015). An `expected` row is
+ * never a ledger transaction — it is a derived lesson row OR an open expectation.
  */
 export type FinanceEntryKind = PayStatus; // 'paid' | 'debt' | 'expected'
 
@@ -136,8 +159,8 @@ export interface FinanceEntry {
   /** Bucket/sort instant: txn.occurredAt, or lesson.startsAt for a derived row. */
   occurredAt: number;
   method: PayMethod | null;
-  /** Origin of the row — drives drill-down (open the txn vs open the lesson). */
-  source: 'txn' | 'lesson';
+  /** Origin of the row — drives drill-down (open the txn / the lesson / the expectation). */
+  source: 'txn' | 'lesson' | 'expectation';
 }
 
 // ── Notifications (Phase 3, ADR-0013) ───────────────────────────────────────

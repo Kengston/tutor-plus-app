@@ -17,6 +17,9 @@
  * strings. `students.schedule` is kept (no drop-column in WatermelonDB) but superseded.
  *
  * v6 (UI-v2 S9, spec 06 §6.3): add `student_notes` (profile notes). Additive — no data change.
+ *
+ * v7 (UI-v2 S10, ADR-0015): add `expectations` (money promised without a lesson, «Ожидается»).
+ * Additive — no data change; existing ledger/aggregates are untouched.
  */
 import { schemaMigrations, createTable, addColumns } from '@nozbe/watermelondb/Schema/migrations';
 
@@ -107,6 +110,23 @@ export const migrations = schemaMigrations({
           columns: [
             { name: 'student_id', type: 'string', isIndexed: true },
             { name: 'text', type: 'string' },
+            { name: 'created_at', type: 'number' },
+            { name: 'updated_at', type: 'number' },
+          ],
+        }),
+      ],
+    },
+    {
+      toVersion: 7,
+      steps: [
+        createTable({
+          name: 'expectations',
+          columns: [
+            { name: 'student_id', type: 'string', isIndexed: true },
+            { name: 'amount', type: 'number' },
+            { name: 'due_at', type: 'number', isIndexed: true },
+            { name: 'comment', type: 'string', isOptional: true },
+            { name: 'status', type: 'string', isIndexed: true },
             { name: 'created_at', type: 'number' },
             { name: 'updated_at', type: 'number' },
           ],

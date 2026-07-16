@@ -1,3 +1,4 @@
+import { ExpectationModel } from './Expectation';
 import { LessonModel } from './Lesson';
 import { NotificationReadModel } from './NotificationRead';
 import { ProfileModel } from './Profile';
@@ -17,6 +18,7 @@ export { ProfileModel } from './Profile';
 export { NotificationReadModel } from './NotificationRead';
 export { ScheduleSlotModel } from './ScheduleSlot';
 export { StudentNoteModel } from './StudentNote';
+export { ExpectationModel } from './Expectation';
 
 /** All model classes — passed to the `Database` constructor (see ../makeDatabase). */
 export const modelClasses = [
@@ -29,4 +31,5 @@ export const modelClasses = [
   NotificationReadModel,
   ScheduleSlotModel,
   StudentNoteModel,
+  ExpectationModel,
 ];
