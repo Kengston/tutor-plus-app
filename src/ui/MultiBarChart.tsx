@@ -10,6 +10,8 @@ export interface BarDatum {
   v: number;
   /** Tooltip value (formatted). */
   value?: string;
+  /** Persistent short label above the bar when `alwaysValue` (falls back to `value`). */
+  top?: string;
   /** Highlighted ("on") bar. */
   on?: boolean;
 }
@@ -20,6 +22,10 @@ export interface MultiBarChartProps {
   compare?: number[];
   showCompare?: boolean;
   onBar?: (bar: BarDatum, index: number) => void;
+  /** Show each bar's value above it, always (spec 08 §8.1 — «подписи видны без тапа»). */
+  alwaysValue?: boolean;
+  /** Neutral (stone) bars so only the accented "on" bar stands out (Overview income chart). */
+  calm?: boolean;
 }
 
 /** Prototype-hardcoded gradient top stop for the highlighted ("on") bar. */
@@ -49,7 +55,7 @@ function BarFill({ top, base }: { top: string; base: string }) {
  * dashed "compare" overlay. Ported from the prototype `t+/kit.jsx` MultiBarChart.
  */
 export function MultiBarChart(props: MultiBarChartProps) {
-  const { data, height = 150, compare, showCompare, onBar } = props;
+  const { data, height = 150, compare, showCompare, onBar, alwaysValue, calm } = props;
   const { colors, shadow } = useTheme();
   const [tip, setTip] = useState<number | null>(null);
 
@@ -57,7 +63,8 @@ export function MultiBarChart(props: MultiBarChartProps) {
     <View style={styles.root}>
       <View style={[styles.row, { height }]}>
         {data.map((b, i) => {
-          const base = b.on ? colors.accent : chartColors[i % chartColors.length];
+          // `on` → amber accent; `calm` → neutral stone (so the current bar pops); else categorical.
+          const base = b.on ? colors.accent : calm ? colors.stoneInactive : chartColors[i % chartColors.length];
           const top = b.on ? ACCENT_TOP : base;
           const frac = clamp01(b.v);
           const cmp = showCompare && compare ? compare[i] : null;
@@ -85,7 +92,17 @@ export function MultiBarChart(props: MultiBarChartProps) {
                   ]}
                 >
                   <BarFill top={top} base={base} />
-                  {tip === i && b.value != null && (
+                  {/* Persistent value above the bar (no tap needed) — spec 08 §8.1. */}
+                  {alwaysValue && (b.top ?? b.value) != null && (
+                    <Text
+                      style={[styles.topLabel, { color: b.on ? colors.heading : colors.muted }]}
+                      numberOfLines={1}
+                    >
+                      {b.top ?? b.value}
+                    </Text>
+                  )}
+                  {/* Tap tooltip — only when the value isn't already shown persistently. */}
+                  {!alwaysValue && tip === i && b.value != null && (
                     <View style={[styles.tip, { backgroundColor: colors.heading, pointerEvents: 'none' }]}>
                       <Text style={[styles.tipText, { color: colors.bg }]} numberOfLines={1}>
                         {b.value}
@@ -155,6 +172,15 @@ const styles = StyleSheet.create({
     zIndex: 5,
   },
   tipText: { fontSize: 12, fontWeight: '600' },
+  topLabel: {
+    position: 'absolute',
+    bottom: '100%',
+    marginBottom: 6,
+    alignSelf: 'center',
+    fontSize: 10.5,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+  },
   label: { fontSize: 11, fontWeight: '400' },
   labelOn: { fontWeight: '600' },
 });

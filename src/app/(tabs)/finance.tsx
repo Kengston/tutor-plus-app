@@ -7,23 +7,24 @@
  * only owns presentation state (period / active tab / search query) and routes drill-downs
  * (a lesson-sourced row opens the lesson; a standalone op opens the operation detail).
  */
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { HeaderAction } from '@/components/AppHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { PeriodSheet } from '@/components/PeriodSheet';
 import { Screen } from '@/components/Screen';
-import { useAllLessons, useAllTransactions, useStudents, useSubjects } from '@/db/hooks';
-import type { LessonModel, StudentModel, SubjectModel } from '@/db/models';
+import { useAllLessons, useAllTransactions, useExpectations, useStudents, useSubjects } from '@/db/hooks';
+import type { StudentModel, SubjectModel } from '@/db/models';
 import { entriesInPeriod, financeEntries, periodSummary } from '@/domain/aggregates';
 import type { FinanceEntry, FinanceEntryKind } from '@/domain/types';
 import { useT, type StringKey } from '@/i18n';
 import { formatRub } from '@/lib/format';
 import { currentMonth, shiftPeriod, startOfDay, type Period } from '@/lib/period';
-import { nowMs } from '@/lib/time';
+import { hhmm, nowMs } from '@/lib/time';
 import { useTheme } from '@/theme';
-import { Card, Fab, Icon, Segmented } from '@/ui';
+import { Card, CatAvatar, Fab, Icon, Segmented, Sheet } from '@/ui';
 
 /** Finance tabs — a stable key drives filtering; the visible label is the i18n string. */
 type FinTab = 'all' | 'paid' | 'debts' | 'expected';
@@ -34,10 +35,10 @@ interface DayGroup {
   entries: FinanceEntry[];
 }
 
-/** kind → accent colour for the left strip & amount (paid→paid, debt→danger, expected→warning). */
+/** kind → amount colour: paid→paid, debt→danger, expected→NEUTRAL (stone700, spec 07 §7.2). */
 function useKindColor(): (kind: FinanceEntryKind) => string {
   const { colors } = useTheme();
-  return (kind) => (kind === 'paid' ? colors.paid : kind === 'debt' ? colors.danger : colors.warning);
+  return (kind) => (kind === 'paid' ? colors.paid : kind === 'debt' ? colors.danger : colors.stone700);
 }
 
 export default function FinanceScreen() {
@@ -51,10 +52,30 @@ export default function FinanceScreen() {
   const [tab, setTab] = useState<FinTab>('all');
   const [periodOpen, setPeriodOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [infoOpen, setInfoOpen] = useState(false); // ⓘ tap-to-reveal on «Фактически получено»
+  // Header actions (spec 07 header: поиск + фильтр): the search field is summoned on demand
+  // (kept while a query is set), the filter sheet drives the SAME `tab` state as the Segmented.
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
 
-  // ── Reactive data (whole ledger + lessons; students/subjects for name resolution) ──
+  // Deep-link entry (`?tab=debts` — «Все задолженности в финансах», spec 08 §8.3). Applied once
+  // per param PAIR via the render-time state-adjustment idiom (mirrors schedule.tsx) so the user
+  // can freely switch tabs afterwards without the stale param snapping back; the sender attaches
+  // a `t` nonce so repeated drill-ins re-apply even when the tab value is the same.
+  const params = useLocalSearchParams<{ tab?: string; t?: string }>();
+  const paramsKey = `${params.tab ?? ''}|${params.t ?? ''}`;
+  const [appliedTabParam, setAppliedTabParam] = useState('|');
+  if (paramsKey !== '|' && paramsKey !== appliedTabParam) {
+    setAppliedTabParam(paramsKey);
+    if (params.tab === 'all' || params.tab === 'paid' || params.tab === 'debts' || params.tab === 'expected') {
+      setTab(params.tab);
+    }
+  }
+
+  // ── Reactive data (whole ledger + lessons + expectations; students/subjects for names) ──
   const lessons = useAllLessons();
   const txns = useAllTransactions();
+  const expectations = useExpectations();
   const students = useStudents();
   const subjects = useSubjects();
 
@@ -68,18 +89,15 @@ export default function FinanceScreen() {
     for (const s of subjects) m.set(s.id, s);
     return m;
   }, [subjects]);
-  // Lesson lookup — resolves a lesson-sourced row's meta line (its topic) for the subtitle.
-  const lessonsById = useMemo(() => {
-    const m = new Map<string, LessonModel>();
-    for (const l of lessons) m.set(l.id, l);
-    return m;
-  }, [lessons]);
 
-  // ── View-model: full entry union, then period-scoped (both pure aggregates) ──
-  const allEntries = useMemo(() => financeEntries(lessons, txns), [lessons, txns]);
+  // ── View-model: full entry union (incl. open expectations, ADR-0015), then period-scoped ──
+  const allEntries = useMemo(
+    () => financeEntries(lessons, txns, expectations),
+    [lessons, txns, expectations],
+  );
   const inPeriod = useMemo(() => entriesInPeriod(allEntries, period), [allEntries, period]);
 
-  // Header summary (received flow + in-period debt) over the period slice (ADR-0012).
+  // Header summary (received flow + in-period expected + debt) over the period slice (ADR-0012/0015).
   const summary = useMemo(() => periodSummary(inPeriod), [inPeriod]);
 
   // ── Filter by tab (kind) then by query (case-insensitive student-name contains) ──
@@ -96,6 +114,8 @@ export default function FinanceScreen() {
       return true;
     });
   }, [inPeriod, tab, query, studentsById]);
+
+  const searching = query.trim().length > 0;
 
   // ── Group the filtered rows by local day, newest day first (already time-desc inside) ──
   const groups = useMemo<DayGroup[]>(() => {
@@ -131,21 +151,22 @@ export default function FinanceScreen() {
   const periodLabel = usePeriodLabel();
   const isCustom = period.type === 'custom';
 
-  // Drill-down: lesson-sourced row → the lesson card; standalone op → the operation detail.
+  // Drill-down: lesson row → the lesson card; expectation → its settle detail; else the op detail.
   const openEntry = (e: FinanceEntry) => {
     if (e.source === 'lesson' && e.lessonId) {
       router.push({ pathname: '/lesson/[id]', params: { id: e.lessonId } });
+    } else if (e.source === 'expectation') {
+      router.push({ pathname: '/finance/[id]', params: { id: e.id.replace('expectation:', ''), kind: 'expectation' } });
     } else {
       router.push({ pathname: '/finance/[id]', params: { id: e.id } });
     }
   };
 
-  // Meta subtitle under the name: lesson topic / subject for a lesson row, else the kind word.
-  const metaOf = (e: FinanceEntry): string => {
-    if (e.source === 'lesson' && e.lessonId) {
-      const topic = lessonsById.get(e.lessonId)?.topic?.trim();
-      if (topic) return topic;
-    }
+  // Secondary line under the name (spec 07 §7.2, mockup): a lesson-anchored row (paid
+  // settlement / derived debt|expected — has a real wall-clock instant) shows its time
+  // («10:00»); a standalone op / expectation (date-only) shows the subject or the kind word.
+  const subtitleOf = (e: FinanceEntry): string => {
+    if (e.lessonId != null) return hhmm(e.occurredAt);
     if (e.subjectId) {
       const name = subjectsById.get(e.subjectId)?.name;
       if (name) return name;
@@ -156,6 +177,22 @@ export default function FinanceScreen() {
   return (
     <Screen
       title={t('finance.title')}
+      actions={
+        <>
+          <HeaderAction
+            icon="search"
+            label={t('common.search')}
+            active={searching || searchOpen}
+            onPress={() => setSearchOpen((v) => !v || searching)}
+          />
+          <HeaderAction
+            icon="filter"
+            label={t('common.filter')}
+            active={tab !== 'all'}
+            onPress={() => setFilterOpen(true)}
+          />
+        </>
+      }
       floatingAction={<Fab onPress={() => router.push('/finance/new')} />}>
       {/* 1 · Period navigator — ± stepper (disabled for custom) + tappable label opening the sheet. */}
       <View style={styles.periodBar}>
@@ -189,17 +226,32 @@ export default function FinanceScreen() {
         </Pressable>
       </View>
 
-      {/* 2 · Summary — received (paid flow) | debt (in-period), split by a thin divider. */}
+      {/* 2 · Summary of three (spec 07 §7.1): «Фактически получено» (big, ⓘ) then «Ожидается» | «Задолженность». */}
       <Card style={styles.summaryCard}>
-        <View style={styles.summaryRow}>
+        <Text style={[styles.summaryReceived, { color: colors.paid }]}>{formatRub(summary.received)}</Text>
+        <View style={styles.receivedCaptionRow}>
+          <Text style={[styles.summaryCaption, { color: colors.muted }]}>{t('finance.receivedFull')}</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('finance.receivedHint')}
+            onPress={() => setInfoOpen((v) => !v)}
+            hitSlop={8}>
+            <Icon name="info" size={15} sw={1.8} stroke={infoOpen ? colors.paid : colors.label3} />
+          </Pressable>
+        </View>
+        {infoOpen ? (
+          <Text style={[styles.receivedHint, { color: colors.muted }]}>{t('finance.receivedHint')}</Text>
+        ) : null}
+
+        <View style={[styles.summarySplit, { borderTopColor: colors.hairline }]}>
           <View style={styles.summaryCol}>
-            <Text style={[styles.summaryCaption, { color: colors.muted }]}>{t('finance.received')}</Text>
-            <Text style={[styles.summaryReceived, { color: colors.paid }]}>{formatRub(summary.received)}</Text>
+            <Text style={[styles.summaryCaption, { color: colors.muted }]}>{t('finance.expected')}</Text>
+            <Text style={[styles.summarySecondary, { color: colors.stone700 }]}>{formatRub(summary.expected)}</Text>
           </View>
           <View style={[styles.summaryDivider, { backgroundColor: colors.hairline }]} />
           <View style={styles.summaryCol}>
-            <Text style={[styles.summaryCaption, { color: colors.muted }]}>{t('finance.debt')}</Text>
-            <Text style={[styles.summaryDebt, { color: colors.danger }]}>{formatRub(summary.debt)}</Text>
+            <Text style={[styles.summaryCaption, { color: colors.muted }]}>{t('finance.debtSummary')}</Text>
+            <Text style={[styles.summarySecondary, { color: colors.danger }]}>{formatRub(summary.debt)}</Text>
           </View>
         </View>
       </Card>
@@ -207,26 +259,32 @@ export default function FinanceScreen() {
       {/* 3 · Kind tabs. */}
       <Segmented tabs={tabLabels} active={TAB_LABEL[tab]} onChange={onTabChange} />
 
-      {/* 4 · Inline search over operations (by student name). */}
-      <View style={[styles.searchRow, { backgroundColor: colors.stoneLight, borderRadius: radius.field }]}>
-        <Icon name="search" size={19} sw={1.7} stroke={colors.muted} />
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder={t('finance.searchOps')}
-          placeholderTextColor={colors.label3}
-          style={[styles.searchInput, { color: colors.heading }]}
-        />
-        {query.length > 0 ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('a11y.clearSearch')}
-            onPress={() => setQuery('')}
-            hitSlop={8}>
-            <Icon name="close" size={17} sw={1.8} stroke={colors.muted} />
-          </Pressable>
-        ) : null}
-      </View>
+      {/* 4 · Search over operations (by student name) — summoned from the header (spec 07). */}
+      {searchOpen || searching ? (
+        <View style={[styles.searchRow, { backgroundColor: colors.stoneLight, borderRadius: radius.field }]}>
+          <Icon name="search" size={19} sw={1.7} stroke={colors.muted} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder={t('finance.searchOps')}
+            placeholderTextColor={colors.label3}
+            autoFocus
+            style={[styles.searchInput, { color: colors.heading }]}
+          />
+          {query.length > 0 ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('a11y.clearSearch')}
+              onPress={() => setQuery('')}
+              hitSlop={8}>
+              <Icon name="close" size={17} sw={1.8} stroke={colors.muted} />
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+      {searching ? (
+        <Text style={[styles.foundCount, { color: colors.muted }]}>{`${t('finance.found')}: ${filtered.length}`}</Text>
+      ) : null}
 
       {/* 5/6 · Grouped list + empty states. */}
       {allEntries.length === 0 ? (
@@ -236,40 +294,46 @@ export default function FinanceScreen() {
         // There IS data, but the current period/tab slice is empty — say which.
         <Card style={styles.emptySliceCard}>
           <Text style={[styles.emptySliceText, { color: colors.muted }]}>
-            {inPeriod.length === 0 ? t('finance.noOpsPeriod') : t('finance.noOpsTab')}
+            {searching ? t('finance.nothingFound') : inPeriod.length === 0 ? t('finance.noOpsPeriod') : t('finance.noOpsTab')}
           </Text>
         </Card>
       ) : (
         groups.map((g) => (
           <View key={g.day} style={styles.group}>
-            {/* Day header: «Сегодня» for today, else «<day> <month-genitive>». */}
+            {/* Day header (caps via style): «СЕГОДНЯ, 26 МАЯ» for today, else «26 МАЯ». */}
             <Text style={[styles.groupHeader, { color: colors.muted }]}>
-              {g.day === todayStart ? t('group.today') : dateLabel(g.day)}
+              {g.day === todayStart ? `${t('group.today')}, ${dateLabel(g.day)}` : dateLabel(g.day)}
             </Text>
             <Card>
-              {g.entries.map((e, i) => (
-                <View key={e.id}>
-                  {i > 0 ? <View style={[styles.hairline, { backgroundColor: colors.hairline }]} /> : null}
-                  <Pressable
-                    onPress={() => openEntry(e)}
-                    style={({ pressed }) => [styles.opRow, pressed && styles.pressed]}>
-                    {/* Left accent strip coloured by kind. */}
-                    <View style={[styles.opStrip, { backgroundColor: kindColor(e.kind) }]} />
-                    <View style={styles.opBody}>
-                      <Text numberOfLines={1} style={[styles.opName, { color: colors.heading }]}>
-                        {studentsById.get(e.studentId)?.name ?? t('common.none')}
-                      </Text>
-                      <Text numberOfLines={1} style={[styles.opMeta, { color: colors.muted }]}>
-                        {metaOf(e)}
-                      </Text>
-                    </View>
-                    <Text style={[styles.opAmount, { color: kindColor(e.kind) }]}>
-                      {e.kind === 'paid' ? '+' : ''}
-                      {formatRub(e.amount)}
-                    </Text>
-                  </Pressable>
-                </View>
-              ))}
+              {g.entries.map((e, i) => {
+                const student = studentsById.get(e.studentId);
+                return (
+                  <View key={e.id}>
+                    {i > 0 ? <View style={[styles.hairline, { backgroundColor: colors.hairline }]} /> : null}
+                    <Pressable
+                      onPress={() => openEntry(e)}
+                      style={({ pressed }) => [styles.opRow, pressed && styles.pressed]}>
+                      {/* Personal marker (initials + category colour) — spec 07 §7.2. */}
+                      <CatAvatar initials={student?.initials ?? '—'} cat={student?.category ?? 'slate'} size={38} />
+                      <View style={styles.opBody}>
+                        <Text numberOfLines={1} style={[styles.opName, { color: colors.heading }]}>
+                          {student?.name ?? t('common.none')}
+                        </Text>
+                        <Text numberOfLines={1} style={[styles.opMeta, { color: colors.muted }]}>
+                          {subtitleOf(e)}
+                        </Text>
+                      </View>
+                      <View style={styles.opAmountWrap}>
+                        {e.kind === 'paid' ? <Icon name="check" size={14} sw={2.4} stroke={colors.paid} /> : null}
+                        <Text style={[styles.opAmount, { color: kindColor(e.kind) }]}>
+                          {e.kind === 'paid' ? '+' : ''}
+                          {formatRub(e.amount)}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  </View>
+                );
+              })}
             </Card>
           </View>
         ))
@@ -282,7 +346,49 @@ export default function FinanceScreen() {
         onClose={() => setPeriodOpen(false)}
         onApply={(p) => setPeriod(p)}
       />
+
+      {filterOpen ? (
+        <FilterSheet current={tab} labels={TAB_LABEL} onPick={setTab} onClose={() => setFilterOpen(false)} />
+      ) : null}
     </Screen>
+  );
+}
+
+// ── Header filter sheet (spec 07: «фильтр») — kind radio synced with the Segmented. ──
+
+function FilterSheet({
+  current,
+  labels,
+  onPick,
+  onClose,
+}: {
+  current: FinTab;
+  labels: Record<FinTab, string>;
+  onPick: (k: FinTab) => void;
+  onClose: () => void;
+}) {
+  const t = useT();
+  const { colors } = useTheme();
+  return (
+    <Sheet title={t('common.filter')} onClose={onClose}>
+      {(Object.keys(labels) as FinTab[]).map((k) => {
+        const on = k === current;
+        return (
+          <Pressable
+            key={k}
+            accessibilityRole="button"
+            accessibilityState={{ selected: on }}
+            onPress={() => {
+              onPick(k);
+              onClose();
+            }}
+            style={[styles.filterOption, { borderBottomColor: colors.hairline }]}>
+            <Text style={[styles.filterOptionLabel, { color: colors.heading }]}>{labels[k]}</Text>
+            {on ? <Icon name="check" size={20} sw={2} stroke={colors.primary} /> : null}
+          </Pressable>
+        );
+      })}
+    </Sheet>
   );
 }
 
@@ -339,13 +445,21 @@ const styles = StyleSheet.create({
   periodLabel: { fontSize: 16, fontWeight: '600', letterSpacing: -0.2 },
   pressed: { opacity: 0.6 },
 
-  // Summary card
-  summaryCard: { paddingVertical: 12, paddingHorizontal: 14 },
-  summaryRow: { flexDirection: 'row', alignItems: 'stretch' },
+  // Summary card — three figures (spec 07 §7.1)
+  summaryCard: { paddingVertical: 16, paddingHorizontal: 16 },
+  summaryReceived: { fontSize: 30, fontWeight: '700', letterSpacing: -0.8, fontVariant: ['tabular-nums'] },
+  receivedCaptionRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 5 },
+  receivedHint: { fontSize: 12.5, marginTop: 6, lineHeight: 17 },
+  summarySplit: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
   summaryCol: { flex: 1 },
-  summaryCaption: { fontSize: 13, fontWeight: '500' },
-  summaryReceived: { fontSize: 22, fontWeight: '600', marginTop: 3, fontVariant: ['tabular-nums'] },
-  summaryDebt: { fontSize: 19, fontWeight: '600', marginTop: 3, fontVariant: ['tabular-nums'] },
+  summaryCaption: { fontSize: 12.5, fontWeight: '500' },
+  summarySecondary: { fontSize: 18, fontWeight: '600', marginTop: 3, fontVariant: ['tabular-nums'] },
   summaryDivider: { width: StyleSheet.hairlineWidth, marginHorizontal: 14, marginVertical: 2 },
 
   // Search
@@ -357,6 +471,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   searchInput: { flex: 1, fontSize: 15, padding: 0 },
+  foundCount: { fontSize: 12.5, fontWeight: '600', paddingHorizontal: 4, marginTop: -6 },
+  filterOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 15,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  filterOptionLabel: { fontSize: 15.5, fontWeight: '500' },
 
   // Empty period/tab slice
   emptySliceCard: { paddingVertical: 40, paddingHorizontal: 24, alignItems: 'center' },
@@ -372,10 +495,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   hairline: { height: StyleSheet.hairlineWidth, marginLeft: 16 },
-  opRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, paddingLeft: 16, paddingRight: 14 },
-  opStrip: { position: 'absolute', left: 0, top: 8, bottom: 8, width: 3, borderRadius: 3 },
+  opRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 14 },
   opBody: { flex: 1, minWidth: 0 },
   opName: { fontSize: 15, fontWeight: '600' },
   opMeta: { fontSize: 13, marginTop: 3 },
-  opAmount: { fontSize: 15, fontWeight: '600', marginLeft: 12, fontVariant: ['tabular-nums'] },
+  opAmountWrap: { flexDirection: 'row', alignItems: 'center', gap: 5, marginLeft: 12 },
+  opAmount: { fontSize: 15, fontWeight: '600', fontVariant: ['tabular-nums'] },
 });

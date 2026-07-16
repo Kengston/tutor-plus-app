@@ -25,6 +25,18 @@ export class ProfileModel extends Model {
   @field('notif_payment') notifPayment!: boolean;
   @field('notif_schedule') notifSchedule!: boolean;
   @field('notif_summary') notifSummary!: boolean;
+  /** v8 master switch + debts split (spec 09 §9.3) — NULLABLE: null (migrated rows) reads as TRUE. */
+  @field('notif_enabled') notifEnabled!: boolean | null;
+  @field('notif_debts') notifDebts!: boolean | null;
+  /** v9 (spec 10 §10.2): contact + working days (CSV of getDay indices; null reads as Пн–Пт). */
+  @field('phone') phone!: string | null;
+  @field('work_days') workDays!: string | null;
+  /** v10 (spec 10 §10.1): visible OPTIONAL Today blocks (CSV; null = all visible). */
+  @field('home_blocks') homeBlocks!: string | null;
+  /** v11 (spec 03 §3.4): registration-wizard defaults for a new lesson (null → legacy). */
+  @field('default_rate') defaultRate!: number | null;
+  @field('default_duration') defaultDuration!: number | null;
+  @field('default_format') defaultFormat!: string | null;
   /** OS notification permission granted (Web Notifications on web; expo-notifications on native). */
   @field('push_granted') pushGranted!: boolean;
   @readonly @date('created_at') createdAt!: Date;

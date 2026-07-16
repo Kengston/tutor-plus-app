@@ -4,9 +4,9 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DateTimePickerSheet } from '@/components/DateTimePickerSheet';
-import { useStudents, useSubjects } from '@/db/hooks';
-import { createLesson } from '@/db/mutations';
-import { DURATIONS, type Duration, type LessonFormat } from '@/domain/types';
+import { useProfile, useStudents, useSubjects } from '@/db/hooks';
+import { createLesson, recordLessonPayment } from '@/db/mutations';
+import { DURATIONS, type Duration, type LessonFormat, type PayStatus } from '@/domain/types';
 import { useT } from '@/i18n';
 import { dayBounds, hhmm, nowMs } from '@/lib/time';
 import { useTheme } from '@/theme';
@@ -20,22 +20,45 @@ function defaultStartsAt(): number {
 }
 
 export default function LessonFormScreen() {
-  const { studentId: preselect } = useLocalSearchParams<{ studentId?: string }>();
+  // `at` prefills date/time (tap on a free window, spec 05 §5.2); `studentId` presets the student.
+  const { studentId: preselect, at } = useLocalSearchParams<{ studentId?: string; at?: string }>();
   const router = useRouter();
   const t = useT();
   const { colors, radius } = useTheme();
 
   const students = useStudents();
   const subjects = useSubjects();
+  const profile = useProfile();
 
   const [studentId, setStudentId] = useState<string | undefined>(preselect);
   const [subjectId, setSubjectId] = useState<string | null>(null);
   const [topic, setTopic] = useState('');
-  const [startsAt, setStartsAt] = useState<number>(defaultStartsAt);
+  const [startsAt, setStartsAt] = useState<number>(() => {
+    const prefill = Number(at);
+    return Number.isFinite(prefill) && prefill > 0 ? prefill : defaultStartsAt();
+  });
   const [duration, setDuration] = useState<Duration>(60);
   const [format, setFormat] = useState<LessonFormat>('online');
+  const [link, setLink] = useState('');
   const [price, setPrice] = useState<string>('');
   const [priceTouched, setPriceTouched] = useState(false);
+  // Payment status at creation (spec 05 §5.3). Default «Ожидается» is DERIVED — no txn
+  // is written; «Оплачено»/«Долг» append the corresponding ledger row (ADR-0008).
+  const [payStatus, setPayStatus] = useState<PayStatus>('expected');
+
+  // Registration-wizard defaults (spec 03 §3.4-5, v11): seed duration/format/price ONCE when
+  // the profile row arrives and the fields are still untouched (render-time state-adjustment
+  // idiom — the row loads async, so useState initializers can't see it).
+  const [defaultsApplied, setDefaultsApplied] = useState(false);
+  if (profile && !defaultsApplied) {
+    setDefaultsApplied(true);
+    const dd = profile.defaultDuration;
+    if (dd != null && (DURATIONS as readonly number[]).includes(dd)) setDuration(dd as Duration);
+    if (profile.defaultFormat === 'online' || profile.defaultFormat === 'inperson') {
+      setFormat(profile.defaultFormat);
+    }
+    // defaultRate flows through the effectivePrice fallback chain below (student rate wins).
+  }
 
   const [pickStudent, setPickStudent] = useState(false);
   const [pickSubject, setPickSubject] = useState(false);
@@ -44,15 +67,16 @@ export default function LessonFormScreen() {
   const selectedStudent = students.find((s) => s.id === studentId);
   const selectedSubject = subjects.find((s) => s.id === subjectId);
 
-  // Price tracks the selected student's rate until the user types a value.
-  const effectivePrice = priceTouched ? price : String(selectedStudent?.rate ?? '');
+  // Price tracks the selected student's rate until the user types a value; with no student
+  // picked yet, the registration-wizard default rate fills in (spec 03 §3.4-5, review fix S17).
+  const effectivePrice = priceTouched ? price : String(selectedStudent?.rate ?? profile?.defaultRate ?? '');
 
   const canSave = !!studentId;
 
   const onSave = async () => {
     if (!studentId) return;
     const parsed = parseInt(effectivePrice.replace(/\D/g, ''), 10);
-    await createLesson({
+    const lesson = await createLesson({
       studentId,
       subjectId,
       topic: topic.trim(),
@@ -60,8 +84,19 @@ export default function LessonFormScreen() {
       durationMin: duration,
       format,
       price: Number.isNaN(parsed) ? 0 : parsed,
+      link: link.trim() || null,
     });
+    // «Ожидается» is the derived default (no row); paid/debt append a ledger txn.
+    if (payStatus !== 'expected') {
+      await recordLessonPayment(lesson, { type: payStatus });
+    }
     router.back();
+  };
+
+  const payLabels: Record<PayStatus, string> = {
+    paid: t('pay.paid'),
+    expected: t('pay.expected'),
+    debt: t('pay.debt'),
   };
 
   const durationLabels = DURATIONS.map((d) => `${d} ${t('common.min')}`);
@@ -82,18 +117,6 @@ export default function LessonFormScreen() {
           <Icon name="back" size={20} stroke={colors.heading} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.heading }]}>{t('lesson.create')}</Text>
-        <Pressable
-          onPress={onSave}
-          disabled={!canSave}
-          hitSlop={8}
-          style={({ pressed }) => [
-            styles.saveBtn,
-            { backgroundColor: colors.primary, opacity: canSave ? (pressed ? 0.85 : 1) : 0.4 },
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel={t('common.save')}>
-          <Text style={[styles.saveLabel, { color: colors.onTint }]}>{t('common.save')}</Text>
-        </Pressable>
       </View>
 
       <ScrollView
@@ -151,6 +174,24 @@ export default function LessonFormScreen() {
           />
         </FieldBlock>
 
+        {/* Meeting link (delta v2.1 §3.1) — optional; prominent right under «Формат»
+            for online lessons (spec: «опционально для очного, заметно для онлайн»). */}
+        <FieldBlock label={t('lesson.linkField')}>
+          <TextInput
+            value={link}
+            onChangeText={setLink}
+            placeholder={format === 'online' ? 'https://meet.google.com/…' : ''}
+            placeholderTextColor={colors.muted}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+            style={[
+              styles.input,
+              { borderRadius: radius.control, color: colors.heading, backgroundColor: colors.elev, borderColor: colors.hairline },
+            ]}
+          />
+        </FieldBlock>
+
         <FieldBlock label={t('field.cost')}>
           <TextInput
             value={effectivePrice}
@@ -167,7 +208,34 @@ export default function LessonFormScreen() {
             ]}
           />
         </FieldBlock>
+
+        {/* Payment status (spec 05 §5.3): «Оплачено / Ожидается / Долг». */}
+        <FieldBlock label={t('lesson.payStatus')}>
+          <Segmented
+            tabs={[payLabels.paid, payLabels.expected, payLabels.debt]}
+            active={payLabels[payStatus]}
+            onChange={(tab) =>
+              setPayStatus(tab === payLabels.paid ? 'paid' : tab === payLabels.debt ? 'debt' : 'expected')
+            }
+          />
+        </FieldBlock>
       </ScrollView>
+
+      {/* Full-width «Создать урок» CTA pinned at the bottom (spec 05 §5.3),
+          disabled until the required fields are filled. */}
+      <View style={[styles.footer, { borderTopColor: colors.hairline, backgroundColor: colors.bg }]}>
+        <Pressable
+          onPress={onSave}
+          disabled={!canSave}
+          accessibilityRole="button"
+          accessibilityLabel={t('lesson.create')}
+          style={({ pressed }) => [
+            styles.createBtn,
+            { backgroundColor: colors.primary, borderRadius: radius.field, opacity: canSave ? (pressed ? 0.85 : 1) : 0.4 },
+          ]}>
+          <Text style={[styles.createLabel, { color: colors.onTint }]}>{t('lesson.create')}</Text>
+        </Pressable>
+      </View>
 
       {pickStudent && (
         <Sheet title={t('lesson.choose')} onClose={() => setPickStudent(false)}>
@@ -282,9 +350,10 @@ const styles = StyleSheet.create({
   },
   backBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { flex: 1, fontSize: 20, fontWeight: '700', letterSpacing: -0.4 },
-  saveBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999 },
-  saveLabel: { fontSize: 14.5, fontWeight: '600' },
   body: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 32, gap: 16 },
+  footer: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 18, borderTopWidth: StyleSheet.hairlineWidth },
+  createBtn: { paddingVertical: 15, alignItems: 'center', justifyContent: 'center' },
+  createLabel: { fontSize: 16, fontWeight: '600' },
   fieldBlock: { gap: 8 },
   fieldLabel: { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4 },
   input: {

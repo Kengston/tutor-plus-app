@@ -3,25 +3,28 @@ import { useMemo, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { DateTimePickerSheet } from '@/components/DateTimePickerSheet';
+import { EmptyState } from '@/components/EmptyState';
+import { QuickActionsSheet } from '@/components/QuickActionsSheet';
 import { Screen } from '@/components/Screen';
-import { payStatusOf, doneOfTotal } from '@/domain/aggregates';
+import { daySummary, debtors } from '@/domain/aggregates';
+import { canJoinOnline } from '@/domain/lesson-link';
+import { lifecycleSnapshot } from '@/domain/undo';
 import type { LessonModel, StudentModel } from '@/db/models';
-import { useAllTransactions, useLessonsInRange, useStudents } from '@/db/hooks';
-import { cancelLesson, markLessonConducted, rescheduleLesson } from '@/db/mutations';
-import { plural, useT } from '@/i18n';
-import { dayBounds, dayBoundsOffset, fracOfDay, hhmm, minutesUntil, nowMs } from '@/lib/time';
+import { useAllTransactions, useLessonsInRange, useProfile, useStudents } from '@/db/hooks';
+import { cancelLesson, markLessonConducted, rescheduleLesson, restoreLessonLifecycle } from '@/db/mutations';
+import { plural, useT, type StringKey } from '@/i18n';
+import { parseHomeBlocks } from '@/lib/home-blocks';
+import { useSnack } from '@/lib/snack';
+import { dayBounds, dayBoundsOffset, hhmm, minutesUntil, nowMs } from '@/lib/time';
 import { catColors, useTheme } from '@/theme';
 import {
   Card,
   CatAvatar,
-  DayLane,
-  Dot,
+  Chip,
   Fab,
   Icon,
-  Ring,
   SectionLabel,
   SwipeRow,
-  type DotTone,
 } from '@/ui';
 
 /** Minutes phrasing forms for `plural()` — composed once per render via t(). */
@@ -39,13 +42,6 @@ function hourForms(t: ReturnType<typeof useT>) {
   return { one: t('unit.hours.one'), few: t('unit.hours.few'), many: t('unit.hours.many') };
 }
 
-/** Derived lesson pay-status → Dot tone. */
-const DOT_TONE: Record<'paid' | 'debt' | 'expected', DotTone> = {
-  paid: 'green',
-  debt: 'red',
-  expected: 'amber',
-};
-
 export default function TodayScreen() {
   const t = useT();
   const { colors, radius } = useTheme();
@@ -57,9 +53,33 @@ export default function TodayScreen() {
   const students = useStudents();
 
   const now = nowMs();
+  const snack = useSnack();
 
   // Reschedule target — the lesson whose date/time the picker sheet is editing.
   const [reschedulingLesson, setReschedulingLesson] = useState<LessonModel | null>(null);
+  // FAB opens the quick-actions sheet (spec 04-today) instead of the lesson form directly.
+  const [quickOpen, setQuickOpen] = useState(false);
+
+  // «Готово»/«Отменить» + undo snack: capture the lifecycle snapshot BEFORE the
+  // mutation; «Вернуть» restores it (reverse mutation, domain/undo).
+  const conductWithUndo = (l: LessonModel) => {
+    const snap = lifecycleSnapshot(l);
+    void markLessonConducted(l).then(() => {
+      snack.show(t('snack.lessonDone'), {
+        actionLabel: t('action.undo'),
+        onAction: () => void restoreLessonLifecycle(l, snap),
+      });
+    });
+  };
+  const cancelWithUndo = (l: LessonModel) => {
+    const snap = lifecycleSnapshot(l);
+    void cancelLesson(l).then(() => {
+      snack.show(t('snack.lessonCancelled'), {
+        actionLabel: t('action.undo'),
+        onAction: () => void restoreLessonLifecycle(l, snap),
+      });
+    });
+  };
 
   const studentsById = useMemo(() => {
     const m = new Map<string, StudentModel>();
@@ -67,55 +87,98 @@ export default function TodayScreen() {
     return m;
   }, [students]);
 
-  const { done, total } = doneOfTotal(lessons);
+  // Cancelled lessons are invisible on «Сегодня» — one set feeds the «Ваш день»
+  // numbers, the dot-timeline and the rows, so they can never disagree (S4 pattern).
+  const visibleToday = useMemo(
+    () => lessons.filter((l) => l.lifecycleStatus !== 'cancelled'),
+    [lessons],
+  );
 
   // Today's still-active lessons from now on (sorted ascending by the hook).
-  const upcomingToday = lessons.filter(
+  const upcomingToday = visibleToday.filter(
     (l) =>
       l.startsAt >= now && (l.lifecycleStatus === 'upcoming' || l.lifecycleStatus === 'ongoing'),
   );
   const nearest = upcomingToday[0];
-  // The nearest lesson is highlighted in its own hero card — drop it from the list below to avoid a duplicate.
-  const restToday = nearest ? upcomingToday.slice(1) : upcomingToday;
 
-  const laneItems = lessons.map((l) => ({
-    frac: fracOfDay(l.startsAt),
-    cat: studentsById.get(l.studentId)?.category,
-    done: l.lifecycleStatus === 'done',
-  }));
+  // Debt badge in «Далее сегодня» (spec 04: «Есть долг») — per-STUDENT outstanding
+  // debt over the effective ledger, via the existing debtors aggregate.
+  const debtByStudent = useMemo(
+    () => new Map(debtors(txns).map((d) => [d.studentId, d.amount])),
+    [txns],
+  );
 
   const tb = dayBoundsOffset(1);
   const tomorrow = useLessonsInRange(tb.start, tb.end);
-  const tomorrowCount = tomorrow.length;
+  const tomorrowVisible = useMemo(
+    () => tomorrow.filter((l) => l.lifecycleStatus !== 'cancelled'),
+    [tomorrow],
+  );
+  // Time range for the tomorrow card: «HH:MM — HH:MM», or a single time when there is
+  // only one lesson (a degenerate «11:00 — 11:00» reads as a bug). Lessons are ASC-sorted.
+  const tomorrowRange =
+    tomorrowVisible.length === 0
+      ? ''
+      : tomorrowVisible.length === 1
+        ? hhmm(tomorrowVisible[0].startsAt)
+        : `${hhmm(tomorrowVisible[0].startsAt)} — ${hhmm(tomorrowVisible[tomorrowVisible.length - 1].startsAt)}`;
+
+  // Greeting header (spec 04): «Добрый день, {Имя}» + «вторник, 26 мая».
+  const profile = useProfile();
+  // «Настройка главной» (spec 10 §10.1): which OPTIONAL blocks are visible (v10 CSV; null = all).
+  const homeBlocks = parseHomeBlocks(profile?.homeBlocks ?? null);
+  const showNearest = homeBlocks.includes('nearest');
+  const showTomorrow = homeBlocks.includes('tomorrow');
+  // The nearest lesson is highlighted in its own hero card — drop it from the list below ONLY
+  // while that card is visible; with the block hidden the lesson falls back into «Далее сегодня»
+  // (review fix S16 — otherwise the very next lesson vanished from the screen).
+  const restToday = showNearest && nearest ? upcomingToday.slice(1) : upcomingToday;
+  const firstName = profile?.name?.trim().split(/\s+/)[0] ?? '';
+  const greeting = firstName ? `${t('today.greeting')}, ${firstName}` : t('today.greeting');
+  const nowDate = new Date(now);
+  const dateLine = `${t(`wdFull.${nowDate.getDay()}` as StringKey)}, ${nowDate.getDate()} ${t(`monthGen.${nowDate.getMonth()}` as StringKey)}`;
+
+  // «Все» / tomorrow card → Расписание · Список on the respective day (spec 04).
+  const openScheduleList = (dayStart: number) =>
+    router.push({ pathname: '/schedule', params: { view: 'list', day: String(dayStart) } });
 
   return (
     <Screen
-      title={t('today.greeting')}
-      floatingAction={<Fab onPress={() => router.push('/lesson/new')} />}>
-      {/* Progress ring + day timeline */}
-      <Card style={styles.hero}>
-        <View style={styles.ringWrap}>
-          <Ring
-            progress={total ? done / total : 0}
-            centerTop={
-              <Text style={[styles.ringTop, { color: colors.heading }]}>
-                {done}/{total}
-              </Text>
-            }
-            centerSub={<Text style={[styles.ringSub, { color: colors.muted }]}>{t('today.progress')}</Text>}
+      title={greeting}
+      subtitle={dateLine}
+      bell
+      floatingAction={<Fab onPress={() => setQuickOpen(true)} />}>
+      {visibleToday.length === 0 ? (
+        // Empty day (spec 04 AC): no placeholder cards — a single empty state.
+        <EmptyState icon="calendar" text={t('today.empty')} />
+      ) : (
+        <>
+          {/* «Ваш день» (spec 04, prototype TodayScreen): counts + dot-timeline. */}
+          <YourDayCard
+            lessons={visibleToday}
+            studentsById={studentsById}
+            onPress={() => openScheduleList(start)}
           />
-        </View>
-        <DayLane items={laneItems} nowFrac={fracOfDay(now)} />
-      </Card>
 
-      {/* Nearest lesson */}
-      {nearest ? (
-        <NearestCard lesson={nearest} student={studentsById.get(nearest.studentId)} now={now} />
-      ) : null}
+          {/* Nearest lesson — optional block («Настройка главной»). */}
+          {showNearest && nearest ? (
+            <NearestCard lesson={nearest} student={studentsById.get(nearest.studentId)} now={now} />
+          ) : null}
 
       {/* Далее сегодня */}
       <View>
-        <SectionLabel>{t('today.next')}</SectionLabel>
+        <SectionLabel
+          right={
+            <Pressable onPress={() => openScheduleList(start)} hitSlop={8} accessibilityRole="button">
+              {({ pressed }) => (
+                <Text style={[styles.allLink, { color: colors.primaryDeep, opacity: pressed ? 0.7 : 1 }]}>
+                  {t('common.all')}
+                </Text>
+              )}
+            </Pressable>
+          }>
+          {t('today.next')}
+        </SectionLabel>
         {restToday.length === 0 ? (
           <View style={[styles.emptyNext, { backgroundColor: colors.surface, borderColor: colors.hairline, borderRadius: radius.row }]}>
             <Text style={[styles.emptyNextText, { color: colors.muted }]}>{t('today.nothingNext')}</Text>
@@ -130,9 +193,7 @@ export default function TodayScreen() {
                       label: t('action.conduct'),
                       color: colors.paid,
                       icon: 'check',
-                      onPress: () => {
-                        void markLessonConducted(l);
-                      },
+                      onPress: () => conductWithUndo(l),
                     },
                   ]}
                   rightActions={[
@@ -148,9 +209,7 @@ export default function TodayScreen() {
                       label: t('action.cancel'),
                       color: colors.danger,
                       icon: 'close',
-                      onPress: () => {
-                        void cancelLesson(l);
-                      },
+                      onPress: () => cancelWithUndo(l),
                     },
                   ]}>
                   <Pressable
@@ -167,7 +226,11 @@ export default function TodayScreen() {
                         </Text>
                       ) : null}
                     </View>
-                    <Dot tone={DOT_TONE[payStatusOf(l.id, txns)]} />
+                    {/* Trailing slot is badge-or-nothing (v2 prototype TLRow): the
+                        «Есть долг» badge for students who owe money, no pay dot. */}
+                    {(debtByStudent.get(l.studentId) ?? 0) > 0 ? (
+                      <Chip tone="danger">{t('today.debtBadge')}</Chip>
+                    ) : null}
                   </Pressable>
                 </SwipeRow>
               </View>
@@ -175,11 +238,28 @@ export default function TodayScreen() {
           </View>
         )}
       </View>
+        </>
+      )}
 
-      {/* Tomorrow preview */}
-      <Text style={[styles.tomorrow, { color: colors.muted }]}>
-        {t('today.tomorrowPreview')} · {tomorrowCount} {plural(tomorrowCount, lessonForms(t))}
-      </Text>
+      {/* Tomorrow card (spec 04): «ЗАВТРА, DD МММ» + count · time range → schedule.
+          Optional block («Настройка главной»). */}
+      {showTomorrow ? (
+        <Card onPress={() => openScheduleList(tb.start)} style={styles.tomorrowCard}>
+          <View style={styles.tomorrowBody}>
+            <Text style={[styles.tomorrowLabel, { color: colors.muted }]}>
+              {t('common.tomorrow')}, {new Date(tb.start).getDate()}{' '}
+              {t(`monthGen.${new Date(tb.start).getMonth()}` as StringKey)}
+            </Text>
+            <Text style={[styles.tomorrowCount, { color: colors.heading }]}>
+              {tomorrowVisible.length} {plural(tomorrowVisible.length, lessonForms(t))}
+              {tomorrowVisible.length > 0 ? ` · ${tomorrowRange}` : ''}
+            </Text>
+          </View>
+          <View style={[styles.tomorrowChevron, { backgroundColor: colors.stoneLight }]}>
+            <Icon name="chevronRight" size={18} stroke={colors.stone700} />
+          </View>
+        </Card>
+      ) : null}
 
       <DateTimePickerSheet
         visible={reschedulingLesson !== null}
@@ -190,7 +270,94 @@ export default function TodayScreen() {
           if (reschedulingLesson) void rescheduleLesson(reschedulingLesson, ms);
         }}
       />
+
+      {quickOpen ? <QuickActionsSheet onClose={() => setQuickOpen(false)} /> : null}
     </Screen>
+  );
+}
+
+/**
+ * «Ваш день» (spec 04; prototype TodayScreen card): header «Ваш день» + «N/М»,
+ * line «K проведено · L впереди», an even-spaced dot-timeline (done = filled with
+ * the student colour, next = highlighted with a primary-light halo, later = outline)
+ * with a progress line, and the «следующее в HH:MM» caption under the next dot.
+ * `lessons` are the day's visible (non-cancelled) lessons, sorted ascending.
+ */
+function YourDayCard({
+  lessons,
+  studentsById,
+  onPress,
+}: {
+  lessons: LessonModel[];
+  studentsById: Map<string, StudentModel>;
+  onPress: () => void;
+}) {
+  const t = useT();
+  const { colors } = useTheme();
+
+  const s = daySummary(lessons);
+  const ahead = s.total - s.done;
+  // Prototype semantics: the "next" dot is the first non-done lesson in day order.
+  const nextIdx = lessons.findIndex((l) => l.lifecycleStatus !== 'done');
+  const n = lessons.length;
+  const prog = n > 1 ? Math.min(nextIdx < 0 ? n : nextIdx, n - 1) / (n - 1) : 0;
+
+  return (
+    <Card onPress={onPress} style={styles.yourDay}>
+      <View style={styles.ydHead}>
+        <Text style={[styles.ydTitle, { color: colors.heading }]}>{t('today.yourDay')}</Text>
+        <Text style={[styles.ydCount, { color: colors.heading }]}>
+          {s.done}/{s.total}
+        </Text>
+      </View>
+      <Text style={[styles.ydSub, { color: colors.muted }]}>
+        {s.done} {t('today.conducted')} · {ahead} {t('today.ahead')}
+      </Text>
+
+      {/* Dot-timeline: progress line + one evenly-spaced dot per lesson. */}
+      <View style={styles.tlWrap}>
+        <View style={[styles.tlLine, { backgroundColor: colors.hairline }]} />
+        <View style={[styles.tlLine, { backgroundColor: colors.primary, width: `${prog * 100}%` }]} />
+        <View style={styles.tlDots}>
+          {lessons.map((l, i) => {
+            const cat = studentsById.get(l.studentId)?.category;
+            const accent = cat ? catColors[cat].accent : colors.accent;
+            const isDone = l.lifecycleStatus === 'done';
+            const isNext = i === nextIdx;
+            return (
+              <View key={l.id} style={styles.tlSlot}>
+                {isDone ? (
+                  <View style={[styles.tlDot, { backgroundColor: accent }]} />
+                ) : isNext ? (
+                  <View style={[styles.tlHalo, { backgroundColor: colors.primaryLight }]}>
+                    <View style={[styles.tlDot, { backgroundColor: accent }]} />
+                  </View>
+                ) : (
+                  <View style={[styles.tlDotFuture, { backgroundColor: colors.surface, borderColor: colors.stoneInactive }]} />
+                )}
+              </View>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* «следующее в HH:MM» — centred under the next dot via the same slot row. */}
+      {nextIdx >= 0 && s.nextAt !== null ? (
+        <View style={styles.tlCaptionRow}>
+          {lessons.map((l, i) => (
+            <View key={l.id} style={styles.tlSlot}>
+              {i === nextIdx ? (
+                // No numberOfLines: on web it ellipsizes to the 20px slot width («с...»);
+                // the fixed-width caption is MEANT to overhang the slot, centred on the dot.
+                <Text style={[styles.tlCaption, { color: colors.muted }]}>
+                  {t('today.nextAt')} {hhmm(s.nextAt as number)}
+                </Text>
+              ) : null}
+            </View>
+          ))}
+        </View>
+      ) : null}
+    </Card>
   );
 }
 
@@ -207,6 +374,7 @@ function NearestCard({
   const t = useT();
   const { colors, radius } = useTheme();
   const router = useRouter();
+  const snack = useSnack();
 
   const m = minutesUntil(lesson.startsAt, now);
   const relative =
@@ -240,31 +408,56 @@ function NearestCard({
         </View>
         <Text style={[styles.nearestTime, { color: colors.heading }]}>{hhmm(lesson.startsAt)}</Text>
       </View>
-      <Pressable
-        onPress={(e) => {
-          e.stopPropagation();
-          const phone = student?.phone?.replace(/[^\d+]/g, '');
-          if (phone) Linking.openURL(`tel:${phone}`).catch(() => undefined);
-        }}
-        accessibilityRole="button"
-        accessibilityLabel={t('common.contact')}
-        style={({ pressed }) => [styles.contactBtn, { backgroundColor: colors.primaryVlight, borderRadius: radius.control, opacity: pressed ? 0.85 : 1 }]}>
-        <Icon name="phone" size={16} sw={1.8} stroke={colors.heading} />
-        <Text style={[styles.contactLabel, { color: colors.heading }]}>{t('common.contact')}</Text>
-      </Pressable>
+      {/* «Подключиться» — primary, ONLY for online lessons with a link (spec 04-today,
+          delta §3.1); «Связаться» stays alongside (or full-width when no join button). */}
+      <View style={styles.ctaRow}>
+        {canJoinOnline(lesson) ? (
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation();
+              Linking.openURL(lesson.link as string).catch(() => snack.show(t('link.openFailed')));
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={t('lesson.join')}
+            style={({ pressed }) => [styles.contactBtn, styles.ctaFlex, { backgroundColor: colors.primary, borderRadius: radius.control, opacity: pressed ? 0.85 : 1 }]}>
+            <Icon name="video" size={16} sw={1.8} stroke={colors.onTint} />
+            <Text style={[styles.contactLabel, { color: colors.onTint }]}>{t('lesson.join')}</Text>
+          </Pressable>
+        ) : null}
+        <Pressable
+          onPress={(e) => {
+            e.stopPropagation();
+            const phone = student?.phone?.replace(/[^\d+]/g, '');
+            if (phone) Linking.openURL(`tel:${phone}`).catch(() => undefined);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.contact')}
+          style={({ pressed }) => [styles.contactBtn, styles.ctaFlex, { backgroundColor: colors.primaryVlight, borderRadius: radius.control, opacity: pressed ? 0.85 : 1 }]}>
+          <Icon name="phone" size={16} sw={1.8} stroke={colors.heading} />
+          <Text style={[styles.contactLabel, { color: colors.heading }]}>{t('common.contact')}</Text>
+        </Pressable>
+      </View>
     </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  hero: {
-    paddingVertical: 18,
-    paddingHorizontal: 16,
-    gap: 16,
-  },
-  ringWrap: { alignItems: 'center' },
-  ringTop: { fontSize: 30, fontWeight: '700', letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
-  ringSub: { fontSize: 12.5, fontWeight: '500', marginTop: 2 },
+  // «Ваш день» card + dot-timeline (prototype TodayScreen)
+  yourDay: { padding: 16 },
+  ydHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
+  ydTitle: { fontSize: 15, fontWeight: '700' },
+  ydCount: { fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  ydSub: { fontSize: 13.5, marginTop: 3 },
+  tlWrap: { marginTop: 16, height: 20, justifyContent: 'center' },
+  tlLine: { position: 'absolute', left: 8, right: 8, height: 2, borderRadius: 2 },
+  tlDots: { flexDirection: 'row', justifyContent: 'space-between' },
+  tlSlot: { width: 20, alignItems: 'center', justifyContent: 'center' },
+  tlDot: { width: 12, height: 12, borderRadius: 6 },
+  tlHalo: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  tlDotFuture: { width: 12, height: 12, borderRadius: 6, borderWidth: 1.5 },
+  tlCaptionRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6, height: 15 },
+  tlCaption: { fontSize: 12, fontWeight: '500', fontVariant: ['tabular-nums'], width: 120, textAlign: 'center' },
+  allLink: { fontSize: 14, fontWeight: '600' },
 
   nearest: {
     padding: 16,
@@ -286,6 +479,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   contactLabel: { fontSize: 14, fontWeight: '600' },
+  ctaRow: { flexDirection: 'row', gap: 10 },
+  ctaFlex: { flex: 1 },
 
   list: { gap: 10 },
   rowShell: { borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
@@ -303,5 +498,10 @@ const styles = StyleSheet.create({
   },
   emptyNextText: { fontSize: 14, fontWeight: '500' },
 
-  tomorrow: { fontSize: 13.5, fontWeight: '500', textAlign: 'center', marginTop: 2 },
+  // Tomorrow card (spec 04: «ЗАВТРА, DD МММ» + count · range + chevron)
+  tomorrowCard: { padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  tomorrowBody: { flex: 1, minWidth: 0 },
+  tomorrowLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase' },
+  tomorrowCount: { fontSize: 16, fontWeight: '500', marginTop: 5, fontVariant: ['tabular-nums'] },
+  tomorrowChevron: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
 });

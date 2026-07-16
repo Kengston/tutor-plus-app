@@ -8,15 +8,21 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { seedIfEmpty } from '@/db/seed';
+import { ensureSlotsFromSchedule, materializeSchedule } from '@/db/slots';
 import { DualModeProvider, useT } from '@/i18n';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { ProfileGate, ReminderSync } from '@/lib/profile';
+import { SnackHost, SnackProvider } from '@/lib/snack';
 import { ThemeProvider as TutorThemeProvider, useTheme, useThemeMode } from '@/theme';
 
 export default function RootLayout() {
   useEffect(() => {
-    // Seed dev data once on first launch (no-op if data exists). Phase 1: web/LokiJS.
-    seedIfEmpty().catch((e) => console.error('[db] seed failed', e));
+    // Seed dev data once, then (ADR-0016) back-fill schedule slots from legacy strings
+    // and materialize the rolling window of series lessons. All three are idempotent.
+    seedIfEmpty()
+      .then(ensureSlotsFromSchedule)
+      .then(materializeSchedule)
+      .catch((e) => console.error('[db] launch bootstrap failed', e));
   }, []);
 
   return (
@@ -85,19 +91,26 @@ function NavigationRoot() {
     <ThemeProvider value={navTheme}>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
       <ReminderSync />
-      <WebFrame bg={colors.bg}>
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="student" />
-          <Stack.Screen name="lesson" />
-          <Stack.Screen name="finance" />
-          <Stack.Screen name="notifications" />
-          <Stack.Screen name="settings" />
-          <Stack.Screen name="gallery" options={{ presentation: 'modal', headerShown: true, title: t('a11y.uiKit') }} />
-          <Stack.Screen name="+not-found" />
-        </Stack>
-      </WebFrame>
+      <SnackProvider>
+        <WebFrame bg={colors.bg}>
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+            <Stack.Screen name="(auth)" />
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="student" />
+            <Stack.Screen name="lesson" />
+            <Stack.Screen name="finance" />
+            <Stack.Screen name="notifications" />
+            <Stack.Screen name="notification" />
+            <Stack.Screen name="notification-settings" />
+            <Stack.Screen name="settings" />
+            <Stack.Screen name="gallery" options={{ presentation: 'modal', headerShown: true, title: t('a11y.uiKit') }} />
+            <Stack.Screen name="+not-found" />
+          </Stack>
+          {/* Single global snack host — inside the WebFrame column (ADR-0010) so the bar
+              tracks the app width, above the Stack so it overlays every screen. */}
+          <SnackHost />
+        </WebFrame>
+      </SnackProvider>
     </ThemeProvider>
   );
 }
