@@ -410,6 +410,10 @@ export interface ProfilePatch {
   workDays?: string | null;
   /** v10 (spec 10 §10.1): visible OPTIONAL Today blocks (CSV; null = all). */
   homeBlocks?: string | null;
+  /** v11 (spec 03 §3.4): registration-wizard defaults for a new lesson. */
+  defaultRate?: number | null;
+  defaultDuration?: number | null;
+  defaultFormat?: string | null;
   pushGranted?: boolean;
 }
 
@@ -432,6 +436,9 @@ export async function updateProfile(profile: ProfileModel, patch: ProfilePatch):
       if (patch.phone !== undefined) p.phone = patch.phone;
       if (patch.workDays !== undefined) p.workDays = patch.workDays;
       if (patch.homeBlocks !== undefined) p.homeBlocks = patch.homeBlocks;
+      if (patch.defaultRate !== undefined) p.defaultRate = patch.defaultRate;
+      if (patch.defaultDuration !== undefined) p.defaultDuration = patch.defaultDuration;
+      if (patch.defaultFormat !== undefined) p.defaultFormat = patch.defaultFormat;
       if (patch.pushGranted !== undefined) p.pushGranted = patch.pushGranted;
     });
   });

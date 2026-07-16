@@ -175,5 +175,19 @@ export const migrations = schemaMigrations({
         }),
       ],
     },
+    {
+      toVersion: 11,
+      steps: [
+        addColumns({
+          table: 'profiles',
+          columns: [
+            // Registration-wizard defaults for a new lesson (spec 03 §3.4; null → legacy).
+            { name: 'default_rate', type: 'number', isOptional: true },
+            { name: 'default_duration', type: 'number', isOptional: true },
+            { name: 'default_format', type: 'string', isOptional: true },
+          ],
+        }),
+      ],
+    },
   ],
 });

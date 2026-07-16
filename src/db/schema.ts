@@ -37,11 +37,15 @@
  *
  * v10 (UI-v2 S16, spec 10 §10.1 «Настройка главной»): `profiles.home_blocks` — CSV of the
  * OPTIONAL Today blocks the user keeps visible (null = all); required blocks are never stored.
+ *
+ * v11 (UI-v2 S17, spec 03 §3.4 шаг «Значения по умолчанию»): `profiles.default_rate` /
+ * `default_duration` / `default_format` — the registration-wizard defaults seeded into a new
+ * lesson. Nullable — null falls back to the pre-wizard behaviour (student rate / 60 / online).
  */
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export const schema = appSchema({
-  version: 10,
+  version: 11,
   tables: [
     tableSchema({
       name: 'students',
@@ -151,6 +155,10 @@ export const schema = appSchema({
         { name: 'work_days', type: 'string', isOptional: true },
         // v10: visible OPTIONAL Today blocks (CSV; null = all visible).
         { name: 'home_blocks', type: 'string', isOptional: true },
+        // v11: registration-wizard defaults for a new lesson (null → legacy fallbacks).
+        { name: 'default_rate', type: 'number', isOptional: true },
+        { name: 'default_duration', type: 'number', isOptional: true },
+        { name: 'default_format', type: 'string', isOptional: true },
         { name: 'push_granted', type: 'boolean' },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },

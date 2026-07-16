@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DateTimePickerSheet } from '@/components/DateTimePickerSheet';
-import { useStudents, useSubjects } from '@/db/hooks';
+import { useProfile, useStudents, useSubjects } from '@/db/hooks';
 import { createLesson, recordLessonPayment } from '@/db/mutations';
 import { DURATIONS, type Duration, type LessonFormat, type PayStatus } from '@/domain/types';
 import { useT } from '@/i18n';
@@ -28,6 +28,7 @@ export default function LessonFormScreen() {
 
   const students = useStudents();
   const subjects = useSubjects();
+  const profile = useProfile();
 
   const [studentId, setStudentId] = useState<string | undefined>(preselect);
   const [subjectId, setSubjectId] = useState<string | null>(null);
@@ -45,6 +46,20 @@ export default function LessonFormScreen() {
   // is written; «Оплачено»/«Долг» append the corresponding ledger row (ADR-0008).
   const [payStatus, setPayStatus] = useState<PayStatus>('expected');
 
+  // Registration-wizard defaults (spec 03 §3.4-5, v11): seed duration/format/price ONCE when
+  // the profile row arrives and the fields are still untouched (render-time state-adjustment
+  // idiom — the row loads async, so useState initializers can't see it).
+  const [defaultsApplied, setDefaultsApplied] = useState(false);
+  if (profile && !defaultsApplied) {
+    setDefaultsApplied(true);
+    const dd = profile.defaultDuration;
+    if (dd != null && (DURATIONS as readonly number[]).includes(dd)) setDuration(dd as Duration);
+    if (profile.defaultFormat === 'online' || profile.defaultFormat === 'inperson') {
+      setFormat(profile.defaultFormat);
+    }
+    // defaultRate flows through the effectivePrice fallback chain below (student rate wins).
+  }
+
   const [pickStudent, setPickStudent] = useState(false);
   const [pickSubject, setPickSubject] = useState(false);
   const [pickWhen, setPickWhen] = useState(false);
@@ -52,8 +67,9 @@ export default function LessonFormScreen() {
   const selectedStudent = students.find((s) => s.id === studentId);
   const selectedSubject = subjects.find((s) => s.id === subjectId);
 
-  // Price tracks the selected student's rate until the user types a value.
-  const effectivePrice = priceTouched ? price : String(selectedStudent?.rate ?? '');
+  // Price tracks the selected student's rate until the user types a value; with no student
+  // picked yet, the registration-wizard default rate fills in (spec 03 §3.4-5, review fix S17).
+  const effectivePrice = priceTouched ? price : String(selectedStudent?.rate ?? profile?.defaultRate ?? '');
 
   const canSave = !!studentId;
 
