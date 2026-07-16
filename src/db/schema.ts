@@ -34,11 +34,14 @@
  *
  * v9 (UI-v2 S15, spec 10 §10.2): `profiles.phone` («Телефон / мессенджер») + `profiles.work_days`
  * (CSV of JS getDay indices; null reads as Пн–Пт). Both nullable — additive, no data change.
+ *
+ * v10 (UI-v2 S16, spec 10 §10.1 «Настройка главной»): `profiles.home_blocks` — CSV of the
+ * OPTIONAL Today blocks the user keeps visible (null = all); required blocks are never stored.
  */
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export const schema = appSchema({
-  version: 9,
+  version: 10,
   tables: [
     tableSchema({
       name: 'students',
@@ -146,6 +149,8 @@ export const schema = appSchema({
         // v9: contact + working days («Пн–Пт» when null). Nullable — additive backfill.
         { name: 'phone', type: 'string', isOptional: true },
         { name: 'work_days', type: 'string', isOptional: true },
+        // v10: visible OPTIONAL Today blocks (CSV; null = all visible).
+        { name: 'home_blocks', type: 'string', isOptional: true },
         { name: 'push_granted', type: 'boolean' },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },

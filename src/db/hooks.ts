@@ -247,7 +247,7 @@ const notifReadsC = () => database.get<NotificationReadModel>('notification_read
 const PROFILE_COLS = [
   'name', 'activity', 'client_type', 'tz', 'theme', 'reminder_lead_min',
   'notif_lessons', 'notif_payment', 'notif_schedule', 'notif_summary',
-  'notif_enabled', 'notif_debts', 'phone', 'work_days', 'push_granted',
+  'notif_enabled', 'notif_debts', 'phone', 'work_days', 'home_blocks', 'push_granted',
 ];
 
 /** The single practitioner profile row (reactive); undefined until `ensureProfile` has run. */

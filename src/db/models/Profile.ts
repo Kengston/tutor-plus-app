@@ -31,6 +31,8 @@ export class ProfileModel extends Model {
   /** v9 (spec 10 §10.2): contact + working days (CSV of getDay indices; null reads as Пн–Пт). */
   @field('phone') phone!: string | null;
   @field('work_days') workDays!: string | null;
+  /** v10 (spec 10 §10.1): visible OPTIONAL Today blocks (CSV; null = all visible). */
+  @field('home_blocks') homeBlocks!: string | null;
   /** OS notification permission granted (Web Notifications on web; expo-notifications on native). */
   @field('push_granted') pushGranted!: boolean;
   @readonly @date('created_at') createdAt!: Date;

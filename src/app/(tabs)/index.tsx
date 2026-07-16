@@ -13,6 +13,7 @@ import type { LessonModel, StudentModel } from '@/db/models';
 import { useAllTransactions, useLessonsInRange, useProfile, useStudents } from '@/db/hooks';
 import { cancelLesson, markLessonConducted, rescheduleLesson, restoreLessonLifecycle } from '@/db/mutations';
 import { plural, useT, type StringKey } from '@/i18n';
+import { parseHomeBlocks } from '@/lib/home-blocks';
 import { useSnack } from '@/lib/snack';
 import { dayBounds, dayBoundsOffset, hhmm, minutesUntil, nowMs } from '@/lib/time';
 import { catColors, useTheme } from '@/theme';
@@ -99,8 +100,6 @@ export default function TodayScreen() {
       l.startsAt >= now && (l.lifecycleStatus === 'upcoming' || l.lifecycleStatus === 'ongoing'),
   );
   const nearest = upcomingToday[0];
-  // The nearest lesson is highlighted in its own hero card — drop it from the list below to avoid a duplicate.
-  const restToday = nearest ? upcomingToday.slice(1) : upcomingToday;
 
   // Debt badge in «Далее сегодня» (spec 04: «Есть долг») — per-STUDENT outstanding
   // debt over the effective ledger, via the existing debtors aggregate.
@@ -126,6 +125,14 @@ export default function TodayScreen() {
 
   // Greeting header (spec 04): «Добрый день, {Имя}» + «вторник, 26 мая».
   const profile = useProfile();
+  // «Настройка главной» (spec 10 §10.1): which OPTIONAL blocks are visible (v10 CSV; null = all).
+  const homeBlocks = parseHomeBlocks(profile?.homeBlocks ?? null);
+  const showNearest = homeBlocks.includes('nearest');
+  const showTomorrow = homeBlocks.includes('tomorrow');
+  // The nearest lesson is highlighted in its own hero card — drop it from the list below ONLY
+  // while that card is visible; with the block hidden the lesson falls back into «Далее сегодня»
+  // (review fix S16 — otherwise the very next lesson vanished from the screen).
+  const restToday = showNearest && nearest ? upcomingToday.slice(1) : upcomingToday;
   const firstName = profile?.name?.trim().split(/\s+/)[0] ?? '';
   const greeting = firstName ? `${t('today.greeting')}, ${firstName}` : t('today.greeting');
   const nowDate = new Date(now);
@@ -152,8 +159,8 @@ export default function TodayScreen() {
             onPress={() => openScheduleList(start)}
           />
 
-          {/* Nearest lesson */}
-          {nearest ? (
+          {/* Nearest lesson — optional block («Настройка главной»). */}
+          {showNearest && nearest ? (
             <NearestCard lesson={nearest} student={studentsById.get(nearest.studentId)} now={now} />
           ) : null}
 
@@ -233,22 +240,25 @@ export default function TodayScreen() {
         </>
       )}
 
-      {/* Tomorrow card (spec 04): «ЗАВТРА, DD МММ» + count · time range → schedule. */}
-      <Card onPress={() => openScheduleList(tb.start)} style={styles.tomorrowCard}>
-        <View style={styles.tomorrowBody}>
-          <Text style={[styles.tomorrowLabel, { color: colors.muted }]}>
-            {t('common.tomorrow')}, {new Date(tb.start).getDate()}{' '}
-            {t(`monthGen.${new Date(tb.start).getMonth()}` as StringKey)}
-          </Text>
-          <Text style={[styles.tomorrowCount, { color: colors.heading }]}>
-            {tomorrowVisible.length} {plural(tomorrowVisible.length, lessonForms(t))}
-            {tomorrowVisible.length > 0 ? ` · ${tomorrowRange}` : ''}
-          </Text>
-        </View>
-        <View style={[styles.tomorrowChevron, { backgroundColor: colors.stoneLight }]}>
-          <Icon name="chevronRight" size={18} stroke={colors.stone700} />
-        </View>
-      </Card>
+      {/* Tomorrow card (spec 04): «ЗАВТРА, DD МММ» + count · time range → schedule.
+          Optional block («Настройка главной»). */}
+      {showTomorrow ? (
+        <Card onPress={() => openScheduleList(tb.start)} style={styles.tomorrowCard}>
+          <View style={styles.tomorrowBody}>
+            <Text style={[styles.tomorrowLabel, { color: colors.muted }]}>
+              {t('common.tomorrow')}, {new Date(tb.start).getDate()}{' '}
+              {t(`monthGen.${new Date(tb.start).getMonth()}` as StringKey)}
+            </Text>
+            <Text style={[styles.tomorrowCount, { color: colors.heading }]}>
+              {tomorrowVisible.length} {plural(tomorrowVisible.length, lessonForms(t))}
+              {tomorrowVisible.length > 0 ? ` · ${tomorrowRange}` : ''}
+            </Text>
+          </View>
+          <View style={[styles.tomorrowChevron, { backgroundColor: colors.stoneLight }]}>
+            <Icon name="chevronRight" size={18} stroke={colors.stone700} />
+          </View>
+        </Card>
+      ) : null}
 
       <DateTimePickerSheet
         visible={reschedulingLesson !== null}

@@ -408,6 +408,8 @@ export interface ProfilePatch {
   /** v9 (spec 10 §10.2): contact + working days (CSV of getDay indices). */
   phone?: string | null;
   workDays?: string | null;
+  /** v10 (spec 10 §10.1): visible OPTIONAL Today blocks (CSV; null = all). */
+  homeBlocks?: string | null;
   pushGranted?: boolean;
 }
 
@@ -429,6 +431,7 @@ export async function updateProfile(profile: ProfileModel, patch: ProfilePatch):
       if (patch.notifDebts !== undefined) p.notifDebts = patch.notifDebts;
       if (patch.phone !== undefined) p.phone = patch.phone;
       if (patch.workDays !== undefined) p.workDays = patch.workDays;
+      if (patch.homeBlocks !== undefined) p.homeBlocks = patch.homeBlocks;
       if (patch.pushGranted !== undefined) p.pushGranted = patch.pushGranted;
     });
   });

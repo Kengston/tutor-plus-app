@@ -709,8 +709,8 @@ export const messages = {
 
   // ── Настройки: тема ──────────────────────────────────────────────────────
   'settings.themeSystem': 'Авто',
-  'settings.themeLight': 'Светлая',
-  'settings.themeDark': 'Тёмная',
+  'settings.themeLight': 'День',
+  'settings.themeDark': 'Вечер',
 
   // ── Настройки: вид деятельности ──────────────────────────────────────────
   'activity.teacher': 'Преподаватель',
@@ -776,6 +776,18 @@ export const messages = {
   // ── Настройки: рабочие дни ────────────────────────────────────────────────
   'set.workDays': 'Рабочие дни',
   'set.workDaysHint': 'Свободные окна и сводки считаются по рабочим дням',
+
+  // ── Оформление: карточки темы + цвета + главная (UI-v2 S16, ADR-0017) ─────
+  'theme.autoHint': 'В режиме «Авто» вечерняя тема с 19:00 до 7:00',
+  'theme.scheduleColors': 'Цвета в расписании',
+  'theme.whereSeen': 'Аватар · календарь · графики',
+  'home.customize': 'Настройка главной',
+  'home.customizeHint': 'Выберите блоки экрана «Сегодня»',
+  'home.required': 'Обязательный',
+  'home.blockNearest': 'Ближайший урок',
+  'home.blockNearest_client': 'Ближайшая встреча',
+  'home.blockTomorrow': 'Карточка «Завтра»',
+  'home.blockNext': 'Далее сегодня',
 } as const;
 
 export type Mode = 'tutor' | 'client';

@@ -163,5 +163,17 @@ export const migrations = schemaMigrations({
         }),
       ],
     },
+    {
+      toVersion: 10,
+      steps: [
+        addColumns({
+          table: 'profiles',
+          columns: [
+            // «Настройка главной»: visible OPTIONAL Today blocks (CSV; null = all visible).
+            { name: 'home_blocks', type: 'string', isOptional: true },
+          ],
+        }),
+      ],
+    },
   ],
 });
