@@ -18,6 +18,7 @@ import {
   NotificationReadModel,
   ProfileModel,
   StudentModel,
+  StudentNoteModel,
   StudentSubjectModel,
   SubjectModel,
   TransactionModel,
@@ -261,6 +262,25 @@ export async function createSubject(name: string): Promise<SubjectModel> {
   return database.write(async () => database.get<SubjectModel>('subjects').create((s) => {
     s.name = name;
   }));
+}
+
+// ── Student notes (spec 06 §6.3, UI-v2 S9) ───────────────────────────────────
+
+/** Append a note to a student's profile. */
+export async function addStudentNote(studentId: string, text: string): Promise<StudentNoteModel> {
+  return database.write(async () =>
+    database.get<StudentNoteModel>('student_notes').create((n) => {
+      n.studentId = studentId;
+      n.text = text;
+    }),
+  );
+}
+
+/** Remove a note (long-press / swipe on the profile). */
+export async function deleteStudentNote(note: StudentNoteModel): Promise<void> {
+  await database.write(async () => {
+    await note.destroyPermanently();
+  });
 }
 
 // ── Profile + prefs (ADR-0013, Phase 3) ──────────────────────────────────────

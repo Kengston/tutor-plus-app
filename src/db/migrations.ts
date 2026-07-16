@@ -15,6 +15,8 @@
  * Existing lessons become standalone (`slot_id=null`, `modified=false`); a launch-time
  * backfill (`db/slots.ensureSlotsFromSchedule`) seeds slots from the legacy `schedule`
  * strings. `students.schedule` is kept (no drop-column in WatermelonDB) but superseded.
+ *
+ * v6 (UI-v2 S9, spec 06 §6.3): add `student_notes` (profile notes). Additive — no data change.
  */
 import { schemaMigrations, createTable, addColumns } from '@nozbe/watermelondb/Schema/migrations';
 
@@ -91,6 +93,20 @@ export const migrations = schemaMigrations({
             { name: 'subject_id', type: 'string', isOptional: true },
             { name: 'active_from', type: 'number' },
             { name: 'active_to', type: 'number', isOptional: true },
+            { name: 'created_at', type: 'number' },
+            { name: 'updated_at', type: 'number' },
+          ],
+        }),
+      ],
+    },
+    {
+      toVersion: 6,
+      steps: [
+        createTable({
+          name: 'student_notes',
+          columns: [
+            { name: 'student_id', type: 'string', isIndexed: true },
+            { name: 'text', type: 'string' },
             { name: 'created_at', type: 'number' },
             { name: 'updated_at', type: 'number' },
           ],

@@ -256,6 +256,33 @@ export const messages = {
   'student.noUpcoming': 'Нет предстоящих занятий',
   'student.noUpcoming_client': 'Нет предстоящих встреч',
 
+  // ── Student profile (spec 06 §6.3, UI-v2 S9) ──────────────────────────────
+  'profile.next': 'Следующее занятие',
+  'profile.next_client': 'Следующая встреча',
+  'profile.openLesson': 'Открыть занятие',
+  'profile.openLesson_client': 'Открыть встречу',
+  'profile.about': 'Об обучении',
+  'profile.payments': 'Оплаты',
+  'profile.noDebt': 'Без задолженности',
+  'profile.notes': 'Заметки',
+  'profile.addNote': 'Добавить заметку',
+  'profile.notesEmpty': 'Пока нет заметок',
+  'profile.history': 'История занятий',
+  'profile.history_client': 'История встреч',
+  'profile.historyEmpty': 'Проведённых занятий пока нет',
+  'profile.historyEmpty_client': 'Проведённых встреч пока нет',
+  'profile.deleteNote': 'Удалить заметку',
+  // Status management (spec 06 §6.3: пауза/архив с подтверждением)
+  'profile.pause': 'Поставить на паузу',
+  'profile.activate': 'Активировать',
+  'profile.confirmPause': 'Приостановить занятия с этим учеником?',
+  'profile.confirmPause_client': 'Приостановить встречи с этим клиентом?',
+  'profile.confirmActivate': 'Вернуть ученика к активным?',
+  'profile.confirmActivate_client': 'Вернуть клиента к активным?',
+  'profile.confirmArchive': 'Убрать ученика в архив?',
+  'profile.confirmArchive_client': 'Убрать клиента в архив?',
+  'profile.confirm': 'Подтвердить',
+
   // ── Student form ─────────────────────────────────────────────────────────
   'form.editTitle': 'Редактирование',
   'form.namePlaceholder': 'Имя ученика',

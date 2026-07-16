@@ -19,6 +19,7 @@ import {
   ProfileModel,
   ScheduleSlotModel,
   StudentModel,
+  StudentNoteModel,
   StudentSubjectModel,
   SubjectModel,
   TransactionModel,
@@ -51,6 +52,7 @@ const lessonsC = () => database.get<LessonModel>('lessons');
 const txnsC = () => database.get<TransactionModel>('transactions');
 const studentSubjectsC = () => database.get<StudentSubjectModel>('student_subjects');
 const slotsC = () => database.get<ScheduleSlotModel>('schedule_slots');
+const notesC = () => database.get<StudentNoteModel>('student_notes');
 
 const STUDENT_COLS = ['name', 'initials', 'category', 'status', 'format', 'rate', 'schedule', 'phone'];
 const SLOT_COLS = ['student_id', 'weekday', 'time_min', 'duration_min', 'format', 'price', 'subject_id', 'active_from', 'active_to'];
@@ -165,6 +167,15 @@ export function useStudentPrimarySubject(): Map<string, string> {
     }
     return primary;
   }, [joins, subjects]);
+}
+
+/** A student's profile notes (reactive), newest first (spec 06 §6.3). */
+export function useStudentNotes(studentId: string): StudentNoteModel[] {
+  return useObservable(
+    () => notesC().query(Q.where('student_id', studentId), Q.sortBy('created_at', Q.desc)).observeWithColumns(['text']),
+    [studentId],
+    [],
+  );
 }
 
 /** A student's schedule slots (reactive), earliest weekday/time first — the slot editor. */

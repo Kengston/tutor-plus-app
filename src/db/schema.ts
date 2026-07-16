@@ -21,11 +21,13 @@
  * `lessons.slot_id`/`slot_date`/`modified` — lessons materialized from slots into a
  * rolling window; (slot_id, slot_date) is the idempotency key, `modified` marks a
  * manually edited occurrence the generator must not touch.
+ *
+ * v6 (UI-v2 S9, spec 06 §6.3): `+student_notes` — free-form notes on a student's profile.
  */
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export const schema = appSchema({
-  version: 5,
+  version: 6,
   tables: [
     tableSchema({
       name: 'students',
@@ -139,6 +141,16 @@ export const schema = appSchema({
       columns: [
         { name: 'item_id', type: 'string', isIndexed: true },
         { name: 'read_at', type: 'number' },
+      ],
+    }),
+    // Free-form notes on a student's profile (spec 06 §6.3): text + timestamp, newest first.
+    tableSchema({
+      name: 'student_notes',
+      columns: [
+        { name: 'student_id', type: 'string', isIndexed: true },
+        { name: 'text', type: 'string' },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
       ],
     }),
   ],
