@@ -52,6 +52,31 @@ export interface Subject {
   createdAt: number;
 }
 
+/**
+ * A recurring slot in a student's weekly schedule = a series (ADR-0016). Replaces the
+ * free-form `Student.schedule` string; lessons are MATERIALIZED from active slots into a
+ * rolling window (`domain/schedule-slots`). `weekday`/`timeMin` are local wall-clock;
+ * `duration`/`format`/`price`/`subject` default from the student but are overridable here.
+ * `activeFrom`/`activeTo` are the watershed dates for scope edits (following/all, slice #25).
+ */
+export interface ScheduleSlot {
+  id: string;
+  studentId: string;
+  /** 0=Sun … 6=Sat (JS getDay convention). */
+  weekday: number;
+  /** Minutes from local midnight (16:00 → 960). */
+  timeMin: number;
+  durationMin: Duration;
+  format: LessonFormat;
+  price: number;
+  subjectId: string | null;
+  /** Local-midnight ms — the slot generates lessons from this day (inclusive). */
+  activeFrom: number;
+  /** Local-midnight ms — generation stops at this day (exclusive); null = open-ended. */
+  activeTo: number | null;
+  createdAt: number;
+}
+
 /** A scheduled event. `payStatus` is derived from linked transactions (ADR-0008). */
 export interface Lesson {
   id: string;
@@ -63,6 +88,9 @@ export interface Lesson {
   durationMin: Duration;
   format: LessonFormat;
   price: number;
+  /** Meeting URL (delta v2.1 §3.1) — drives «Подключиться»/«Открыть встречу»
+   *  visibility together with `format === 'online'` (`domain/lesson-link`). */
+  link: string | null;
   lifecycleStatus: LifecycleStatus;
   cancelReason: string | null;
   comment: string | null;
@@ -82,14 +110,40 @@ export interface Transaction {
   /** UTC-instant ms. */
   occurredAt: number;
   comment: string | null;
+  /** Set on a COMPENSATING row (undo, `domain/undo`): id of the txn it reverses. The
+   *  pair is excluded from derived values via `withoutReversals` — never deleted. */
+  reversesId: string | null;
+  createdAt: number;
+}
+
+/** Lifecycle of an `Expectation` — a plain mutable flag (ADR-0015; NOT the append-only ledger). */
+export type ExpectationStatus = 'open' | 'closed';
+
+/**
+ * A promise of money NOT tied to a lesson (prepayment/package: «жду от Маши 5 000 ₽ в
+ * пятницу») — a lightweight CRUD entity OUTSIDE the append-only ledger (ADR-0015). It is
+ * NOT a transaction: it never enters `received`/`debt`/netting. «Отметить оплату» APPENDS a
+ * real `paid` txn and flips `status` open→closed (mutability is fine — this is not the ledger).
+ * An overdue open expectation stays `expected` — it is NEVER auto-converted to debt (ADR-0009).
+ */
+export interface Expectation {
+  id: string;
+  /** Participant — the student/client who owes the promised payment. */
+  studentId: string;
+  amount: number;
+  /** Due date — UTC-instant ms (the day money is expected); the Finance bucket/sort key. */
+  dueAt: number;
+  comment: string | null;
+  status: ExpectationStatus;
   createdAt: number;
 }
 
 /**
- * A money-relevant row in the Finance list (ADR-0011) — a VIEW-MODEL, not a stored
+ * A money-relevant row in the Finance list (ADR-0011/0015) — a VIEW-MODEL, not a stored
  * entity. The list is a union of real `paid` transactions, derived `debt`/`expected`
- * lessons (a lesson's payStatus, not a stored row), and standalone `debt` transactions.
- * `expected` is never stored — it is always a derived lesson row (ADR-0008/0011).
+ * lessons (a lesson's payStatus, not a stored row), standalone `debt` transactions, and
+ * OPEN `Expectation`s (money promised without a lesson, ADR-0015). An `expected` row is
+ * never a ledger transaction — it is a derived lesson row OR an open expectation.
  */
 export type FinanceEntryKind = PayStatus; // 'paid' | 'debt' | 'expected'
 
@@ -105,8 +159,8 @@ export interface FinanceEntry {
   /** Bucket/sort instant: txn.occurredAt, or lesson.startsAt for a derived row. */
   occurredAt: number;
   method: PayMethod | null;
-  /** Origin of the row — drives drill-down (open the txn vs open the lesson). */
-  source: 'txn' | 'lesson';
+  /** Origin of the row — drives drill-down (open the txn / the lesson / the expectation). */
+  source: 'txn' | 'lesson' | 'expectation';
 }
 
 // ── Notifications (Phase 3, ADR-0013) ───────────────────────────────────────
@@ -163,12 +217,17 @@ export type ThemeChoice = 'system' | 'light' | 'dark';
  * The four toggles map 1:1 to the feed filter categories.
  */
 export interface ReminderPrefs {
+  /** «Включить уведомления» — the master switch (spec 09 §9.3): off silences the whole feed
+   *  AND the OS scheduler, regardless of the per-category toggles below. */
+  enabled: boolean;
   /** Lead-time minutes: 10 | 20 | 60 | 1440. */
   leadMin: number;
   /** «Занятия» — upcoming-lesson reminders. */
   lessons: boolean;
-  /** «Оплата» — payment + debt events. */
+  /** «Оплата» — payment events (paid rows). */
   payment: boolean;
+  /** «Уведомлять о долгах» — debt events, SEPARATE from payments (spec 09 §9.3). */
+  debts: boolean;
   /** «Расписание» — cancellations / schedule changes. */
   schedule: boolean;
   /** «Система» — daily summary. */

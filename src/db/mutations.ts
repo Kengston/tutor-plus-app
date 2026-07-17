@@ -6,17 +6,21 @@
  */
 import { Q } from '@nozbe/watermelondb';
 
+import { settleExpectation } from '@/domain/expectations';
 import type { Duration, LessonFormat, PayMethod, StudentStatus, TxnType } from '@/domain/types';
+import { reversalOf, type LessonLifecycleSnapshot } from '@/domain/undo';
 import type { Activity, ClientType } from '@/i18n';
 import { initialsOf } from '@/lib/format';
 import type { CatColor, ThemeMode } from '@/theme';
 
 import { database } from '.';
 import {
+  ExpectationModel,
   LessonModel,
   NotificationReadModel,
   ProfileModel,
   StudentModel,
+  StudentNoteModel,
   StudentSubjectModel,
   SubjectModel,
   TransactionModel,
@@ -102,6 +106,8 @@ export interface LessonInput {
   durationMin: Duration;
   format: LessonFormat;
   price: number;
+  /** Meeting URL (delta v2.1 §3.1) — optional; meaningful for online lessons. */
+  link?: string | null;
 }
 
 export async function createLesson(input: LessonInput): Promise<LessonModel> {
@@ -114,6 +120,11 @@ export async function createLesson(input: LessonInput): Promise<LessonModel> {
       l.durationMin = input.durationMin;
       l.format = input.format;
       l.price = input.price;
+      l.link = input.link?.trim() || null;
+      // Standalone lesson (ADR-0016): not tied to a slot, never regenerated.
+      l.slotId = null;
+      l.slotDate = null;
+      l.modified = false;
       l.lifecycleStatus = 'upcoming';
     }),
   );
@@ -136,13 +147,14 @@ export async function markLessonConducted(lesson: LessonModel): Promise<void> {
  * Record a payment against a lesson — APPENDS a linked transaction (ADR-0008/0009).
  * Append-only: a correction is a NEW compensating row, never an in-place edit. Debt is
  * always explicit (chosen here), never auto-derived from a conducted-but-unpaid lesson.
+ * Returns the created row so the caller's undo snack can `reverseTransaction` it.
  */
 export async function recordLessonPayment(
   lesson: LessonModel,
   pay: { type: Exclude<TxnType, 'expected'>; method?: PayMethod },
-): Promise<void> {
-  await database.write(async () => {
-    await database.get<TransactionModel>('transactions').create((t) => {
+): Promise<TransactionModel> {
+  return database.write(async () =>
+    database.get<TransactionModel>('transactions').create((t) => {
       t.studentId = lesson.studentId;
       t.lessonId = lesson.id;
       t.amount = lesson.price;
@@ -150,8 +162,8 @@ export async function recordLessonPayment(
       t.method = pay.method ?? null;
       t.subjectId = lesson.subjectId;
       t.occurredAt = Date.now();
-    });
-  });
+    }),
+  );
 }
 
 export interface TransactionInput {
@@ -205,14 +217,130 @@ export async function rescheduleLesson(lesson: LessonModel, startsAt: number): P
     await lesson.update((l) => {
       l.startsAt = startsAt;
       l.lifecycleStatus = 'upcoming';
+      // Manual reschedule detaches a materialized lesson from regeneration (ADR-0016).
+      l.modified = true;
     });
   });
+}
+
+// ── Undo («Вернуть», UI-v2 S1) — see domain/undo ─────────────────────────────
+
+/** Reverse mutation for a lifecycle action: restore the snapshot captured before it. */
+export async function restoreLessonLifecycle(
+  lesson: LessonModel,
+  snapshot: LessonLifecycleSnapshot,
+): Promise<void> {
+  await database.write(async () => {
+    await lesson.update((l) => {
+      l.lifecycleStatus = snapshot.lifecycleStatus;
+      l.cancelReason = snapshot.cancelReason ?? '';
+      l.comment = snapshot.comment;
+    });
+  });
+}
+
+/**
+ * Undo a money action: APPEND the compensating row (`domain/undo.reversalOf`) — the
+ * original is never edited/deleted (ADR-0002). Derived values drop the pair via
+ * `withoutReversals` at the data boundary (db/hooks).
+ */
+export async function reverseTransaction(txn: TransactionModel): Promise<TransactionModel> {
+  const input = reversalOf(txn);
+  return database.write(async () =>
+    database.get<TransactionModel>('transactions').create((t) => {
+      t.studentId = input.studentId;
+      t.lessonId = input.lessonId;
+      t.amount = input.amount;
+      t.type = input.type;
+      t.method = input.method;
+      t.subjectId = input.subjectId;
+      t.occurredAt = Date.now();
+      t.reversesId = input.reversesId;
+    }),
+  );
 }
 
 export async function createSubject(name: string): Promise<SubjectModel> {
   return database.write(async () => database.get<SubjectModel>('subjects').create((s) => {
     s.name = name;
   }));
+}
+
+// ── Expectations (ADR-0015, UI-v2 S10) ───────────────────────────────────────
+// «Ожидается» money promised without a lesson. A CRUD entity OUTSIDE the append-only ledger:
+// creating one writes NO transaction (so received/debt are untouched); settling appends a
+// real `paid` txn AND flips the expectation closed. Overdue ones never auto-become debt.
+
+export interface ExpectationInput {
+  studentId: string;
+  amount: number;
+  /** Due date — UTC-instant ms; defaults to now. */
+  dueAt?: number;
+  comment?: string | null;
+}
+
+/** Create an expectation (ADR-0015) — NOT a ledger write; the «Ожидается» type in «Новая
+ *  операция» lands here, keeping the money registry append-only. */
+export async function createExpectation(input: ExpectationInput): Promise<ExpectationModel> {
+  return database.write(async () =>
+    database.get<ExpectationModel>('expectations').create((x) => {
+      x.studentId = input.studentId;
+      x.amount = input.amount;
+      x.dueAt = input.dueAt ?? Date.now();
+      x.comment = input.comment ?? null;
+      x.status = 'open';
+    }),
+  );
+}
+
+/**
+ * Settle an expectation (ADR-0015): in ONE writer, APPEND a `paid` txn for the promised money
+ * AND mark the expectation `closed`. The ledger stays append-only (the payment is a new row);
+ * the expectation (not a ledger row) flips open→closed. The settle rule is the pure
+ * `domain/expectations.settleExpectation`.
+ */
+export async function settleExpectationPaid(
+  expectation: ExpectationModel,
+  pay: { method: PayMethod; occurredAt?: number },
+): Promise<void> {
+  const { payment, nextStatus } = settleExpectation(expectation, {
+    method: pay.method,
+    occurredAt: pay.occurredAt ?? Date.now(),
+  });
+  await database.write(async () => {
+    await database.get<TransactionModel>('transactions').create((t) => {
+      t.studentId = payment.studentId;
+      t.lessonId = null;
+      t.amount = payment.amount;
+      t.type = 'paid';
+      t.method = payment.method;
+      t.subjectId = null;
+      t.occurredAt = payment.occurredAt;
+      t.comment = payment.comment;
+    });
+    await expectation.update((x) => {
+      x.status = nextStatus;
+    });
+  });
+}
+
+// ── Student notes (spec 06 §6.3, UI-v2 S9) ───────────────────────────────────
+
+/** Append a note to a student's profile. */
+export async function addStudentNote(studentId: string, text: string): Promise<StudentNoteModel> {
+  return database.write(async () =>
+    database.get<StudentNoteModel>('student_notes').create((n) => {
+      n.studentId = studentId;
+      n.text = text;
+    }),
+  );
+}
+
+/** Remove a note (long-press / swipe on the profile). */
+export async function deleteStudentNote(note: StudentNoteModel): Promise<void> {
+  await database.write(async () => {
+    await note.destroyPermanently();
+  });
 }
 
 // ── Profile + prefs (ADR-0013, Phase 3) ──────────────────────────────────────
@@ -229,6 +357,8 @@ export const PROFILE_DEFAULTS = {
   notifPayment: true,
   notifSchedule: true,
   notifSummary: true,
+  notifEnabled: true,
+  notifDebts: true,
   pushGranted: false,
 };
 
@@ -254,6 +384,8 @@ export async function ensureProfile(): Promise<ProfileModel> {
       p.notifPayment = PROFILE_DEFAULTS.notifPayment;
       p.notifSchedule = PROFILE_DEFAULTS.notifSchedule;
       p.notifSummary = PROFILE_DEFAULTS.notifSummary;
+      p.notifEnabled = PROFILE_DEFAULTS.notifEnabled;
+      p.notifDebts = PROFILE_DEFAULTS.notifDebts;
       p.pushGranted = PROFILE_DEFAULTS.pushGranted;
     });
   });
@@ -270,6 +402,18 @@ export interface ProfilePatch {
   notifPayment?: boolean;
   notifSchedule?: boolean;
   notifSummary?: boolean;
+  /** v8: master switch + debts split (spec 09 §9.3). */
+  notifEnabled?: boolean;
+  notifDebts?: boolean;
+  /** v9 (spec 10 §10.2): contact + working days (CSV of getDay indices). */
+  phone?: string | null;
+  workDays?: string | null;
+  /** v10 (spec 10 §10.1): visible OPTIONAL Today blocks (CSV; null = all). */
+  homeBlocks?: string | null;
+  /** v11 (spec 03 §3.4): registration-wizard defaults for a new lesson. */
+  defaultRate?: number | null;
+  defaultDuration?: number | null;
+  defaultFormat?: string | null;
   pushGranted?: boolean;
 }
 
@@ -287,6 +431,14 @@ export async function updateProfile(profile: ProfileModel, patch: ProfilePatch):
       if (patch.notifPayment !== undefined) p.notifPayment = patch.notifPayment;
       if (patch.notifSchedule !== undefined) p.notifSchedule = patch.notifSchedule;
       if (patch.notifSummary !== undefined) p.notifSummary = patch.notifSummary;
+      if (patch.notifEnabled !== undefined) p.notifEnabled = patch.notifEnabled;
+      if (patch.notifDebts !== undefined) p.notifDebts = patch.notifDebts;
+      if (patch.phone !== undefined) p.phone = patch.phone;
+      if (patch.workDays !== undefined) p.workDays = patch.workDays;
+      if (patch.homeBlocks !== undefined) p.homeBlocks = patch.homeBlocks;
+      if (patch.defaultRate !== undefined) p.defaultRate = patch.defaultRate;
+      if (patch.defaultDuration !== undefined) p.defaultDuration = patch.defaultDuration;
+      if (patch.defaultFormat !== undefined) p.defaultFormat = patch.defaultFormat;
       if (patch.pushGranted !== undefined) p.pushGranted = patch.pushGranted;
     });
   });

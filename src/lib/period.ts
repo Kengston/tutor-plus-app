@@ -127,3 +127,39 @@ export function weekStarts(fromMs: number, toMs: number): number[] {
   }
   return out;
 }
+
+/**
+ * Four sub-ranges of a period for the Dynamics line chart (spec 08 §8.2). A month splits
+ * into the spec's day intervals — «1–7», «8–14», «15–21», «22–конец» (the last absorbs
+ * 28/30/31-day tails); a year into CALENDAR quarters (Янв–Мар … Окт–Дек); week/custom into
+ * 4 near-equal DAY-ALIGNED chunks (midnight boundaries — labels never overlap; a <4-day
+ * range degenerates some chunks to empty, which read as zeros). Sub-ranges are plain
+ * `custom` periods, so the same metric-in-period helpers evaluate them; quartering the
+ * comparison period the same way keeps the two lines positionally comparable.
+ */
+export function periodQuarters(p: Period): Period[] {
+  if (p.type === 'month') {
+    const d = new Date(p.start);
+    const day = (n: number) => new Date(d.getFullYear(), d.getMonth(), n).getTime();
+    return [
+      { type: 'custom', start: day(1), end: day(8) },
+      { type: 'custom', start: day(8), end: day(15) },
+      { type: 'custom', start: day(15), end: day(22) },
+      { type: 'custom', start: day(22), end: p.end },
+    ];
+  }
+  if (p.type === 'year') {
+    const y = new Date(p.start).getFullYear();
+    const q = (m: number) => new Date(y, m, 1).getTime();
+    return [
+      { type: 'custom', start: q(0), end: q(3) },
+      { type: 'custom', start: q(3), end: q(6) },
+      { type: 'custom', start: q(6), end: q(9) },
+      { type: 'custom', start: q(9), end: p.end },
+    ];
+  }
+  // week / custom — day-aligned near-equal chunks (both period types start at local midnight).
+  const days = Math.round((p.end - p.start) / DAY);
+  const bound = (i: number) => (i === 4 ? p.end : p.start + Math.round((days * i) / 4) * DAY);
+  return [0, 1, 2, 3].map((i) => ({ type: 'custom' as const, start: bound(i), end: bound(i + 1) }));
+}

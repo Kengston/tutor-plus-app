@@ -16,7 +16,9 @@
 import { periodContains, type Period } from '@/lib/period';
 
 import type {
+  ExpectationStatus,
   FinanceEntry,
+  LessonFormat,
   LifecycleStatus,
   PayMethod,
   PayStatus,
@@ -41,6 +43,13 @@ type LessonSlice = {
   price: number;
   startsAt: number;
   lifecycleStatus: LifecycleStatus;
+};
+type ExpectationSlice = {
+  id: string;
+  studentId: string;
+  amount: number;
+  dueAt: number;
+  status: ExpectationStatus;
 };
 
 // ── Phase-1 derivations (unchanged contract) ─────────────────────────────────
@@ -71,6 +80,31 @@ export function doneOfTotal(
   let done = 0;
   for (const l of lessons) if (l.lifecycleStatus === 'done') done += 1;
   return { done, total: lessons.length };
+}
+
+/**
+ * Selected-day summary under the calendar grid (UI-v2 S4, spec 05 §5.1; prototype
+ * `DayGlance`): «Сегодня · N уроков» + «K проведено · следующее в HH:MM». Cancelled
+ * lessons are excluded entirely; `nextAt` is the earliest still-active (upcoming/
+ * ongoing) lesson's instant, `null` when the day is over (prototype: «день завершён»).
+ */
+export function daySummary(
+  lessons: readonly Pick<LessonSlice, 'lifecycleStatus' | 'startsAt'>[],
+): { total: number; done: number; nextAt: number | null } {
+  let total = 0;
+  let done = 0;
+  let nextAt: number | null = null;
+  for (const l of lessons) {
+    if (l.lifecycleStatus === 'cancelled') continue;
+    total += 1;
+    if (l.lifecycleStatus === 'done') {
+      done += 1;
+    } else if (nextAt === null || l.startsAt < nextAt) {
+      // upcoming/ongoing — candidate for «следующее в HH:MM»
+      nextAt = l.startsAt;
+    }
+  }
+  return { total, done, nextAt };
 }
 
 // ── Debt (Phase-2 netting, ADR-0011) ─────────────────────────────────────────
@@ -114,6 +148,106 @@ export function hasDebt(transactions: readonly DebtTxnSlice[]): boolean {
   return debtOf(transactions) > 0;
 }
 
+type StudentTxnSlice = DebtTxnSlice & Pick<TxnSlice, 'studentId' | 'occurredAt'>;
+
+/** Outstanding debt as of an instant — the ledger replayed up to `asOfMs` (exclusive), netted
+ *  PER STUDENT exactly like `debtors()`/the hero total (one student's standalone income must not
+ *  cancel another's debt — review fix S13). Powers the «к предыдущему периоду» delta. */
+export function debtAsOf(transactions: readonly StudentTxnSlice[], asOfMs: number): number {
+  const past = transactions.filter((t) => t.occurredAt < asOfMs);
+  return debtors(past).reduce((s, d) => s + d.amount, 0);
+}
+
+const DAY_MS = 86_400_000;
+
+/** One unsettled debt position — the aging unit (spec 08 §8.3). */
+export interface UnsettledDebt {
+  studentId: string;
+  amount: number;
+  /** When the debt arose (its txn instant) — the aging clock starts here. */
+  occurredAt: number;
+}
+
+/** Per-student netting core of `unsettledDebts` — one student's txns in, their open positions out. */
+function unsettledDebtsOfStudent(transactions: readonly StudentTxnSlice[]): UnsettledDebt[] {
+  const paidLessons = new Set<string>();
+  let standalonePaid = 0;
+  for (const t of transactions) {
+    if (t.type !== 'paid') continue;
+    if (t.lessonId != null) paidLessons.add(t.lessonId);
+    else standalonePaid += t.amount;
+  }
+
+  const out: UnsettledDebt[] = [];
+  const standalone: UnsettledDebt[] = [];
+  for (const t of transactions) {
+    if (t.type !== 'debt') continue;
+    const pos = { studentId: t.studentId, amount: t.amount, occurredAt: t.occurredAt };
+    if (t.lessonId != null) {
+      if (!paidLessons.has(t.lessonId)) out.push(pos);
+    } else {
+      standalone.push(pos);
+    }
+  }
+
+  // FIFO offset: the student's standalone payments consume their OLDEST standalone debts first.
+  standalone.sort((a, b) => a.occurredAt - b.occurredAt);
+  let credit = standalonePaid;
+  for (const d of standalone) {
+    if (credit >= d.amount) {
+      credit -= d.amount;
+      continue; // fully covered
+    }
+    out.push(credit > 0 ? { ...d, amount: d.amount - credit } : d);
+    credit = 0;
+  }
+
+  return out;
+}
+
+/**
+ * Unsettled debt positions with their origin instants (spec 08 §8.3 «агрегаты получают дату
+ * происхождения долга»), netted PER STUDENT — mirrors `debtors()`, the tab's canonical total
+ * (`debtOf`'s contract is one student's txns; pooling credit across students would let one
+ * student's income erase another's debt — review fix S13). Per student: a lesson-anchored debt
+ * drops once its lesson has ANY `paid` txn; standalone debts are offset by that student's
+ * standalone payments OLDEST-FIRST (FIFO). Σ amounts === Σ `debtors()` by construction.
+ */
+export function unsettledDebts(transactions: readonly StudentTxnSlice[]): UnsettledDebt[] {
+  const byStudent = new Map<string, StudentTxnSlice[]>();
+  for (const t of transactions) {
+    const arr = byStudent.get(t.studentId);
+    if (arr) arr.push(t);
+    else byStudent.set(t.studentId, [t]);
+  }
+  const out: UnsettledDebt[] = [];
+  for (const list of byStudent.values()) out.push(...unsettledDebtsOfStudent(list));
+  return out;
+}
+
+/** Default grace before a debt counts as overdue (spec §8.3 «Ещё не просрочено» bucket). */
+export const DEBT_GRACE_DAYS = 7;
+
+/** Aging buckets over unsettled debts (spec 08 §8.3 «По сроку»): age ≤ grace → «ещё не
+ *  просрочено»; grace < age ≤ 14 дней → «до 14 дней»; > 14 дней → «больше 14» (a 15-day
+ *  debt lands here). Whole days via floor — a debt turns overdue only once a full day passes. */
+export function debtAgingBuckets(
+  entries: readonly Pick<UnsettledDebt, 'amount' | 'occurredAt'>[],
+  nowMs: number,
+  graceDays: number = DEBT_GRACE_DAYS,
+): { fresh: { amount: number; count: number }; d14: { amount: number; count: number }; over14: { amount: number; count: number } } {
+  const fresh = { amount: 0, count: 0 };
+  const d14 = { amount: 0, count: 0 };
+  const over14 = { amount: 0, count: 0 };
+  for (const e of entries) {
+    const age = Math.floor((nowMs - e.occurredAt) / DAY_MS);
+    const b = age <= graceDays ? fresh : age <= 14 ? d14 : over14;
+    b.amount += e.amount;
+    b.count += 1;
+  }
+  return { fresh, d14, over14 };
+}
+
 /** Outstanding debt per student over the WHOLE ledger — for the Analytics debtors list. */
 export function debtors(
   transactions: readonly (DebtTxnSlice & Pick<TxnSlice, 'studentId'>)[],
@@ -153,16 +287,20 @@ function linkedStatusMap(
 }
 
 /**
- * The Finance list as a union of view rows (ADR-0011), newest first:
+ * The Finance list as a union of view rows (ADR-0011/0015), newest first:
  *   1. every `paid` txn               → a paid row (lesson settlements + standalone income)
  *   2. each non-cancelled lesson with derived `debt`/`expected` status → a derived row
  *      (paid lessons are represented by their paid txn in #1)
  *   3. every standalone `debt` txn    → a debt row
- * `expected` rows are never stored — always derived from a lesson with no linked txn.
+ *   4. every OPEN `Expectation`       → an `expected` row (money promised without a lesson,
+ *      ADR-0015; closed ones are settled — their `paid` txn already appears in #1)
+ * An `expected` row is never a ledger txn — it is a derived lesson row (#2) or an open
+ * expectation (#4).
  */
 export function financeEntries(
   lessons: readonly LessonSlice[],
   transactions: readonly TxnSlice[],
+  expectations: readonly ExpectationSlice[] = [],
 ): FinanceEntry[] {
   const entries: FinanceEntry[] = [];
   const linked = linkedStatusMap(transactions);
@@ -216,6 +354,21 @@ export function financeEntries(
     }
   }
 
+  for (const x of expectations) {
+    if (x.status !== 'open') continue; // closed → already settled (its `paid` txn is in #1)
+    entries.push({
+      id: `expectation:${x.id}`,
+      kind: 'expected',
+      studentId: x.studentId,
+      lessonId: null,
+      subjectId: null,
+      amount: x.amount,
+      occurredAt: x.dueAt, // never converts to debt when past-due (ADR-0009/0015)
+      method: null,
+      source: 'expectation',
+    });
+  }
+
   entries.sort((a, b) => b.occurredAt - a.occurredAt);
   return entries;
 }
@@ -225,15 +378,23 @@ export function entriesInPeriod(entries: readonly FinanceEntry[], period: Period
   return entries.filter((e) => periodContains(period, e.occurredAt));
 }
 
-/** Period summary for the Finance header — received (flow) + debt (in-period), ADR-0012. */
-export function periodSummary(entries: readonly FinanceEntry[]): { received: number; debt: number } {
+/**
+ * Period summary for the Finance header (spec 07 §7.1) — the three figures over the period
+ * slice: `received` («Фактически получено» = Σ paid flow), `debt` («Задолженность»), and
+ * `expected` («Ожидается» = derived expected-lessons + open Expectations, ADR-0012/0015).
+ */
+export function periodSummary(
+  entries: readonly FinanceEntry[],
+): { received: number; debt: number; expected: number } {
   let received = 0;
   let debt = 0;
+  let expected = 0;
   for (const e of entries) {
     if (e.kind === 'paid') received += e.amount;
     else if (e.kind === 'debt') debt += e.amount;
+    else expected += e.amount; // 'expected' — expected-lessons + open Expectations
   }
-  return { received, debt };
+  return { received, debt, expected };
 }
 
 // ── Analytics aggregates (ADR-0012) ──────────────────────────────────────────
@@ -303,6 +464,44 @@ export function cancellationsInPeriod(lessons: readonly LessonSlice[], period: P
     if (l.lifecycleStatus === 'cancelled' && periodContains(period, l.startsAt)) n += 1;
   }
   return n;
+}
+
+/** Distinct students with a CONDUCTED lesson in period — the Dynamics «Ученики» metric
+ *  (consistent with «Занятия» = conducted count, spec 08 §8.2). */
+export function activeStudentsInPeriod(
+  lessons: readonly Pick<LessonSlice, 'studentId' | 'lifecycleStatus' | 'startsAt'>[],
+  period: Period,
+): number {
+  const ids = new Set<string>();
+  for (const l of lessons) {
+    if (l.lifecycleStatus === 'done' && periodContains(period, l.startsAt)) ids.add(l.studentId);
+  }
+  return ids.size;
+}
+
+/**
+ * «ГЛАВНОЕ ЗА ПЕРИОД» (spec 08 §8.2) — the sub-range where the current period diverged most
+ * from the comparison (largest |cur−prev|). Pure and conservative: `null` when the series are
+ * empty, equal, or the baseline is all-zero (nothing meaningful to say) — the screen then
+ * shows a correct empty state. `quarter` indexes the periodQuarters sub-range.
+ */
+export function dynamicsHighlight(
+  cur: readonly number[],
+  prev: readonly number[],
+): { quarter: number; diff: number; dir: 'up' | 'down' } | null {
+  if (cur.length === 0 || prev.every((v) => v === 0)) return null;
+  let best = -1;
+  let bestAbs = 0;
+  for (let i = 0; i < cur.length; i += 1) {
+    const d = Math.abs(cur[i] - (prev[i] ?? 0));
+    if (d > bestAbs) {
+      bestAbs = d;
+      best = i;
+    }
+  }
+  if (best < 0) return null; // all quarters equal — no divergence to highlight
+  const diff = cur[best] - (prev[best] ?? 0);
+  return { quarter: best, diff: Math.abs(diff), dir: diff >= 0 ? 'up' : 'down' };
 }
 
 /** Average payment in period = received / count(paid) (rounded; 0 if none). */
@@ -400,4 +599,90 @@ export function metricDelta(
   const abs = current - previous;
   const pct = previous === 0 ? null : Math.round((abs / previous) * 100);
   return { abs, pct, dir: abs > 0 ? 'up' : abs < 0 ? 'down' : 'flat' };
+}
+
+// ── «Структура дохода» breakdowns (UI-v2 S11, spec 08 §8.1) ──────────────────
+// The Overview donut has three interchangeable cuts of the SAME period income:
+// Направления (subjectTotals, above), Ученики (per-student), Формат (per lesson-format).
+
+/** Income per student — Σ `paid` amount whose `occurredAt` ∈ period, sorted desc («Ученики»). */
+export function incomeByStudent(
+  transactions: readonly Pick<TxnSlice, 'type' | 'amount' | 'occurredAt' | 'studentId'>[],
+  period: Period,
+): { studentId: string; amount: number }[] {
+  const acc = new Map<string, number>();
+  for (const t of transactions) {
+    if (t.type !== 'paid' || !periodContains(period, t.occurredAt)) continue;
+    acc.set(t.studentId, (acc.get(t.studentId) ?? 0) + t.amount);
+  }
+  const out = [...acc].map(([studentId, amount]) => ({ studentId, amount }));
+  out.sort((a, b) => b.amount - a.amount);
+  return out;
+}
+
+/**
+ * Income per lesson-format (online / inperson) — `paid` txns joined to their lesson's format,
+ * in period, sorted desc («Формат»). A standalone paid op (no `lessonId`) has no format, so it is
+ * excluded (the cut is about how sessions were held, not general income).
+ */
+export function incomeByFormat(
+  lessons: readonly { id: string; format: LessonFormat }[],
+  transactions: readonly Pick<TxnSlice, 'type' | 'amount' | 'occurredAt' | 'lessonId'>[],
+  period: Period,
+): { format: LessonFormat; amount: number }[] {
+  const fmtOf = new Map<string, LessonFormat>();
+  for (const l of lessons) fmtOf.set(l.id, l.format);
+  const acc = new Map<LessonFormat, number>();
+  for (const t of transactions) {
+    if (t.type !== 'paid' || t.lessonId == null || !periodContains(period, t.occurredAt)) continue;
+    const f = fmtOf.get(t.lessonId);
+    if (f === undefined) continue;
+    acc.set(f, (acc.get(f) ?? 0) + t.amount);
+  }
+  const out = [...acc].map(([format, amount]) => ({ format, amount }));
+  out.sort((a, b) => b.amount - a.amount);
+  return out;
+}
+
+// ── «Выводы» — rule-based Overview insights (UI-v2 S11, spec 08 §8.1) ─────────
+
+/**
+ * A structured Overview insight (the screen composes the localized sentence — the generator
+ * stays lexicon-free, ADR-0006). `topDirection` = the dominant income direction + its share;
+ * `incomeDelta` = income change vs the comparison period.
+ */
+export type OverviewInsight =
+  | { kind: 'topDirection'; subjectId: string | null; pct: number }
+  | { kind: 'incomeDelta'; pct: number; dir: 'up' | 'down' };
+
+/**
+ * Rule-based «Выводы» for the Overview — PURE, derived from the aggregates (no LLM, spec 08 §8.1).
+ * Deliberately conservative: emits an item only when the data genuinely supports it (a dominant
+ * direction with income; an income change against a NON-empty comparison baseline). Thin/empty
+ * data → `[]`, so the screen shows a correct empty state instead of a meaningless line.
+ */
+export function overviewInsights(
+  transactions: readonly PaidTxnSlice[],
+  period: Period,
+  comparePeriod: Period,
+): OverviewInsight[] {
+  const out: OverviewInsight[] = [];
+
+  // (1) Dominant direction by income share (subjectTotals is already income-desc).
+  const totals = subjectTotals(transactions, period);
+  const total = totals.reduce((s, x) => s + x.amount, 0);
+  if (total > 0 && totals[0] && totals[0].amount > 0) {
+    out.push({ kind: 'topDirection', subjectId: totals[0].subjectId, pct: Math.round((totals[0].amount / total) * 100) });
+  }
+
+  // (2) Income change vs the comparison period — only when the baseline had income (else no %).
+  const baseline = incomeInPeriod(transactions, comparePeriod);
+  if (baseline > 0) {
+    const d = metricDelta(incomeInPeriod(transactions, period), baseline);
+    if (d.pct !== null && d.pct !== 0) {
+      out.push({ kind: 'incomeDelta', pct: Math.abs(d.pct), dir: d.dir === 'down' ? 'down' : 'up' });
+    }
+  }
+
+  return out;
 }

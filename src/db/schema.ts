@@ -9,11 +9,43 @@
  * theme/dual-mode TODO; reminder settings live here) and `+notification_reads` (the ONLY
  * persistence the DERIVED notification feed needs — `unread = itemId ∉ this table`). The feed
  * itself is a view-model (`domain/notifications`), never a stored `notifications` table.
+ *
+ * v3 (UI-v2 S1, undo): `transactions.reverses_id` — a compensating row's link to the txn
+ * it reverses (`domain/undo`). Undo never edits/deletes ledger rows (ADR-0002); the pair
+ * is filtered out of derived values at the data boundary.
+ *
+ * v4 (UI-v2 S3, delta v2.1 §3.1): `lessons.link` — meeting URL on the lesson;
+ * «Подключиться»/«Открыть встречу» show only for online lessons with a link.
+ *
+ * v5 (UI-v2 S6, ADR-0016): `+schedule_slots` (a student's recurring series) and
+ * `lessons.slot_id`/`slot_date`/`modified` — lessons materialized from slots into a
+ * rolling window; (slot_id, slot_date) is the idempotency key, `modified` marks a
+ * manually edited occurrence the generator must not touch.
+ *
+ * v6 (UI-v2 S9, spec 06 §6.3): `+student_notes` — free-form notes on a student's profile.
+ *
+ * v7 (UI-v2 S10, ADR-0015): `+expectations` — money promised WITHOUT a lesson («Ожидается»),
+ * a plain CRUD entity OUTSIDE the append-only ledger. NOT a transaction: never counted in
+ * received/debt; «Отметить оплату» appends a `paid` txn and flips `status` open→closed.
+ *
+ * v8 (UI-v2 S14, spec 09 §9.3): `profiles.notif_enabled` (master switch) + `profiles.notif_debts`
+ * (debts separated from payments). NULLABLE on purpose: addColumns backfills existing rows with
+ * null, and `reminderPrefsOf` reads null as TRUE — a migrated user's feed stays on.
+ *
+ * v9 (UI-v2 S15, spec 10 §10.2): `profiles.phone` («Телефон / мессенджер») + `profiles.work_days`
+ * (CSV of JS getDay indices; null reads as Пн–Пт). Both nullable — additive, no data change.
+ *
+ * v10 (UI-v2 S16, spec 10 §10.1 «Настройка главной»): `profiles.home_blocks` — CSV of the
+ * OPTIONAL Today blocks the user keeps visible (null = all); required blocks are never stored.
+ *
+ * v11 (UI-v2 S17, spec 03 §3.4 шаг «Значения по умолчанию»): `profiles.default_rate` /
+ * `default_duration` / `default_format` — the registration-wizard defaults seeded into a new
+ * lesson. Nullable — null falls back to the pre-wizard behaviour (student rate / 60 / online).
  */
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export const schema = appSchema({
-  version: 2,
+  version: 11,
   tables: [
     tableSchema({
       name: 'students',
@@ -48,9 +80,31 @@ export const schema = appSchema({
         { name: 'duration_min', type: 'number' },
         { name: 'format', type: 'string' },
         { name: 'price', type: 'number' },
+        { name: 'link', type: 'string', isOptional: true },
+        { name: 'slot_id', type: 'string', isOptional: true, isIndexed: true },
+        { name: 'slot_date', type: 'number', isOptional: true },
+        { name: 'modified', type: 'boolean' },
         { name: 'lifecycle_status', type: 'string', isIndexed: true },
         { name: 'cancel_reason', type: 'string', isOptional: true },
         { name: 'comment', type: 'string', isOptional: true },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+    // Recurring schedule slots — a student's series (ADR-0016). Lessons are materialized
+    // from active slots; wall-clock (weekday/time_min) resolves in the device tz.
+    tableSchema({
+      name: 'schedule_slots',
+      columns: [
+        { name: 'student_id', type: 'string', isIndexed: true },
+        { name: 'weekday', type: 'number' }, // 0=Sun … 6=Sat
+        { name: 'time_min', type: 'number' }, // minutes from local midnight
+        { name: 'duration_min', type: 'number' },
+        { name: 'format', type: 'string' },
+        { name: 'price', type: 'number' },
+        { name: 'subject_id', type: 'string', isOptional: true },
+        { name: 'active_from', type: 'number' },
+        { name: 'active_to', type: 'number', isOptional: true },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
       ],
@@ -66,6 +120,7 @@ export const schema = appSchema({
         { name: 'subject_id', type: 'string', isOptional: true },
         { name: 'occurred_at', type: 'number', isIndexed: true },
         { name: 'comment', type: 'string', isOptional: true },
+        { name: 'reverses_id', type: 'string', isOptional: true, isIndexed: true },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
       ],
@@ -92,6 +147,18 @@ export const schema = appSchema({
         { name: 'notif_payment', type: 'boolean' },
         { name: 'notif_schedule', type: 'boolean' },
         { name: 'notif_summary', type: 'boolean' },
+        // v8: master switch + debts-vs-payments split. Nullable — null reads as TRUE (see header).
+        { name: 'notif_enabled', type: 'boolean', isOptional: true },
+        { name: 'notif_debts', type: 'boolean', isOptional: true },
+        // v9: contact + working days («Пн–Пт» when null). Nullable — additive backfill.
+        { name: 'phone', type: 'string', isOptional: true },
+        { name: 'work_days', type: 'string', isOptional: true },
+        // v10: visible OPTIONAL Today blocks (CSV; null = all visible).
+        { name: 'home_blocks', type: 'string', isOptional: true },
+        // v11: registration-wizard defaults for a new lesson (null → legacy fallbacks).
+        { name: 'default_rate', type: 'number', isOptional: true },
+        { name: 'default_duration', type: 'number', isOptional: true },
+        { name: 'default_format', type: 'string', isOptional: true },
         { name: 'push_granted', type: 'boolean' },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
@@ -104,6 +171,30 @@ export const schema = appSchema({
       columns: [
         { name: 'item_id', type: 'string', isIndexed: true },
         { name: 'read_at', type: 'number' },
+      ],
+    }),
+    // Free-form notes on a student's profile (spec 06 §6.3): text + timestamp, newest first.
+    tableSchema({
+      name: 'student_notes',
+      columns: [
+        { name: 'student_id', type: 'string', isIndexed: true },
+        { name: 'text', type: 'string' },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+    // Expected payment without a lesson (ADR-0015): participant + amount + due date; `status`
+    // open/closed. A CRUD entity, NOT the append-only ledger — never counted in received/debt.
+    tableSchema({
+      name: 'expectations',
+      columns: [
+        { name: 'student_id', type: 'string', isIndexed: true },
+        { name: 'amount', type: 'number' },
+        { name: 'due_at', type: 'number', isIndexed: true },
+        { name: 'comment', type: 'string', isOptional: true },
+        { name: 'status', type: 'string', isIndexed: true },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
       ],
     }),
   ],

@@ -15,7 +15,7 @@ import { messages, t as translate, type Mode, type StringKey } from './strings';
 export type ClientType = 'Ученик' | 'Клиент';
 
 /** Professional vertical — NON-lexical (ADR-0006). Presets default clientType only. */
-export type Activity = 'teacher' | 'psychologist' | 'coach' | 'mentor' | 'trainer';
+export type Activity = 'teacher' | 'psychologist' | 'coach' | 'mentor' | 'trainer' | 'other';
 
 export const clientTypeToMode = (c: ClientType): Mode => (c === 'Клиент' ? 'client' : 'tutor');
 export const modeToClientType = (m: Mode): ClientType => (m === 'client' ? 'Клиент' : 'Ученик');
@@ -27,6 +27,7 @@ export const activityDefaultClientType: Record<Activity, ClientType> = {
   coach: 'Клиент',
   mentor: 'Клиент',
   trainer: 'Клиент',
+  other: 'Клиент',
 };
 
 interface DualModeContextValue {

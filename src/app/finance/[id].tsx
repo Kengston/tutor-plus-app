@@ -4,22 +4,24 @@ import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/EmptyState';
-import { useStudent, useSubjects, useTransaction } from '@/db/hooks';
-import { createTransaction } from '@/db/mutations';
+import { useExpectation, useStudent, useSubjects, useTransaction } from '@/db/hooks';
+import { createTransaction, settleExpectationPaid } from '@/db/mutations';
+import type { PayMethod, PayStatus } from '@/domain/types';
 import { useT } from '@/i18n';
 import { formatRub } from '@/lib/format';
 import { hhmm } from '@/lib/time';
 import { useTheme } from '@/theme';
-import { Card, Chip, Icon } from '@/ui';
+import { Card, Chip, type ChipTone, Icon } from '@/ui';
 
 /**
- * Finance operation detail (ADR-0011) — drill-down for a TXN-sourced Finance row.
- * The Finance list routes lesson-sourced rows to `/lesson/[id]` and only standalone /
- * settlement transactions here, so `id` is always a transaction id.
+ * Finance entry detail (ADR-0011/0015) — drill-down for a TXN-sourced row OR an OPEN
+ * `Expectation`. The Finance list routes lesson-sourced rows to `/lesson/[id]`; standalone /
+ * settlement transactions come here as `id`, and open expectations as `id` + `kind='expectation'`.
  *
- * Money is APPEND-ONLY: a `debt` is settled by APPENDING a compensating `paid` txn
- * (carrying the same lessonId so the lesson's derived payStatus flips) — never by editing
- * the original row. Mirrors the custom Header + SafeAreaView shell from `lesson/[id].tsx`.
+ * Money is APPEND-ONLY: a `debt` is settled by APPENDING a compensating `paid` txn (carrying the
+ * same lessonId so the lesson's derived payStatus flips) — never by editing the original row. An
+ * expectation settles the same way (a `paid` txn) but ALSO flips the expectation closed (ADR-0015).
+ * Mirrors the custom Header + SafeAreaView shell from `lesson/[id].tsx`.
  */
 
 /** RU date «8 июня» (genitive day-month) from a UTC-instant ms (device-local), via i18n month keys. */
@@ -32,42 +34,85 @@ function useDateLabel(): (ms: number) => string {
   };
 }
 
+/** kind → amount/status colour (paid→paid, debt→danger, expected→neutral, spec 07). */
+function kindColor(kind: PayStatus, colors: { paid: string; danger: string; stone700: string }): string {
+  return kind === 'paid' ? colors.paid : kind === 'debt' ? colors.danger : colors.stone700;
+}
+
+/** kind → chip tone (expected is neutral, spec 07). */
+function kindTone(kind: PayStatus): ChipTone {
+  return kind === 'paid' ? 'paid' : kind === 'debt' ? 'danger' : 'neutral';
+}
+
 export default function OperationDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, kind } = useLocalSearchParams<{ id: string; kind?: string }>();
   const router = useRouter();
   const t = useT();
   const { colors, radius } = useTheme();
   const dateLabel = useDateLabel();
 
-  // `id` is a transaction id (txn-sourced Finance rows route here); the student owns the operation.
-  const txn = useTransaction(id);
-  const student = useStudent(txn?.studentId ?? '');
+  // `id` is a transaction id, unless `kind='expectation'` — then it is an expectation id. Load the
+  // matching entity (the other hook gets '' → stays undefined; established `?? ''` idiom in this repo).
+  const isExpectation = kind === 'expectation';
+  const txn = useTransaction(isExpectation ? '' : id);
+  const expectation = useExpectation(isExpectation ? id : '');
 
-  // Resolve the optional subject NAME via the live subjects table (FK → row, no ORM join, ADR-0007).
+  // Normalise txn / expectation to one view — `canSettle` drives the «Отметить оплату» action.
+  const view = useMemo<
+    | { studentId: string; amount: number; dateMs: number; kind: PayStatus; method: PayMethod | null; subjectId: string | null; canSettle: boolean }
+    | null
+  >(() => {
+    if (isExpectation) {
+      if (!expectation) return null;
+      return {
+        studentId: expectation.studentId,
+        amount: expectation.amount,
+        dateMs: expectation.dueAt,
+        kind: 'expected',
+        method: null, // an expectation has no payment method until settled
+        subjectId: null,
+        canSettle: true,
+      };
+    }
+    if (!txn) return null;
+    // A real txn is paid | debt (`expected` is never stored, ADR-0008/0011); debt is settleable.
+    return {
+      studentId: txn.studentId,
+      amount: txn.amount,
+      dateMs: txn.occurredAt,
+      kind: txn.type,
+      method: txn.method,
+      subjectId: txn.subjectId,
+      canSettle: txn.type === 'debt',
+    };
+  }, [isExpectation, expectation, txn]);
+
+  // Owner + optional subject name (live subjects table; FK → row, no ORM join, ADR-0007).
+  const student = useStudent(view?.studentId ?? '');
   const subjects = useSubjects();
   const subjectName = useMemo(() => {
-    if (!txn?.subjectId) return undefined;
-    return subjects.find((s) => s.id === txn.subjectId)?.name;
-    // Depend on `txn` (not `txn?.subjectId`) to match the compiler-inferred dependency
-    // (react-hooks/preserve-manual-memoization); txn is a single fetched record, so this is cheap.
-  }, [subjects, txn]);
+    if (!view?.subjectId) return undefined;
+    return subjects.find((s) => s.id === view.subjectId)?.name;
+  }, [subjects, view]);
 
-  // `expected` is never a stored row (ADR-0008/0011) → a real txn is paid | debt. Treat paid specially,
-  // everything else (debt) takes the danger styling + the settle action.
-  const isPaid = txn?.type === 'paid';
-  const amountColor = isPaid ? colors.paid : colors.danger;
+  const amountColor = view ? kindColor(view.kind, colors) : colors.heading;
 
-  /** Settle a debt: APPEND a `paid` txn carrying the debt's lesson/subject links, then pop. */
+  /** Settle a debt or an expectation: APPEND a `paid` txn (an expectation also flips closed), then pop. */
   const markPaid = async () => {
-    if (!txn) return;
-    await createTransaction({
-      studentId: txn.studentId,
-      type: 'paid',
-      amount: txn.amount,
-      method: 'transfer',
-      lessonId: txn.lessonId,
-      subjectId: txn.subjectId,
-    });
+    if (isExpectation) {
+      if (!expectation) return;
+      await settleExpectationPaid(expectation, { method: 'transfer' });
+    } else {
+      if (!txn) return;
+      await createTransaction({
+        studentId: txn.studentId,
+        type: 'paid',
+        amount: txn.amount,
+        method: 'transfer',
+        lessonId: txn.lessonId,
+        subjectId: txn.subjectId,
+      });
+    }
     router.back();
   };
 
@@ -80,18 +125,18 @@ export default function OperationDetailScreen() {
     <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
       <Header title={t('finance.opTitle')} onBack={() => router.back()} />
 
-      {!txn ? (
+      {!view ? (
         <EmptyState icon="wallet" text={t('common.none')} />
       ) : (
         <View style={styles.content}>
           {/* Hero: signed amount (leading «+» for income) + the type chip. */}
           <View style={styles.hero}>
             <Text style={[styles.amount, { color: amountColor }]}>
-              {isPaid ? '+' : ''}
-              {formatRub(txn.amount)}
+              {view.kind === 'paid' ? '+' : ''}
+              {formatRub(view.amount)}
             </Text>
             <View style={styles.chipRow}>
-              <Chip tone={isPaid ? 'paid' : 'danger'}>{t(`pay.${txn.type}` as 'pay.paid')}</Chip>
+              <Chip tone={kindTone(view.kind)}>{t(`pay.${view.kind}` as 'pay.paid')}</Chip>
             </View>
           </View>
 
@@ -99,11 +144,15 @@ export default function OperationDetailScreen() {
           <Card style={styles.card}>
             <Field label={t('field.student')} value={student?.name ?? t('common.none')} />
             <Hairline />
-            <Field label={t('field.date')} value={`${dateLabel(txn.occurredAt)} · ${hhmm(txn.occurredAt)}`} />
+            {/* Expectation carries a date only (no wall-clock time); a txn shows date · time. */}
+            <Field
+              label={t('field.date')}
+              value={isExpectation ? dateLabel(view.dateMs) : `${dateLabel(view.dateMs)} · ${hhmm(view.dateMs)}`}
+            />
             <Hairline />
             <Field
               label={t('finance.method')}
-              value={txn.method ? t(`method.${txn.method}` as 'method.transfer') : t('common.none')}
+              value={view.method ? t(`method.${view.method}` as 'method.transfer') : t('common.none')}
             />
             {subjectName ? (
               <>
@@ -113,12 +162,12 @@ export default function OperationDetailScreen() {
             ) : null}
             <Hairline />
             <Field label={t('finance.status')}>
-              <Text style={[styles.value, { color: amountColor }]}>{t(`pay.${txn.type}` as 'pay.paid')}</Text>
+              <Text style={[styles.value, { color: amountColor }]}>{t(`pay.${view.kind}` as 'pay.paid')}</Text>
             </Field>
           </Card>
 
-          {/* Action — settle a debt (primary), or contact for a recorded payment. */}
-          {txn.type === 'debt' ? (
+          {/* Action — settle a debt/expectation (primary), or contact for a recorded payment. */}
+          {view.canSettle ? (
             <Pressable
               onPress={markPaid}
               style={({ pressed }) => [

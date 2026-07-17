@@ -1,8 +1,9 @@
 /**
- * «Новая операция» — the general money-write screen (ADR-0011). Appends a standalone
- * transaction (Оплата → `type:'paid'` / Долг → `type:'debt'`) via `createTransaction`
- * (money is APPEND-ONLY; this only ever CREATES a row). No «Ожидается» here — `expected`
- * is a DERIVED state, never a stored row (ADR-0011), so the type picker offers paid/debt only.
+ * «Новая операция» — the general money-write screen (ADR-0011/0015). Оплата → `type:'paid'` /
+ * Долг → `type:'debt'` APPEND a standalone ledger transaction via `createTransaction` (money is
+ * APPEND-ONLY; this only ever CREATES a row). «Ожидается» is DIFFERENT: it creates an
+ * `Expectation` entity OUTSIDE the ledger via `createExpectation` (ADR-0015) — NOT a transaction,
+ * so the money registry stays append-only and received/debt are untouched.
  *
  * Shell mirrors lesson/[id].tsx: a custom Header (this stack has headerShown:false) inside a
  * SafeAreaView; the body is a ScrollView so the lower fields/keyboard stay reachable. Pickers
@@ -16,16 +17,26 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DateTimePickerSheet } from '@/components/DateTimePickerSheet';
 import { useStudents, useSubjects } from '@/db/hooks';
-import { createTransaction } from '@/db/mutations';
+import { createExpectation, createTransaction } from '@/db/mutations';
 import type { PayMethod } from '@/domain/types';
 import { useT, type StringKey } from '@/i18n';
 import { formatNumberRu } from '@/lib/format';
 import { nowMs } from '@/lib/time';
 import { useTheme } from '@/theme';
-import { Card, Chip, Icon, SectionLabel, Sheet } from '@/ui';
+import { Card, Chip, type ChipTone, Icon, SectionLabel, Sheet } from '@/ui';
 
-/** Stored transaction kinds for this form (`expected` is derived, never written — ADR-0011). */
-type OpType = 'paid' | 'debt';
+/**
+ * Operation kinds in the type picker (spec 07 §7.3). `paid`/`debt` write a ledger txn;
+ * `expected` writes an `Expectation` entity OUTSIDE the ledger (ADR-0015), never a transaction.
+ */
+type OpType = 'paid' | 'debt' | 'expected';
+
+/** Type picker options, in display order. */
+const OP_TYPES: { key: OpType; label: StringKey }[] = [
+  { key: 'paid', label: 'op.paid' },
+  { key: 'debt', label: 'op.debt' },
+  { key: 'expected', label: 'op.expected' },
+];
 
 /** RU date «8 июня» (genitive day-month) from a UTC-instant ms (device-local) — same pattern as lesson/[id].tsx. */
 function useDateLabel(): (ms: number) => string {
@@ -67,8 +78,9 @@ export default function NewOperationScreen() {
   const [datePicker, setDatePicker] = useState(false);
   const [subjectPicker, setSubjectPicker] = useState(false);
 
-  // Amount preview colour follows the operation type (income vs. owed).
-  const previewColor = type === 'paid' ? colors.paid : colors.danger;
+  // Amount preview colour follows the operation type (income / owed / neutral-pending, spec 07).
+  const previewColor = type === 'paid' ? colors.paid : type === 'debt' ? colors.danger : colors.stone700;
+  const previewChipTone: ChipTone = type === 'paid' ? 'paid' : type === 'debt' ? 'danger' : 'neutral';
   // Chosen entities (undefined until a row is tapped → placeholder shown).
   const student = students.find((s) => s.id === studentId);
   const subject = subjects.find((s) => s.id === subjectId);
@@ -78,16 +90,21 @@ export default function NewOperationScreen() {
 
   const save = async () => {
     if (!canSave || studentId == null) return;
-    await createTransaction({
-      studentId,
-      type,
-      amount,
-      // Method only makes sense for an actual payment; a debt has none.
-      method: type === 'paid' ? method : null,
-      occurredAt,
-      subjectId: subjectId ?? null,
-      comment: comment || null,
-    });
+    if (type === 'expected') {
+      // «Ожидается» is NOT a ledger row (ADR-0015) — create an Expectation entity instead.
+      await createExpectation({ studentId, amount, dueAt: occurredAt, comment: comment || null });
+    } else {
+      await createTransaction({
+        studentId,
+        type, // narrowed to 'paid' | 'debt' — the only stored ledger types
+        amount,
+        // Method only makes sense for an actual payment; a debt has none.
+        method: type === 'paid' ? method : null,
+        occurredAt,
+        subjectId: subjectId ?? null,
+        comment: comment || null,
+      });
+    }
     router.back();
   };
 
@@ -105,19 +122,19 @@ export default function NewOperationScreen() {
             {`${formatNumberRu(amount)} ₽`}
           </Text>
           <View style={styles.previewChip}>
-            <Chip tone={type === 'paid' ? 'paid' : 'danger'}>{t(type === 'paid' ? 'op.paid' : 'op.debt')}</Chip>
+            <Chip tone={previewChipTone}>{t(`op.${type}` as StringKey)}</Chip>
           </View>
         </View>
 
-        {/* ── Тип операции (paid / debt) ────────────────────────────────────── */}
+        {/* ── Тип операции (Оплата / Долг / Ожидается) ──────────────────────── */}
         <SectionLabel>{t('finance.opType')}</SectionLabel>
         <View style={styles.btnRow}>
-          {(['paid', 'debt'] as const).map((k) => {
-            const on = k === type;
+          {OP_TYPES.map(({ key, label }) => {
+            const on = key === type;
             return (
               <Pressable
-                key={k}
-                onPress={() => setType(k)}
+                key={key}
+                onPress={() => setType(key)}
                 accessibilityRole="button"
                 accessibilityState={{ selected: on }}
                 style={({ pressed }) => [
@@ -129,9 +146,7 @@ export default function NewOperationScreen() {
                   },
                   pressed && styles.pressed,
                 ]}>
-                <Text style={[styles.choiceLabel, { color: on ? colors.primary : colors.body }]}>
-                  {t(k === 'paid' ? 'op.paid' : 'op.debt')}
-                </Text>
+                <Text style={[styles.choiceLabel, { color: on ? colors.primary : colors.body }]}>{t(label)}</Text>
               </Pressable>
             );
           })}

@@ -52,7 +52,7 @@ export interface Theme {
   colors: ColorTokens;
   radius: { card: number; sheet: number; control: number; pill: number; field: number; row: number; group: number };
   /** Cross-platform boxShadow string (RN 0.85+ supports `boxShadow`). */
-  shadow: { card: string; fab: string; sheet: string; control: string; marker: string; barGlow: string; pill: string };
+  shadow: { card: string; fab: string; sheet: string; control: string; marker: string; barGlow: string; pill: string; snack: string };
 }
 
 export const lightColors: ColorTokens = {
@@ -60,9 +60,10 @@ export const lightColors: ColorTokens = {
   surface: '#FFFDF7',
   elev: '#FFFFFF',
   heading: '#151E2D',
-  body: 'rgba(21,30,45,0.80)',
-  muted: 'rgba(21,30,45,0.55)',
-  label3: 'rgba(21,30,45,0.30)',
+  // Alpha steps aligned to spec 00 §0.1 (UI-v2 S16): body .84 · muted .70 · label3 .46.
+  body: 'rgba(21,30,45,0.84)',
+  muted: 'rgba(21,30,45,0.70)',
+  label3: 'rgba(21,30,45,0.46)',
   hairline: 'rgba(21,30,45,0.12)',
   primary: '#151E2D',
   onTint: '#FFFFFF',
@@ -80,7 +81,7 @@ export const lightColors: ColorTokens = {
   stoneLight: 'rgba(21,30,45,0.05)',
   stone700: 'rgba(21,30,45,0.55)',
   terracotta: '#C97F5D',
-  tabbar: 'rgba(247,241,227,0.78)',
+  tabbar: 'rgba(247,241,227,0.70)',
   sheetScrim: 'rgba(21,30,45,0.34)',
   catTerracotta: '#9A4B28',
   catSlate: '#3D566D',
@@ -90,33 +91,35 @@ export const lightColors: ColorTokens = {
   catLavender: '#534A75',
 };
 
+/** «Вечер» — the prototype's `html[data-theme="evening"]` palette VERBATIM (UI-v2 S16, spec 00:
+ *  фон #1A1613, акцент #EBB65C; the previous blue-ish dark set diverged from the mockups). */
 export const darkColors: ColorTokens = {
-  bg: '#13161D',
-  surface: '#1C212B',
-  elev: '#222937',
-  heading: '#F3ECDD',
-  body: 'rgba(243,236,221,0.82)',
-  muted: 'rgba(243,236,221,0.60)',
-  label3: 'rgba(243,236,221,0.32)',
-  hairline: 'rgba(243,236,221,0.10)',
-  primary: '#FFD364',
-  onTint: '#1B1407',
-  primaryLight: 'rgba(255,211,100,0.20)',
-  primaryVlight: 'rgba(243,236,221,0.06)',
-  primaryDeep: '#FFD364',
-  accent: '#FFD364',
-  accentSoft: 'rgba(255,211,100,0.22)',
-  paid: '#9CB87E',
-  warning: '#E0A93A',
-  warningLight: 'rgba(224,169,58,0.18)',
-  danger: '#E08A6A',
-  dangerLight: 'rgba(224,138,106,0.16)',
-  stoneInactive: 'rgba(243,236,221,0.32)',
-  stoneLight: 'rgba(243,236,221,0.06)',
-  stone700: 'rgba(243,236,221,0.60)',
+  bg: '#1A1613',
+  surface: '#242019',
+  elev: '#2C2620',
+  heading: '#F1E8D8',
+  body: 'rgba(241,232,216,0.85)',
+  muted: 'rgba(241,232,216,0.66)',
+  label3: 'rgba(241,232,216,0.44)',
+  hairline: 'rgba(241,232,216,0.11)',
+  primary: '#EBB65C',
+  onTint: '#23190A',
+  primaryLight: 'rgba(235,182,92,0.22)',
+  primaryVlight: 'rgba(241,232,216,0.055)',
+  primaryDeep: '#EBB65C',
+  accent: '#EBB65C',
+  accentSoft: 'rgba(235,182,92,0.20)',
+  paid: '#93B183',
+  warning: '#E7B25A',
+  warningLight: 'rgba(231,178,90,0.18)',
+  danger: '#D98A63',
+  dangerLight: 'rgba(217,138,99,0.16)',
+  stoneInactive: 'rgba(241,232,216,0.44)',
+  stoneLight: 'rgba(241,232,216,0.06)',
+  stone700: 'rgba(241,232,216,0.70)',
   // not overridden in the evening theme — inherit day values
   terracotta: '#C97F5D',
-  tabbar: 'rgba(18,21,28,0.80)',
+  tabbar: 'rgba(26,22,19,0.66)',
   sheetScrim: 'rgba(0,0,0,0.55)',
   catTerracotta: '#9A4B28',
   catSlate: '#3D566D',
@@ -140,6 +143,7 @@ export const lightTheme: Theme = {
     marker: '0 1px 4px rgba(0,0,0,0.25)',
     barGlow: '0px 4px 12px -4px rgba(232,180,60,0.6)',
     pill: '0px 1px 3px rgba(0,0,0,0.12)',
+    snack: '0px 16px 34px -14px rgba(0,0,0,0.5)',
   },
 };
 
@@ -155,6 +159,7 @@ export const darkTheme: Theme = {
     marker: '0 1px 4px rgba(0,0,0,0.25)',
     barGlow: '0px 4px 12px -4px rgba(232,180,60,0.6)',
     pill: '0px 1px 3px rgba(0,0,0,0.12)',
+    snack: '0px 16px 34px -14px rgba(0,0,0,0.5)',
   },
 };
 
@@ -173,5 +178,13 @@ export const catColors = {
 
 export type CatColor = keyof typeof catColors;
 
-/** Multi-series chart palette (`CHART_COLORS` in the prototype). */
-export const chartColors = ['#7A95B0', '#C9899B', '#84A98C', '#C9A961', '#9B8FBE', '#C97F5D'] as const;
+/** Multi-series chart palette — DERIVED from the categorical accents so avatars, calendar
+ *  markers and charts share ONE source of truth (UI-v2 S16 «сведение двух наборов»). */
+export const chartColors = [
+  catColors.slate.accent,
+  catColors.rose.accent,
+  catColors.sage.accent,
+  catColors.ochre.accent,
+  catColors.lavender.accent,
+  catColors.terracotta.accent,
+] as const;

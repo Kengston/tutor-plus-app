@@ -45,10 +45,10 @@ export interface PlannedReminder {
  */
 export function planReminders(
   lessons: readonly LessonSlice[],
-  prefs: Pick<ReminderPrefs, 'leadMin' | 'lessons'>,
+  prefs: Pick<ReminderPrefs, 'enabled' | 'leadMin' | 'lessons'>,
   now: number,
 ): PlannedReminder[] {
-  if (!prefs.lessons) return [];
+  if (!prefs.enabled || !prefs.lessons) return []; // master switch silences the OS side too (spec 09 §9.3)
   const leadMs = prefs.leadMin * 60_000;
   const out: PlannedReminder[] = [];
   for (const l of lessons) {
