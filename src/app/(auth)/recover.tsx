@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useT } from '@/i18n';
 import { isStrongPassword, isValidCode, isValidContact, passwordChecks } from '@/lib/auth-validate';
+import { useBack } from '@/lib/nav';
 import { useTheme } from '@/theme';
 import { Icon } from '@/ui';
 
@@ -23,6 +24,7 @@ type Step = 'contact' | 'code' | 'password' | 'done';
 
 export default function RecoverScreen() {
   const router = useRouter();
+  const goBack = useBack();
   const t = useT();
   const { colors, radius } = useTheme();
 
@@ -73,7 +75,7 @@ export default function RecoverScreen() {
     <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
       <Header
         title={step === 'code' ? t('auth.codeTitle') : step === 'password' ? t('auth.newPasswordTitle') : t('auth.recoverTitle')}
-        onBack={() => (step === 'contact' || step === 'done' ? router.back() : setStep(step === 'code' ? 'contact' : 'code'))}
+        onBack={() => (step === 'contact' || step === 'done' ? goBack() : setStep(step === 'code' ? 'contact' : 'code'))}
       />
 
       <View style={styles.content}>

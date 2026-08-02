@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { type ReactNode, useMemo } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,6 +9,7 @@ import { createTransaction, settleExpectationPaid } from '@/db/mutations';
 import type { PayMethod, PayStatus } from '@/domain/types';
 import { useT } from '@/i18n';
 import { formatRub } from '@/lib/format';
+import { useBack } from '@/lib/nav';
 import { hhmm } from '@/lib/time';
 import { useTheme } from '@/theme';
 import { Card, Chip, type ChipTone, Icon } from '@/ui';
@@ -46,7 +47,7 @@ function kindTone(kind: PayStatus): ChipTone {
 
 export default function OperationDetailScreen() {
   const { id, kind } = useLocalSearchParams<{ id: string; kind?: string }>();
-  const router = useRouter();
+  const goBack = useBack();
   const t = useT();
   const { colors, radius } = useTheme();
   const dateLabel = useDateLabel();
@@ -113,7 +114,7 @@ export default function OperationDetailScreen() {
         subjectId: txn.subjectId,
       });
     }
-    router.back();
+    goBack();
   };
 
   /** Reach out to the student/client via the device dialer (paid-operation convenience). */
@@ -123,7 +124,7 @@ export default function OperationDetailScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
-      <Header title={t('finance.opTitle')} onBack={() => router.back()} />
+      <Header title={t('finance.opTitle')} onBack={() => goBack()} />
 
       {!view ? (
         <EmptyState icon="wallet" text={t('common.none')} />

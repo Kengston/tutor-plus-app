@@ -10,11 +10,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useT } from '@/i18n';
 import { useAuth } from '@/lib/auth';
+import { useBack } from '@/lib/nav';
 import { useTheme } from '@/theme';
 import { Card, Chip, Icon, SectionLabel } from '@/ui';
 
 export default function SecurityScreen() {
   const router = useRouter();
+  const goBack = useBack();
   const t = useT();
   const { colors, radius } = useTheme();
   const { signOut } = useAuth();
@@ -26,7 +28,7 @@ export default function SecurityScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
-      <Header title={t('set.security')} onBack={() => router.back()} />
+      <Header title={t('set.security')} onBack={() => goBack()} />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Card style={styles.card}>

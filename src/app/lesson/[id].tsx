@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { type ReactNode, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,8 +21,9 @@ import type { Scope } from '@/domain/scope';
 import { type PayStatus, type TxnType } from '@/domain/types';
 import { lifecycleSnapshot } from '@/domain/undo';
 import { useT } from '@/i18n';
-import { useSnack } from '@/lib/snack';
 import { formatRub } from '@/lib/format';
+import { useBack } from '@/lib/nav';
+import { useSnack } from '@/lib/snack';
 import { hhmm } from '@/lib/time';
 import { useTheme } from '@/theme';
 import { Card, Dot, Icon, Sheet, type DotTone } from '@/ui';
@@ -41,7 +42,7 @@ const PAY_TONE: Record<PayStatus, DotTone> = { paid: 'green', debt: 'red', expec
 
 export default function LessonCardScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
+  const goBack = useBack();
   const t = useT();
   const { colors, radius } = useTheme();
   const dateLabel = useDateLabel();
@@ -101,7 +102,7 @@ export default function LessonCardScreen() {
     });
     // Return to the schedule after the action (prototype pattern) — the cancelled lesson
     // leaves the timeline, and the detail is a transient action screen.
-    router.back();
+    goBack();
   };
 
   // Reschedule: pick the new time, then a series lesson asks the scope; a standalone one
@@ -113,7 +114,7 @@ export default function LessonCardScreen() {
       setRescheduleScopeOpen(true);
     } else {
       void rescheduleLesson(lesson, ms);
-      router.back();
+      goBack();
     }
   };
   const onRescheduleScopePick = (scope: Scope) => {
@@ -123,7 +124,7 @@ export default function LessonCardScreen() {
       snack.show(t('snack.rescheduled'), { actionLabel: t('action.undo'), onAction: () => void undo() });
     });
     // Return to the schedule, which reflects the new time (prototype pattern).
-    router.back();
+    goBack();
   };
   // Money undo (ADR-0002): «Отменить» appends the COMPENSATING row — never deletes.
   const recordPaymentWithUndo = (type: Exclude<TxnType, 'expected'>) => {
@@ -140,7 +141,7 @@ export default function LessonCardScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
-      <Header title={t('lesson.nom')} onBack={() => router.back()} />
+      <Header title={t('lesson.nom')} onBack={() => goBack()} />
 
       {!lesson ? (
         <EmptyState icon="calendar" text={t('common.none')} />

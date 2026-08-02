@@ -10,17 +10,17 @@
  * The finish applies everything to the single profile row (context + DB, ADR-0013 C) and
  * signs in against the Phase-0 stub.
  */
-import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useProfile } from '@/db/hooks';
 import { updateProfile } from '@/db/mutations';
+import { DURATIONS, type Duration, type LessonFormat } from '@/domain/types';
 import { activityDefaultClientType, useMode, useT, type Activity, type ClientType, type StringKey } from '@/i18n';
 import { useAuth } from '@/lib/auth';
 import { isStrongPassword, isValidContact, passwordChecks } from '@/lib/auth-validate';
-import { DURATIONS, type Duration, type LessonFormat } from '@/domain/types';
+import { useBack } from '@/lib/nav';
 import { useTheme } from '@/theme';
 import { Icon, Segmented } from '@/ui';
 
@@ -45,7 +45,7 @@ const LEADS: { key: number; label: StringKey }[] = [
 ];
 
 export default function RegisterScreen() {
-  const router = useRouter();
+  const goBack = useBack();
   const t = useT();
   const { colors, radius } = useTheme();
   const { signIn } = useAuth();
@@ -126,7 +126,7 @@ export default function RegisterScreen() {
       <Header
         title={stepTitle}
         subtitle={`${t('auth.stepOf')} ${step} ${t('common.of')} ${TOTAL_STEPS}`}
-        onBack={() => (step === 1 ? router.back() : setStep((s) => s - 1))}
+        onBack={() => (step === 1 ? goBack() : setStep((s) => s - 1))}
       />
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>

@@ -3,22 +3,22 @@
  * for now (multi-currency arrives with sync, Phase 4); the row exists so the section matches
  * the spec structure and the value is honest.
  */
-import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useT } from '@/i18n';
+import { useBack } from '@/lib/nav';
 import { useTheme } from '@/theme';
 import { Card, Icon } from '@/ui';
 
 export default function PaymentSettingsScreen() {
-  const router = useRouter();
+  const goBack = useBack();
   const t = useT();
   const { colors } = useTheme();
 
   return (
     <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
-      <Header title={t('set.payment')} onBack={() => router.back()} />
+      <Header title={t('set.payment')} onBack={() => goBack()} />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Card style={styles.card}>

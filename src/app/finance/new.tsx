@@ -10,7 +10,6 @@
  * reuse the shared kit Sheet (student/subject) and DateTimePickerSheet (date) — no new sheets.
  * All strings via i18n (dual-mode resolves inside t()); all colours via theme tokens.
  */
-import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,6 +20,7 @@ import { createExpectation, createTransaction } from '@/db/mutations';
 import type { PayMethod } from '@/domain/types';
 import { useT, type StringKey } from '@/i18n';
 import { formatNumberRu } from '@/lib/format';
+import { useBack } from '@/lib/nav';
 import { nowMs } from '@/lib/time';
 import { useTheme } from '@/theme';
 import { Card, Chip, type ChipTone, Icon, SectionLabel, Sheet } from '@/ui';
@@ -56,7 +56,7 @@ const METHODS: { key: PayMethod; label: StringKey }[] = [
 ];
 
 export default function NewOperationScreen() {
-  const router = useRouter();
+  const goBack = useBack();
   const t = useT();
   const { colors, radius } = useTheme();
   const dateLabel = useDateLabel();
@@ -105,12 +105,12 @@ export default function NewOperationScreen() {
         comment: comment || null,
       });
     }
-    router.back();
+    goBack();
   };
 
   return (
     <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
-      <Header title={t('finance.newOp')} onBack={() => router.back()} />
+      <Header title={t('finance.newOp')} onBack={() => goBack()} />
 
       <ScrollView
         contentContainerStyle={styles.content}

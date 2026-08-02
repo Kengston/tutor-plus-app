@@ -66,11 +66,17 @@ export const DEFAULT_REMINDER_PREFS: ReminderPrefs = {
 interface InitialProfile {
   theme: ThemeMode;
   clientType: ClientType;
+  /** Persisted auth session (schema v12). Null on migrated rows → signed out. */
+  signedIn: boolean;
 }
 
 /**
  * Block until the single profile row exists, then render children with its theme/mode as the
  * providers' initial values. A brief null splash before mount is acceptable (Phase-0 parity).
+ *
+ * The session flag rides along (TP-FIX-0719, п. 6): the auth gate must know whether the user
+ * is signed in BEFORE it can decide to redirect, otherwise a reload on an inner screen (or a
+ * deep link) bounces to `/sign-in` on the first frame.
  */
 export function ProfileGate({ children }: { children: (initial: InitialProfile) => ReactNode }) {
   const [initial, setInitial] = useState<InitialProfile | null>(null);
@@ -79,11 +85,11 @@ export function ProfileGate({ children }: { children: (initial: InitialProfile) 
     let alive = true;
     ensureProfile()
       .then((p) => {
-        if (alive) setInitial({ theme: p.theme, clientType: p.clientType });
+        if (alive) setInitial({ theme: p.theme, clientType: p.clientType, signedIn: p.signedIn === true });
       })
       .catch((e) => {
         console.error('[profile] ensure failed', e);
-        if (alive) setInitial({ theme: 'system', clientType: 'Ученик' });
+        if (alive) setInitial({ theme: 'system', clientType: 'Ученик', signedIn: false });
       });
     return () => {
       alive = false;

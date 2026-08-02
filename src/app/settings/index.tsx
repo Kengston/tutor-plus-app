@@ -21,6 +21,7 @@ import { nowMs } from '@/lib/time';
 import { useTheme, useThemeMode } from '@/theme';
 import { Card, CatAvatar, Icon, SectionLabel, Sheet, type IconName } from '@/ui';
 
+import { useBack } from '@/lib/nav';
 import { WORK_DAY_KEYS, workDaysLabel } from '@/lib/work-days';
 
 export default function SettingsScreen() {
@@ -31,6 +32,7 @@ export default function SettingsScreen() {
 
 function SettingsHome({ profile }: { profile: ProfileModel }) {
   const router = useRouter();
+  const goBack = useBack();
   const t = useT();
   const { colors, radius } = useTheme();
   const { mode: themeMode } = useThemeMode();
@@ -64,15 +66,19 @@ function SettingsHome({ profile }: { profile: ProfileModel }) {
 
   return (
     <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
-      <Header title={t('settings.title')} onBack={() => router.back()} />
+      <Header title={t('settings.title')} onBack={() => goBack()} />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* ── Profile card: avatar · name · activity · edit (spec 10 §10.1) ── */}
         <Card style={styles.profileCard}>
-          <CatAvatar initials={profile.name ? initialsOf(profile.name) : '—'} cat="slate" size={52} />
+          {/* No name yet (signed in against an account that never went through the wizard):
+              invite the user to add one instead of showing a dash (TP-FIX-0719, п. 4). */}
+          <CatAvatar initials={profile.name ? initialsOf(profile.name) : '+'} cat="slate" size={52} />
           <View style={styles.profileBody}>
-            <Text numberOfLines={1} style={[styles.profileName, { color: colors.heading }]}>
-              {profile.name || t('common.none')}
+            <Text
+              numberOfLines={1}
+              style={[styles.profileName, { color: profile.name ? colors.heading : colors.muted }]}>
+              {profile.name || t('set.namePlaceholder')}
             </Text>
             <Text numberOfLines={1} style={[styles.profileActivity, { color: colors.muted }]}>
               {activityLabel}

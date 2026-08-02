@@ -359,6 +359,8 @@ export const PROFILE_DEFAULTS = {
   notifSummary: true,
   notifEnabled: true,
   notifDebts: true,
+  // A fresh install starts SIGNED OUT — the auth gate (ADR-0005 §2) owns the first screen.
+  signedIn: false,
   pushGranted: false,
 };
 
@@ -386,6 +388,7 @@ export async function ensureProfile(): Promise<ProfileModel> {
       p.notifSummary = PROFILE_DEFAULTS.notifSummary;
       p.notifEnabled = PROFILE_DEFAULTS.notifEnabled;
       p.notifDebts = PROFILE_DEFAULTS.notifDebts;
+      p.signedIn = PROFILE_DEFAULTS.signedIn;
       p.pushGranted = PROFILE_DEFAULTS.pushGranted;
     });
   });
@@ -414,6 +417,8 @@ export interface ProfilePatch {
   defaultRate?: number | null;
   defaultDuration?: number | null;
   defaultFormat?: string | null;
+  /** v12 (TP-FIX-0719, п. 6): persisted auth session — written by the auth shell, not Settings. */
+  signedIn?: boolean;
   pushGranted?: boolean;
 }
 
@@ -439,6 +444,7 @@ export async function updateProfile(profile: ProfileModel, patch: ProfilePatch):
       if (patch.defaultRate !== undefined) p.defaultRate = patch.defaultRate;
       if (patch.defaultDuration !== undefined) p.defaultDuration = patch.defaultDuration;
       if (patch.defaultFormat !== undefined) p.defaultFormat = patch.defaultFormat;
+      if (patch.signedIn !== undefined) p.signedIn = patch.signedIn;
       if (patch.pushGranted !== undefined) p.pushGranted = patch.pushGranted;
     });
   });

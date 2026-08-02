@@ -11,11 +11,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useT } from '@/i18n';
 import { useAuth } from '@/lib/auth';
 import { isValidContact } from '@/lib/auth-validate';
+import { useBack } from '@/lib/nav';
 import { useTheme } from '@/theme';
 import { Icon } from '@/ui';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const goBack = useBack();
   const t = useT();
   const { colors, radius } = useTheme();
   const { signIn } = useAuth();
@@ -33,12 +35,17 @@ export default function LoginScreen() {
     setContactErr(cErr);
     setPasswordErr(pErr);
     if (cErr || pErr) return;
-    signIn('email'); // Phase-0 stub: a valid pair signs in
+    // Phase-0 stub: a valid pair signs in. The display name comes from the saved account
+    // profile — the single `profiles` row, which is this build's account store and now
+    // survives sign-out and reloads (TP-FIX-0719, пп. 4/6). An account that never went
+    // through the wizard simply has no name yet: the greeting drops the comma and Settings
+    // shows «Добавьте имя» instead of a dash. A real lookup arrives with GoTrue in Phase 4.
+    signIn('email');
   };
 
   return (
     <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
-      <Header title={t('auth.loginTitle')} onBack={() => router.back()} />
+      <Header title={t('auth.loginTitle')} onBack={() => goBack()} />
 
       <View style={styles.content}>
         {/* Email или телефон */}

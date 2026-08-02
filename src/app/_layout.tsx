@@ -32,7 +32,7 @@ export default function RootLayout() {
           {(initial) => (
             <TutorThemeProvider initial={initial.theme}>
               <DualModeProvider initial={initial.clientType}>
-                <AuthProvider>
+                <AuthProvider initialSession={initial.signedIn}>
                   <NavigationRoot />
                 </AuthProvider>
               </DualModeProvider>

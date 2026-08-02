@@ -8,12 +8,14 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useT, type StringKey } from '@/i18n';
+import { useBack } from '@/lib/nav';
 import { nowMs } from '@/lib/time';
 import { useTheme } from '@/theme';
 import { Card, Chip, Icon } from '@/ui';
 
 export default function DataSupportScreen() {
   const router = useRouter();
+  const goBack = useBack();
   const t = useT();
   const { colors } = useTheme();
 
@@ -24,7 +26,7 @@ export default function DataSupportScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
-      <Header title={t('set.dataSupport')} onBack={() => router.back()} />
+      <Header title={t('set.dataSupport')} onBack={() => goBack()} />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Card style={styles.card}>
