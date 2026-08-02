@@ -21,16 +21,21 @@ import type { NotificationCategory, NotificationItem, NotificationKind } from '@
 import { useNow } from '@/hooks/use-now';
 import { plural, useT } from '@/i18n';
 import { formatRub } from '@/lib/format';
+import { useBack } from '@/lib/nav';
 import { DEFAULT_REMINDER_PREFS, reminderPrefsOf } from '@/lib/profile';
 import { hhmm, minutesUntil } from '@/lib/time';
 import { useTheme } from '@/theme';
-import { Icon, SectionLabel, Segmented, Sheet, SwipeRow, type IconName } from '@/ui';
+import { Icon, SectionLabel, Segmented, SwipeRow, type IconName } from '@/ui';
 
 /** Filter axis incl. the «Все» pseudo-category that clears the type filter. */
 type Filter = 'all' | NotificationCategory;
 
-/** Read-state tabs (spec 09 §9.1): Все / Непрочитанные / Прочитанные. */
-type ReadTab = 'all' | 'unread' | 'read';
+/**
+ * Read-state tabs. Two, not three, and the type filter is a chips row under them rather than
+ * a modal (TP-FIX-0719, п. 7 — приведено к эталонному прототипу; «Прочитанные» = «Все» минус
+ * «Непрочитанные», а чипы держат фильтр на виду вместо спрятанной воронки).
+ */
+type ReadTab = 'all' | 'unread';
 
 /** Time-bucket order — the sections render today → yesterday → earlier. */
 const GROUP_ORDER = ['today', 'yesterday', 'earlier'] as const;
@@ -64,8 +69,9 @@ function dayForms(t: ReturnType<typeof useT>) {
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  const goBack = useBack();
   const t = useT();
-  const { colors } = useTheme();
+  const { colors, radius } = useTheme();
 
   // ── Build the feed (ADR-0013) — view-model over live data + read-state. ──
   const lessons = useAllLessons();
@@ -98,31 +104,33 @@ export default function NotificationsScreen() {
     [lessons, transactions, students, prefs, reads, now],
   );
 
-  // ── Filter state (spec 09 §9.1–9.2): read-state TABS + a modal filter over type/status. ──
+  // ── Filter state: read-state TABS + a visible category chips row (see the ReadTab note). ──
   const [filter, setFilter] = useState<Filter>('all');
   const [readTab, setReadTab] = useState<ReadTab>('all');
-  const [filterOpen, setFilterOpen] = useState(false);
 
   // Read-state tab label ↔ key bridge (Segmented matches by the visible string).
   const READ_LABEL: Record<ReadTab, string> = {
     all: t('notif.filter.all'),
     unread: t('notif.tab.unread'),
-    read: t('notif.tab.read'),
   };
-  const readTabs = (['all', 'unread', 'read'] as ReadTab[]).map((k) => READ_LABEL[k]);
+  const readTabs = (['all', 'unread'] as ReadTab[]).map((k) => READ_LABEL[k]);
   const onReadTabChange = (label: string) => {
-    const next = (['all', 'unread', 'read'] as ReadTab[]).find((k) => READ_LABEL[k] === label);
+    const next = (['all', 'unread'] as ReadTab[]).find((k) => READ_LABEL[k] === label);
     if (next) setReadTab(next);
+  };
+
+  // Category chips: «Все» clears the type axis, the rest narrow it (labels are mode-aware).
+  const CATEGORY_LABEL: Record<Filter, string> = {
+    all: t('notif.filter.all'),
+    lesson: t('notif.filter.lesson'),
+    payment: t('notif.filter.payment'),
+    schedule: t('notif.filter.schedule'),
+    system: t('notif.filter.system'),
   };
 
   // Apply both axes: type (unless «Все») and the read-state tab.
   const filtered = useMemo(
-    () =>
-      items.filter(
-        (it) =>
-          (filter === 'all' || it.category === filter) &&
-          (readTab === 'all' || (readTab === 'unread' ? it.unread : !it.unread)),
-      ),
+    () => items.filter((it) => (filter === 'all' || it.category === filter) && (readTab === 'all' || it.unread)),
     [items, filter, readTab],
   );
 
@@ -149,21 +157,49 @@ export default function NotificationsScreen() {
     <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
       <Header
         title={t('notif.title')}
-        onBack={() => router.back()}
+        onBack={() => goBack()}
         action={
           // Acts on the VISIBLE (filtered) set — least surprise when a type/read filter is active.
           filtered.some((i) => i.unread)
             ? { label: t('notif.markAllRead'), onPress: () => void markAllNotificationsRead(filtered.map((i) => i.id)) }
             : undefined
         }
-        icons={[
-          { name: 'filter', label: t('a11y.notifFilter'), onPress: () => setFilterOpen(true) },
-          { name: 'sliders', label: t('a11y.notifSettings'), onPress: () => router.push('/notification-settings') },
-        ]}
+        icons={[{ name: 'sliders', label: t('a11y.notifSettings'), onPress: () => router.push('/notification-settings') }]}
       />
 
-      {/* Read-state tabs (spec 09 §9.1): Все / Непрочитанные / Прочитанные. */}
+      {/* Read-state tabs: Все / Непрочитанные. */}
       <Segmented tabs={readTabs} active={READ_LABEL[readTab]} onChange={onReadTabChange} />
+
+      {/* Category chips right under the tabs — the type filter stays visible (эталон). */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.catChips}
+        style={styles.catChipsRow}>
+        {(['all', ...NOTIFICATION_CATEGORIES] as Filter[]).map((k) => {
+          const on = filter === k;
+          return (
+            <Pressable
+              key={k}
+              onPress={() => setFilter(k)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+              style={({ pressed }) => [
+                styles.catChip,
+                {
+                  backgroundColor: on ? colors.primaryVlight : colors.surface,
+                  borderColor: on ? colors.primary : colors.hairline,
+                  borderRadius: radius.pill,
+                },
+                pressed && styles.pressed,
+              ]}>
+              <Text style={[styles.catChipLabel, { color: on ? colors.primary : colors.body }]}>
+                {CATEGORY_LABEL[k]}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {items.length === 0 ? (
@@ -186,115 +222,7 @@ export default function NotificationsScreen() {
         )}
       </ScrollView>
 
-      {/* Modal filter (spec 09 §9.2): «Тип» + «Статус» chips, «Сбросить» / «Применить». */}
-      {filterOpen ? (
-        <FilterSheet
-          filter={filter}
-          readTab={readTab}
-          onApply={(f, r) => {
-            setFilter(f);
-            setReadTab(r);
-            setFilterOpen(false);
-          }}
-          onClose={() => setFilterOpen(false)}
-        />
-      ) : null}
     </SafeAreaView>
-  );
-}
-
-/** Modal filter over type + read-status — DRAFT state commits only on «Применить» (spec 09 §9.2). */
-function FilterSheet({
-  filter,
-  readTab,
-  onApply,
-  onClose,
-}: {
-  filter: Filter;
-  readTab: ReadTab;
-  onApply: (f: Filter, r: ReadTab) => void;
-  onClose: () => void;
-}) {
-  const t = useT();
-  const { colors, radius } = useTheme();
-  const [draftType, setDraftType] = useState<Filter>(filter);
-  const [draftRead, setDraftRead] = useState<ReadTab>(readTab);
-
-  const TYPE_LABEL: Record<Filter, string> = {
-    all: t('notif.filter.all'),
-    lesson: t('notif.filter.lesson'),
-    payment: t('notif.filter.payment'),
-    schedule: t('notif.filter.schedule'),
-    system: t('notif.filter.system'),
-  };
-  const READ_LABEL: Record<ReadTab, string> = {
-    all: t('notif.filter.all'),
-    unread: t('notif.tab.unread'),
-    read: t('notif.tab.read'),
-  };
-
-  const chip = (on: boolean, label: string, onPress: () => void) => (
-    <Pressable
-      key={label}
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityState={{ selected: on }}
-      style={({ pressed }) => [
-        styles.filterChip,
-        {
-          backgroundColor: on ? colors.primaryVlight : colors.surface,
-          borderColor: on ? colors.primary : colors.hairline,
-          borderRadius: radius.pill,
-        },
-        pressed && styles.pressed,
-      ]}>
-      <Text style={[styles.filterChipLabel, { color: on ? colors.primary : colors.body }]}>{label}</Text>
-    </Pressable>
-  );
-
-  return (
-    <Sheet title={t('common.filter')} onClose={onClose}>
-      <Text style={[styles.filterGroupLabel, { color: colors.muted }]}>{t('notif.filterType')}</Text>
-      <View style={styles.filterChips}>
-        {(['all', ...NOTIFICATION_CATEGORIES] as Filter[]).map((k) =>
-          chip(draftType === k, TYPE_LABEL[k], () => setDraftType(k)),
-        )}
-      </View>
-
-      <Text style={[styles.filterGroupLabel, { color: colors.muted }]}>{t('field.status')}</Text>
-      <View style={styles.filterChips}>
-        {(['all', 'unread', 'read'] as ReadTab[]).map((k) =>
-          chip(draftRead === k, READ_LABEL[k], () => setDraftRead(k)),
-        )}
-      </View>
-
-      <View style={styles.filterActions}>
-        <Pressable
-          onPress={() => {
-            setDraftType('all');
-            setDraftRead('all');
-          }}
-          accessibilityRole="button"
-          style={({ pressed }) => [
-            styles.filterBtn,
-            { backgroundColor: colors.stoneLight, borderRadius: radius.field },
-            pressed && styles.pressed,
-          ]}>
-          <Text style={[styles.filterBtnLabel, { color: colors.body }]}>{t('common.reset')}</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => onApply(draftType, draftRead)}
-          accessibilityRole="button"
-          style={({ pressed }) => [
-            styles.filterBtn,
-            styles.filterBtnPrimary,
-            { backgroundColor: colors.primary, borderRadius: radius.field },
-            pressed && styles.pressed,
-          ]}>
-          <Text style={[styles.filterBtnLabel, { color: colors.onTint }]}>{t('common.apply')}</Text>
-        </Pressable>
-      </View>
-    </Sheet>
   );
 }
 
@@ -479,14 +407,11 @@ const styles = StyleSheet.create({
   markAllLabel: { fontSize: 13, fontWeight: '600' },
 
   // modal filter (spec 09 §9.2)
-  filterGroupLabel: { fontSize: 13, fontWeight: '500', marginBottom: 10, marginTop: 4 },
-  filterChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-  filterChip: { paddingHorizontal: 13, paddingVertical: 8, borderWidth: StyleSheet.hairlineWidth },
-  filterChipLabel: { fontSize: 13.5, fontWeight: '600' },
-  filterActions: { flexDirection: 'row', gap: 10, marginTop: 6 },
-  filterBtn: { flex: 1, height: 48, alignItems: 'center', justifyContent: 'center' },
-  filterBtnPrimary: { flex: 2 },
-  filterBtnLabel: { fontSize: 15, fontWeight: '600' },
+  // Category chips row under the tabs (эталон) — horizontal, so «Система» never wraps.
+  catChipsRow: { flexGrow: 0, marginTop: 12 },
+  catChips: { flexDirection: 'row', gap: 8, paddingHorizontal: 16 },
+  catChip: { paddingHorizontal: 13, paddingVertical: 8, borderWidth: StyleSheet.hairlineWidth },
+  catChipLabel: { fontSize: 13.5, fontWeight: '600' },
 
   content: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 40, gap: 18 },
   section: { gap: 0 },
