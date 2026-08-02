@@ -15,6 +15,12 @@ const easeOutCubic = (t: number): number => 1 - Math.pow(1 - t, 3);
 /**
  * Ported from prototype t+/components.jsx `useCountUp` / `CountUp`:
  * animates 0→value with ease-out cubic over `duration` via a requestAnimationFrame loop.
+ *
+ * The loop is only the PRETTY path. `requestAnimationFrame` stops firing while the tab/app
+ * sits in the background, which froze the headline on a partial sum — «Ожидают оплаты»
+ * showed 548 ₽ / 630 ₽ instead of the real 6 000 ₽ and looked unstable between visits
+ * (TP-FIX-0719, п. 1). Timers keep firing in that state, so one lands the final value
+ * regardless of whether a single frame was ever painted.
  */
 export function CountUp(props: CountUpProps) {
   const { value, format = formatNumberRu, duration = 1000, style } = props;
@@ -36,7 +42,11 @@ export function CountUp(props: CountUpProps) {
     };
 
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    const settle = setTimeout(() => setCurrent(value), duration + 80);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(settle);
+    };
   }, [value, duration]);
 
   return <Text style={style}>{format(current)}</Text>;

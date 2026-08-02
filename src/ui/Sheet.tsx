@@ -2,19 +2,27 @@
  * Sheet — bottom-sheet shell ported from the prototype (t+/kit.jsx `Sheet`).
  *
  * RN `Modal` (transparent) hosts an animated scrim (fade-in, `colors.sheetScrim`)
- * and a slide-up panel (reanimated `entering`), mirroring the prototype's
- * `om-rise` / `om-snack` keyframes. The panel has rounded top corners
- * (`radius.sheet`), a centred grab-handle, an optional title row with a close
- * button, and a scrollable body. Drag the handle down past a threshold — or tap
- * the scrim — to dismiss.
+ * and a slide-up panel, mirroring the prototype's `om-rise` / `om-snack` keyframes.
+ * The panel has rounded top corners (`radius.sheet`), a centred grab-handle, an
+ * optional title row with a close button, and a scrollable body. Drag the handle
+ * down past a threshold — or tap the scrim — to dismiss.
+ *
+ * WHY the entry is NOT reanimated's `entering={SlideInDown}` (TP-FIX-0719, пп. 2/3/5):
+ * that layout animation parks the panel below the viewport and only the frame loop
+ * brings it back — and the frame loop stops whenever the tab/app is backgrounded
+ * (`requestAnimationFrame` is throttled to nothing). A sheet opened in that state stayed
+ * off-screen (measured: `translateY(613px)`, scrim at `opacity 0.069`) while its
+ * full-screen scrim kept swallowing every tap — the app looked frozen. Here the entry
+ * is an ordinary shared value, so it can be OVERRIDDEN: a timer (timers keep firing
+ * when rAF does not) notices an entry that never finished and drops the panel to a
+ * plain resting style, which needs no extra frame to take effect.
  */
-import { useCallback, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
   runOnJS,
-  SlideInDown,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -37,8 +45,19 @@ export interface SheetProps {
 const DISMISS_THRESHOLD = 90;
 /** Velocity (px/s) that triggers a dismiss regardless of distance (a flick). */
 const DISMISS_VELOCITY = 800;
+/** Slide-up duration — the prototype's `om-snack .3s`. */
+const ENTER_MS = 300;
+const ENTER_TIMING: WithTimingConfig = { duration: ENTER_MS, easing: Easing.bezier(0.22, 0.61, 0.36, 1) };
 /** Scrim fade-in matches the prototype's `om-rise .2s ease`. */
 const SCRIM_FADE: WithTimingConfig = { duration: 200, easing: Easing.inOut(Easing.ease) };
+/** By now the entry MUST have finished. If it has not, the frame loop is starved (see the
+ *  file header) and the sheet is rescued to its resting position by a plain style. */
+const ENTER_DEADLINE_MS = ENTER_MS + 250;
+
+/** Resting styles used when the entry animation never completed — plain values, so they
+ *  win over whatever inline transform/opacity reanimated left on the node. */
+const PANEL_REST = { opacity: 1, transform: [{ translateY: 0 }] } as const;
+const SCRIM_REST = { opacity: 1 } as const;
 
 export function Sheet({ title, onClose, children, visible = true }: SheetProps) {
   const { colors, radius, shadow } = useTheme();
@@ -46,23 +65,66 @@ export function Sheet({ title, onClose, children, visible = true }: SheetProps) 
 
   // Vertical drag offset for the panel (0 = resting, >0 = dragged down).
   const dragY = useSharedValue(0);
+  // Entry progress: 0 = one panel-height below the resting position, 1 = at rest.
+  const enter = useSharedValue(0);
+  const scrimOpacity = useSharedValue(0);
+
+  // Panel height, measured on first layout — the slide starts exactly one panel below the
+  // rest position, so a two-row picker and a full-height list travel the same visual way.
+  const [panelH, setPanelH] = useState(0);
+  // The deadline timer's verdict: the entry did not finish in time → render at rest.
+  const [rescued, setRescued] = useState(false);
+  // Ref mirror of «the entry finished», read by the timer without re-arming the effect.
+  const enteredRef = useRef(false);
 
   const close = useCallback(() => {
     dragY.value = 0;
     onClose();
   }, [dragY, onClose]);
 
-  // Panel: `om-snack` slide-up on mount; drag-down tracks the finger.
+  // Entry completed for real → hand control back to the animated (drag-capable) styles.
+  const markEntered = useCallback(() => {
+    enteredRef.current = true;
+    setRescued(false);
+  }, []);
+
+  // Entry runs per OPEN, not per mount: sheets with a `visible` prop (DateTimePickerSheet,
+  // PeriodSheet, the students sort) stay mounted and only toggle.
+  useEffect(() => {
+    if (!visible || panelH === 0) return; // wait for the first layout — it is the travel distance
+    enteredRef.current = false;
+    enter.value = 0;
+    scrimOpacity.value = 0;
+    enter.value = withTiming(1, ENTER_TIMING, (finished) => {
+      if (finished) runOnJS(markEntered)();
+    });
+    scrimOpacity.value = withTiming(1, SCRIM_FADE);
+    const deadline = setTimeout(() => {
+      if (!enteredRef.current) setRescued(true);
+    }, ENTER_DEADLINE_MS);
+    return () => {
+      clearTimeout(deadline);
+      // Re-arm on close: without this the panel would render AT REST for one frame on the
+      // next open, before the restarted entry pushed it back below the viewport.
+      enter.value = 0;
+      scrimOpacity.value = 0;
+    };
+  }, [visible, panelH, enter, scrimOpacity, markEntered]);
+
+  // Panel: entry offset + the live drag offset. Invisible for the single frame before the
+  // first layout, so it never flashes at the resting position and then jumps down.
   const panelStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: dragY.value }],
+    opacity: panelH === 0 ? 0 : 1,
+    transform: [{ translateY: dragY.value + (1 - enter.value) * panelH }],
   }));
 
-  // Scrim fades opacity from 0→1 on mount (`om-rise`); tap dismisses.
-  const scrimOpacity = useSharedValue(0);
+  // Scrim fades opacity from 0→1 on open (`om-rise`); tap dismisses.
   const scrimStyle = useAnimatedStyle(() => ({ opacity: scrimOpacity.value }));
-  const onScrimLayout = useCallback(() => {
-    scrimOpacity.value = withTiming(1, SCRIM_FADE);
-  }, [scrimOpacity]);
+
+  // Frame loop starved: fall back to static styles. The moment it resumes, the timing
+  // callback fires, `markEntered` clears the flag and the animated (drag-capable) styles
+  // take over again — at the same resting position, so nothing jumps.
+  const rescue = rescued;
 
   const panGesture = Gesture.Pan()
     .onChange((e) => {
@@ -80,7 +142,7 @@ export function Sheet({ title, onClose, children, visible = true }: SheetProps) 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <View style={styles.fill}>
-        <Animated.View style={[StyleSheet.absoluteFill, scrimStyle]} onLayout={onScrimLayout}>
+        <Animated.View style={[StyleSheet.absoluteFill, rescue ? SCRIM_REST : scrimStyle]}>
           <Pressable
             style={[StyleSheet.absoluteFill, { backgroundColor: colors.sheetScrim }]}
             onPress={onClose}
@@ -90,10 +152,13 @@ export function Sheet({ title, onClose, children, visible = true }: SheetProps) 
         </Animated.View>
 
         <Animated.View
-          entering={SlideInDown.duration(300).easing(Easing.bezier(0.22, 0.61, 0.36, 1))}
+          onLayout={(e) => {
+            const h = e.nativeEvent.layout.height;
+            setPanelH((prev) => (prev === 0 ? h : prev));
+          }}
           style={[
             styles.sheet,
-            panelStyle,
+            rescue ? PANEL_REST : panelStyle,
             {
               backgroundColor: colors.surface,
               borderTopLeftRadius: radius.sheet,

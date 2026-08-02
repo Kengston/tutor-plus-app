@@ -93,6 +93,37 @@ describe('debtAgingBuckets («По сроку»)', () => {
   });
 });
 
+describe('«Ожидают оплаты» — заголовок сходится с разбивкой (TP-FIX-0719, п. 1)', () => {
+  // Acceptance criterion of the report: header = «Ещё не просрочено» + «до 14 дней» +
+  // «Больше 14» = Σ «Требуют внимания». All three read the SAME per-student netting.
+  it('заголовок == Σ бакетов «По сроку» == Σ строк списка должников', () => {
+    const txns = [
+      debt(6000, daysAgo(20), { studentId: 'igor', lessonId: 'l1' }), // over14, still open
+      debt(1500, daysAgo(9), { studentId: 'maria', lessonId: 'l2' }),
+      paid(1500, daysAgo(1), { studentId: 'maria', lessonId: 'l2' }), // settles l2 → drops out
+      debt(900, daysAgo(2), { studentId: 'maria' }), // fresh standalone
+    ];
+    const header = debtors(txns).reduce((s, d) => s + d.amount, 0);
+    const aging = debtAgingBuckets(unsettledDebts(txns), NOW);
+
+    expect(header).toBe(6900);
+    expect(aging.fresh.amount + aging.d14.amount + aging.over14.amount).toBe(header);
+    expect(debtors(txns)).toEqual([
+      { studentId: 'igor', amount: 6000 },
+      { studentId: 'maria', amount: 900 },
+    ]);
+  });
+
+  it('«ожидается» (pending) НЕ считается задолженностью — это отдельная сущность (ADR-0015)', () => {
+    const txns = [
+      debt(6000, daysAgo(20), { studentId: 'igor', lessonId: 'l1' }),
+      { studentId: 'maria', type: 'expected' as const, amount: 548, lessonId: null, occurredAt: daysAgo(4) },
+    ];
+    expect(debtors(txns).reduce((s, d) => s + d.amount, 0)).toBe(6000);
+    expect(unsettledDebts(txns).reduce((s, d) => s + d.amount, 0)).toBe(6000);
+  });
+});
+
 describe('debtAsOf (дельта «к предыдущему периоду»)', () => {
   it('replays the ledger only up to the instant — later txns invisible', () => {
     const txns = [
