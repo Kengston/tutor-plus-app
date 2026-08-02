@@ -29,21 +29,33 @@ export function CountUp(props: CountUpProps) {
   useEffect(() => {
     let raf = 0;
     let start: number | null = null;
+    // Set by whichever finishes first. The timer cannot simply cancel the pending frame:
+    // a starved rAF callback is still queued, and when the tab comes back it would run with
+    // `start === null` → p = 0 → the headline blinks 0 ₽ and counts up all over again on top
+    // of the value the timer already landed. The flag makes that late frame a no-op.
+    let done = false;
 
     const tick = (ts: number) => {
+      if (done) return;
       if (start === null) start = ts;
       const p = Math.min((ts - start) / duration, 1);
       setCurrent(value * easeOutCubic(p));
       if (p < 1) {
         raf = requestAnimationFrame(tick);
       } else {
+        done = true;
         setCurrent(value);
       }
     };
 
     raf = requestAnimationFrame(tick);
-    const settle = setTimeout(() => setCurrent(value), duration + 80);
+    const settle = setTimeout(() => {
+      done = true;
+      cancelAnimationFrame(raf);
+      setCurrent(value);
+    }, duration + 80);
     return () => {
+      done = true;
       cancelAnimationFrame(raf);
       clearTimeout(settle);
     };

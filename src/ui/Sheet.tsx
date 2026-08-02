@@ -74,9 +74,14 @@ export function Sheet({ title, onClose, children, visible = true }: SheetProps) 
   const enter = useSharedValue(0);
   const scrimOpacity = useSharedValue(0);
 
-  // Panel height, measured on first layout — the slide starts exactly one panel below the
-  // rest position, so a two-row picker and a full-height list travel the same visual way.
-  const [panelH, setPanelH] = useState(0);
+  // Travel distance of the entry: one panel height, so a two-row picker and a full-height
+  // list slide the same visual way. A SHARED VALUE, not React state, on purpose — layout
+  // arrives whenever the frame loop feels like it, and a late measurement must refine the
+  // distance WITHOUT re-running the entry effect. (It used to be state in the effect's deps:
+  // a height landing after the deadline tore down an already-settled sheet, dropped it back
+  // below the viewport and replayed the entry — with the invisible scrim eating taps for the
+  // 300 ms that took.)
+  const travel = useSharedValue(FALLBACK_TRAVEL);
   // Entry window is over: the panel drops the entry offset and keeps only the drag offset.
   // Flipped by a TIMER, never by the animation's own callback — the whole point is to be
   // independent of frames (see the file header).
@@ -104,19 +109,25 @@ export function Sheet({ title, onClose, children, visible = true }: SheetProps) 
       enter.value = 0;
       scrimOpacity.value = 0;
     };
-    // `panelH` restarts the entry once the real travel distance is known (it lands within
-    // the first rendering step, so the restart is invisible).
-  }, [visible, panelH, enter, scrimOpacity]);
+    // Deps are the OPEN signal only. Nothing frame-dependent belongs here: anything that can
+    // arrive late would tear down a sheet the deadline already rescued.
+  }, [visible, enter, scrimOpacity]);
 
   // Entry: the panel sits `travel` below its resting position and rides up. Also carries the
   // live drag offset, so a drag during the entry still tracks the finger.
   const panelStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: dragY.value + (1 - enter.value) * (panelH || FALLBACK_TRAVEL) }],
+    transform: [{ translateY: dragY.value + (1 - enter.value) * travel.value }],
   }));
 
-  // Post-entry: drag only. Reanimated recomputes an attached animated style on every React
-  // render, so switching to this style lands the panel at rest WITHOUT needing a frame —
-  // that is what rescues a sheet whose entry animation never ran.
+  // Post-entry: drag only — no entry offset, so the panel is at rest by construction.
+  //
+  // Swapping `panelStyle` → `restStyle` is what rescues a sheet whose entry never ran, and it
+  // works without a single frame because the STYLE IDENTITY changes: reanimated attaches the
+  // new style through `ViewDescriptorsSet.add`, which force-updates props synchronously (on
+  // web the mutable's modify runs inline, not on a scheduled UI frame), while React DOM drops
+  // the inline transform the old style had written. Do NOT merge the two styles into one or
+  // memoize this component: an unchanged style identity takes reanimated's early-return path
+  // and the panel would stay parked below the viewport.
   const restStyle = useAnimatedStyle(() => ({ transform: [{ translateY: dragY.value }] }));
 
   // Scrim fades opacity from 0→1 on open (`om-rise`); tap dismisses. Same deal: once the
@@ -151,8 +162,9 @@ export function Sheet({ title, onClose, children, visible = true }: SheetProps) 
 
         <Animated.View
           onLayout={(e) => {
+            // Refine the travel distance in place — no state, no re-render, no restart.
             const h = e.nativeEvent.layout.height;
-            setPanelH((prev) => (prev === 0 ? h : prev));
+            if (h > 0) travel.value = h;
           }}
           style={[
             styles.sheet,

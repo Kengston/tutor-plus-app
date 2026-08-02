@@ -406,7 +406,6 @@ const styles = StyleSheet.create({
   markAll: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 11, paddingVertical: 7 },
   markAllLabel: { fontSize: 13, fontWeight: '600' },
 
-  // modal filter (spec 09 §9.2)
   // Category chips row under the tabs (эталон) — horizontal, so «Система» never wraps.
   catChipsRow: { flexGrow: 0, marginTop: 12 },
   catChips: { flexDirection: 'row', gap: 8, paddingHorizontal: 16 },
