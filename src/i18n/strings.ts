@@ -409,6 +409,10 @@ export const messages = {
   'snack.lessonCancelled_client': 'Встреча отменена',
   'snack.paymentRecorded': 'Оплата отмечена',
   'snack.rescheduled': 'Расписание обновлено',
+  // Занятие с деньгами защищено от групповых правок (ADR-0016 §4) — честный отказ вместо
+  // ложного «отменено» (TP-FIX-0719, п. 3).
+  'snack.protectedByMoney': 'По уроку есть оплата — изменение не применено',
+  'snack.protectedByMoney_client': 'По встрече есть оплата — изменение не применено',
   'snack.undone': 'Отменено',
 
   // ── Quick actions (FAB on «Сегодня», spec 04-today) ──────────────────────

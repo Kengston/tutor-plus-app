@@ -97,12 +97,19 @@ export default function LessonCardScreen() {
   const confirmCancel = () => {
     if (!lesson) return;
     setReasonOpen(false);
-    void scopeCancel(lesson, pendingCancelScope, reason.trim()).then(({ undo }) => {
+    void scopeCancel(lesson, pendingCancelScope, reason.trim()).then(({ affected, undo }) => {
+      // An occurrence that carries a money operation is PROTECTED from scope edits
+      // (ADR-0016 §4) — the write touches nothing. Say so instead of reporting a cancel
+      // that never happened and walking the user away from the screen (TP-FIX-0719, п. 3).
+      if (affected === 0) {
+        snack.show(t('snack.protectedByMoney'));
+        return;
+      }
       snack.show(t('snack.lessonCancelled'), { actionLabel: t('action.undo'), onAction: () => void undo() });
+      // Return to the schedule after the action (prototype pattern) — the cancelled lesson
+      // leaves the timeline, and the detail is a transient action screen.
+      goBack();
     });
-    // Return to the schedule after the action (prototype pattern) — the cancelled lesson
-    // leaves the timeline, and the detail is a transient action screen.
-    goBack();
   };
 
   // Reschedule: pick the new time, then a series lesson asks the scope; a standalone one
@@ -120,11 +127,15 @@ export default function LessonCardScreen() {
   const onRescheduleScopePick = (scope: Scope) => {
     setRescheduleScopeOpen(false);
     if (!lesson || pendingStartsAt === null) return;
-    void scopeReschedule(lesson, scope, pendingStartsAt).then(({ undo }) => {
+    void scopeReschedule(lesson, scope, pendingStartsAt).then(({ affected, undo }) => {
+      if (affected === 0) {
+        snack.show(t('snack.protectedByMoney')); // same protection as the cancel path
+        return;
+      }
       snack.show(t('snack.rescheduled'), { actionLabel: t('action.undo'), onAction: () => void undo() });
+      // Return to the schedule, which reflects the new time (prototype pattern).
+      goBack();
     });
-    // Return to the schedule, which reflects the new time (prototype pattern).
-    goBack();
   };
   // Money undo (ADR-0002): «Отменить» appends the COMPENSATING row — never deletes.
   const recordPaymentWithUndo = (type: Exclude<TxnType, 'expected'>) => {
