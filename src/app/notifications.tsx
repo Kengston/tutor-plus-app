@@ -407,8 +407,11 @@ const styles = StyleSheet.create({
   markAllLabel: { fontSize: 13, fontWeight: '600' },
 
   // Category chips row under the tabs (эталон) — horizontal, so «Система» never wraps.
-  catChipsRow: { flexGrow: 0, marginTop: 12 },
-  catChips: { flexDirection: 'row', gap: 8, paddingHorizontal: 16 },
+  // `flexShrink: 0` is load-bearing: this row is a flex child of the screen column, and RN
+  // defaults children to shrinkable. With a long enough feed below it the row got squeezed
+  // to 18px and clipped the chips through the middle of their labels.
+  catChipsRow: { flexGrow: 0, flexShrink: 0, marginTop: 12 },
+  catChips: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 2 },
   catChip: { paddingHorizontal: 13, paddingVertical: 8, borderWidth: StyleSheet.hairlineWidth },
   catChipLabel: { fontSize: 13.5, fontWeight: '600' },
 
