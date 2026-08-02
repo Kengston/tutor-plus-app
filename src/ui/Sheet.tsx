@@ -12,12 +12,16 @@
  * brings it back — and the frame loop stops whenever the tab/app is backgrounded
  * (`requestAnimationFrame` is throttled to nothing). A sheet opened in that state stayed
  * off-screen (measured: `translateY(613px)`, scrim at `opacity 0.069`) while its
- * full-screen scrim kept swallowing every tap — the app looked frozen. Here the entry
- * is an ordinary shared value, so it can be OVERRIDDEN: a timer (timers keep firing
- * when rAF does not) notices an entry that never finished and drops the panel to a
- * plain resting style, which needs no extra frame to take effect.
+ * full-screen scrim kept swallowing every tap — the app looked frozen.
+ *
+ * So the entry here is a plain shared value that a TIMER can overrule: `setTimeout` keeps
+ * firing when `requestAnimationFrame` does not, and past the deadline the panel switches to
+ * a drag-only style that puts it at rest. Nothing on that path waits for a frame — notably
+ * NOT the measured panel height (`onLayout` rides on ResizeObserver, delivered in the same
+ * rendering step as rAF, so it starves together with it); the height only refines the travel
+ * distance, and `FALLBACK_TRAVEL` covers the window before it arrives.
  */
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -50,14 +54,15 @@ const ENTER_MS = 300;
 const ENTER_TIMING: WithTimingConfig = { duration: ENTER_MS, easing: Easing.bezier(0.22, 0.61, 0.36, 1) };
 /** Scrim fade-in matches the prototype's `om-rise .2s ease`. */
 const SCRIM_FADE: WithTimingConfig = { duration: 200, easing: Easing.inOut(Easing.ease) };
-/** By now the entry MUST have finished. If it has not, the frame loop is starved (see the
- *  file header) and the sheet is rescued to its resting position by a plain style. */
+/** By this point the entry is over, one way or another: a timer (which fires even when the
+ *  frame loop does not) drops the sheet to its resting position. */
 const ENTER_DEADLINE_MS = ENTER_MS + 250;
-
-/** Resting styles used when the entry animation never completed — plain values, so they
- *  win over whatever inline transform/opacity reanimated left on the node. */
-const PANEL_REST = { opacity: 1, transform: [{ translateY: 0 }] } as const;
-const SCRIM_REST = { opacity: 1 } as const;
+/** Travel distance before the panel has been measured. `onLayout` rides on ResizeObserver,
+ *  which is delivered in the SAME rendering step as `requestAnimationFrame` — so in a
+ *  backgrounded tab it starves too and the height never arrives. The entry therefore starts
+ *  from this generous offset (off-screen on any phone-sized viewport) and refines to the
+ *  real height as soon as layout lands; it is never a PRECONDITION for anything. */
+const FALLBACK_TRAVEL = 720;
 
 export function Sheet({ title, onClose, children, visible = true }: SheetProps) {
   const { colors, radius, shadow } = useTheme();
@@ -72,59 +77,52 @@ export function Sheet({ title, onClose, children, visible = true }: SheetProps) 
   // Panel height, measured on first layout — the slide starts exactly one panel below the
   // rest position, so a two-row picker and a full-height list travel the same visual way.
   const [panelH, setPanelH] = useState(0);
-  // The deadline timer's verdict: the entry did not finish in time → render at rest.
-  const [rescued, setRescued] = useState(false);
-  // Ref mirror of «the entry finished», read by the timer without re-arming the effect.
-  const enteredRef = useRef(false);
+  // Entry window is over: the panel drops the entry offset and keeps only the drag offset.
+  // Flipped by a TIMER, never by the animation's own callback — the whole point is to be
+  // independent of frames (see the file header).
+  const [settled, setSettled] = useState(false);
 
   const close = useCallback(() => {
     dragY.value = 0;
     onClose();
   }, [dragY, onClose]);
 
-  // Entry completed for real → hand control back to the animated (drag-capable) styles.
-  const markEntered = useCallback(() => {
-    enteredRef.current = true;
-    setRescued(false);
-  }, []);
-
   // Entry runs per OPEN, not per mount: sheets with a `visible` prop (DateTimePickerSheet,
   // PeriodSheet, the students sort) stay mounted and only toggle.
   useEffect(() => {
-    if (!visible || panelH === 0) return; // wait for the first layout — it is the travel distance
-    enteredRef.current = false;
+    if (!visible) return;
     enter.value = 0;
     scrimOpacity.value = 0;
-    enter.value = withTiming(1, ENTER_TIMING, (finished) => {
-      if (finished) runOnJS(markEntered)();
-    });
+    enter.value = withTiming(1, ENTER_TIMING);
     scrimOpacity.value = withTiming(1, SCRIM_FADE);
-    const deadline = setTimeout(() => {
-      if (!enteredRef.current) setRescued(true);
-    }, ENTER_DEADLINE_MS);
+    const deadline = setTimeout(() => setSettled(true), ENTER_DEADLINE_MS);
     return () => {
       clearTimeout(deadline);
-      // Re-arm on close: without this the panel would render AT REST for one frame on the
-      // next open, before the restarted entry pushed it back below the viewport.
+      // Re-arm for the next open: the panel must start below the viewport again, and the
+      // entry animation must be allowed to play instead of snapping straight to rest.
+      setSettled(false);
       enter.value = 0;
       scrimOpacity.value = 0;
     };
-  }, [visible, panelH, enter, scrimOpacity, markEntered]);
+    // `panelH` restarts the entry once the real travel distance is known (it lands within
+    // the first rendering step, so the restart is invisible).
+  }, [visible, panelH, enter, scrimOpacity]);
 
-  // Panel: entry offset + the live drag offset. Invisible for the single frame before the
-  // first layout, so it never flashes at the resting position and then jumps down.
+  // Entry: the panel sits `travel` below its resting position and rides up. Also carries the
+  // live drag offset, so a drag during the entry still tracks the finger.
   const panelStyle = useAnimatedStyle(() => ({
-    opacity: panelH === 0 ? 0 : 1,
-    transform: [{ translateY: dragY.value + (1 - enter.value) * panelH }],
+    transform: [{ translateY: dragY.value + (1 - enter.value) * (panelH || FALLBACK_TRAVEL) }],
   }));
 
-  // Scrim fades opacity from 0→1 on open (`om-rise`); tap dismisses.
-  const scrimStyle = useAnimatedStyle(() => ({ opacity: scrimOpacity.value }));
+  // Post-entry: drag only. Reanimated recomputes an attached animated style on every React
+  // render, so switching to this style lands the panel at rest WITHOUT needing a frame —
+  // that is what rescues a sheet whose entry animation never ran.
+  const restStyle = useAnimatedStyle(() => ({ transform: [{ translateY: dragY.value }] }));
 
-  // Frame loop starved: fall back to static styles. The moment it resumes, the timing
-  // callback fires, `markEntered` clears the flag and the animated (drag-capable) styles
-  // take over again — at the same resting position, so nothing jumps.
-  const rescue = rescued;
+  // Scrim fades opacity from 0→1 on open (`om-rise`); tap dismisses. Same deal: once the
+  // entry window is over it is simply opaque, no frames required.
+  const scrimStyle = useAnimatedStyle(() => ({ opacity: scrimOpacity.value }));
+  const scrimRest = { opacity: 1 } as const;
 
   const panGesture = Gesture.Pan()
     .onChange((e) => {
@@ -142,7 +140,7 @@ export function Sheet({ title, onClose, children, visible = true }: SheetProps) 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <View style={styles.fill}>
-        <Animated.View style={[StyleSheet.absoluteFill, rescue ? SCRIM_REST : scrimStyle]}>
+        <Animated.View style={[StyleSheet.absoluteFill, settled ? scrimRest : scrimStyle]}>
           <Pressable
             style={[StyleSheet.absoluteFill, { backgroundColor: colors.sheetScrim }]}
             onPress={onClose}
@@ -158,7 +156,7 @@ export function Sheet({ title, onClose, children, visible = true }: SheetProps) 
           }}
           style={[
             styles.sheet,
-            rescue ? PANEL_REST : panelStyle,
+            settled ? restStyle : panelStyle,
             {
               backgroundColor: colors.surface,
               borderTopLeftRadius: radius.sheet,

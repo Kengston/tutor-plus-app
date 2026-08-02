@@ -65,6 +65,7 @@ export default function LessonCardScreen() {
 
   const series = lesson ? isSeriesLesson(lesson) : false;
   const conducted = lesson?.lifecycleStatus === 'done';
+  const cancelled = lesson?.lifecycleStatus === 'cancelled';
 
   // «Готово» + undo: snapshot BEFORE the mutation, «Вернуть» restores it.
   const conductWithUndo = () => {
@@ -94,15 +95,25 @@ export default function LessonCardScreen() {
     setCancelScopeOpen(false);
     setReasonOpen(true);
   };
+  /**
+   * A scope edit can touch NOTHING: `domain/scope` protects an occurrence that carries a
+   * money operation or is already done/cancelled, and «all» can land on an empty window
+   * (ADR-0016 §4). Reporting success there is a lie (the lesson stays put), and reporting
+   * the wrong reason is only marginally better — so name the one that actually applies.
+   * `txns` is the same reversal-filtered ledger the protection is computed from.
+   */
+  const refusalText = () => {
+    if (txns.length > 0) return t('snack.protectedByMoney');
+    if (lesson?.lifecycleStatus === 'done') return t('snack.protectedDone');
+    return t('snack.noChanges');
+  };
+
   const confirmCancel = () => {
     if (!lesson) return;
     setReasonOpen(false);
     void scopeCancel(lesson, pendingCancelScope, reason.trim()).then(({ affected, undo }) => {
-      // An occurrence that carries a money operation is PROTECTED from scope edits
-      // (ADR-0016 §4) — the write touches nothing. Say so instead of reporting a cancel
-      // that never happened and walking the user away from the screen (TP-FIX-0719, п. 3).
       if (affected === 0) {
-        snack.show(t('snack.protectedByMoney'));
+        snack.show(refusalText());
         return;
       }
       snack.show(t('snack.lessonCancelled'), { actionLabel: t('action.undo'), onAction: () => void undo() });
@@ -129,7 +140,7 @@ export default function LessonCardScreen() {
     if (!lesson || pendingStartsAt === null) return;
     void scopeReschedule(lesson, scope, pendingStartsAt).then(({ affected, undo }) => {
       if (affected === 0) {
-        snack.show(t('snack.protectedByMoney')); // same protection as the cancel path
+        snack.show(refusalText()); // same protection rules as the cancel path
         return;
       }
       snack.show(t('snack.rescheduled'), { actionLabel: t('action.undo'), onAction: () => void undo() });
@@ -265,12 +276,15 @@ export default function LessonCardScreen() {
                 <Text style={[styles.actionLabel, { color: colors.body }]}>{t('action.reschedule')}</Text>
               </Pressable>
 
+              {/* Already cancelled → nothing left to cancel; the domain would refuse anyway. */}
               <Pressable
                 onPress={onCancelPress}
+                disabled={cancelled}
                 style={({ pressed }) => [
                   styles.action,
                   styles.actionGhost,
                   { backgroundColor: colors.dangerLight, borderRadius: radius.field },
+                  cancelled && styles.disabled,
                   pressed && styles.pressed,
                 ]}>
                 <Icon name="close" size={17} sw={2} stroke={colors.danger} />
@@ -444,4 +458,5 @@ const styles = StyleSheet.create({
   },
   payChoiceLabel: { fontSize: 15, fontWeight: '600' },
   pressed: { opacity: 0.85 },
+  disabled: { opacity: 0.45 },
 });
