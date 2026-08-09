@@ -5,7 +5,6 @@
  * are visible; required ones are locked). Theme writes hit BOTH the context setter (instant
  * re-theme) and the profile row (survives reload) — ADR-0013 C.
  */
-import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -13,6 +12,7 @@ import { useProfile } from '@/db/hooks';
 import { updateProfile } from '@/db/mutations';
 import { useT, type StringKey } from '@/i18n';
 import { parseHomeBlocks, serializeHomeBlocks, type HomeBlock } from '@/lib/home-blocks';
+import { useBack } from '@/lib/nav';
 import { catColors, darkColors, lightColors, useTheme, useThemeMode, type CatColor, type ThemeMode } from '@/theme';
 import { Card, Icon, SectionLabel } from '@/ui';
 
@@ -26,7 +26,7 @@ const THEME_CARDS: { key: ThemeMode; label: StringKey }[] = [
 const CATS: CatColor[] = ['terracotta', 'slate', 'ochre', 'sage', 'rose', 'lavender'];
 
 export default function AppearanceScreen() {
-  const router = useRouter();
+  const goBack = useBack();
   const t = useT();
   const { colors } = useTheme();
   const { mode: themeMode, setMode } = useThemeMode();
@@ -49,7 +49,7 @@ export default function AppearanceScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
-      <Header title={t('settings.appearance')} onBack={() => router.back()} />
+      <Header title={t('settings.appearance')} onBack={() => goBack()} />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* ── Theme preview cards (spec: карточки-превью + подпись про «Авто») ── */}

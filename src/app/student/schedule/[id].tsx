@@ -4,7 +4,7 @@
  * rolling-window materializer so the timeline reflects it immediately. Weekday/time are
  * local wall-clock; duration/format default from the student, overridable on the slot.
  */
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,6 +15,7 @@ import type { ScheduleSlotModel } from '@/db/models';
 import { closeSlot, createSlot, materializeSchedule, updateSlot } from '@/db/slots';
 import { DURATIONS, type Duration, type LessonFormat } from '@/domain/types';
 import { useT, type StringKey } from '@/i18n';
+import { backOrHome } from '@/lib/nav';
 import { nowMs } from '@/lib/time';
 import { useTheme } from '@/theme';
 import { Icon, Segmented, Sheet } from '@/ui';
@@ -280,7 +281,7 @@ function Header({ title }: { title: string }) {
   return (
     <View style={[styles.header, { borderBottomColor: colors.hairline }]}>
       <Pressable
-        onPress={() => router.back()}
+        onPress={() => backOrHome()}
         hitSlop={10}
         style={({ pressed }) => [styles.headerBtn, pressed && styles.pressed]}
         accessibilityRole="button"

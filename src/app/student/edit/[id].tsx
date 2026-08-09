@@ -1,5 +1,5 @@
 /** Edit Ученик/Клиент — loads the live model, feeds it into the shared form. */
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -7,11 +7,12 @@ import { useStudent, useStudentSubjects } from '@/db/hooks';
 import { updateStudent } from '@/db/mutations';
 import type { StudentInput } from '@/db/mutations';
 import { StudentForm } from '@/features/students/StudentForm';
+import { useBack } from '@/lib/nav';
 import { useTheme } from '@/theme';
 
 export default function EditStudentScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
+  const goBack = useBack();
   const { colors } = useTheme();
   const student = useStudent(id);
   const subjects = useStudentSubjects(id);
@@ -27,7 +28,7 @@ export default function EditStudentScreen() {
   async function handleSave(input: StudentInput) {
     if (!student) return;
     await updateStudent(student, input);
-    router.back();
+    goBack();
   }
 
   return (
@@ -47,7 +48,7 @@ export default function EditStudentScreen() {
           subjectIds,
         }}
         onSave={handleSave}
-        onDone={() => router.back()}
+        onDone={() => goBack()}
       />
     </View>
   );

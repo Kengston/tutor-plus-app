@@ -37,6 +37,8 @@ export class ProfileModel extends Model {
   @field('default_rate') defaultRate!: number | null;
   @field('default_duration') defaultDuration!: number | null;
   @field('default_format') defaultFormat!: string | null;
+  /** v12 (TP-FIX-0719, п. 6): persisted auth session — null (migrated rows) reads as signed out. */
+  @field('signed_in') signedIn!: boolean | null;
   /** OS notification permission granted (Web Notifications on web; expo-notifications on native). */
   @field('push_granted') pushGranted!: boolean;
   @readonly @date('created_at') createdAt!: Date;

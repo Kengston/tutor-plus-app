@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import { useProfile, useStudents, useSubjects } from '@/db/hooks';
 import { createLesson, recordLessonPayment } from '@/db/mutations';
 import { DURATIONS, type Duration, type LessonFormat, type PayStatus } from '@/domain/types';
 import { useT } from '@/i18n';
+import { useBack } from '@/lib/nav';
 import { dayBounds, hhmm, nowMs } from '@/lib/time';
 import { useTheme } from '@/theme';
 import { CatAvatar, Icon, Segmented, Sheet } from '@/ui';
@@ -22,7 +23,7 @@ function defaultStartsAt(): number {
 export default function LessonFormScreen() {
   // `at` prefills date/time (tap on a free window, spec 05 §5.2); `studentId` presets the student.
   const { studentId: preselect, at } = useLocalSearchParams<{ studentId?: string; at?: string }>();
-  const router = useRouter();
+  const goBack = useBack();
   const t = useT();
   const { colors, radius } = useTheme();
 
@@ -90,7 +91,7 @@ export default function LessonFormScreen() {
     if (payStatus !== 'expected') {
       await recordLessonPayment(lesson, { type: payStatus });
     }
-    router.back();
+    goBack();
   };
 
   const payLabels: Record<PayStatus, string> = {
@@ -109,7 +110,7 @@ export default function LessonFormScreen() {
     <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
       <View style={styles.header}>
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBack()}
           hitSlop={8}
           style={({ pressed }) => [styles.backBtn, { backgroundColor: colors.stoneLight }, pressed && styles.pressed]}
           accessibilityRole="button"

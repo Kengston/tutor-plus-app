@@ -23,6 +23,9 @@
  *
  * v8 (UI-v2 S14, spec 09 §9.3): add `profiles.notif_enabled` + `profiles.notif_debts` —
  * NULLABLE, and null reads as TRUE in `reminderPrefsOf`, so migrating never silences the feed.
+ *
+ * v12 (TP-FIX-0719, п. 6): add `profiles.signed_in` — the auth session survives a reload and
+ * a deep link. NULLABLE and null reads as SIGNED OUT, so migrating never logs anyone in.
  */
 import { schemaMigrations, createTable, addColumns } from '@nozbe/watermelondb/Schema/migrations';
 
@@ -185,6 +188,18 @@ export const migrations = schemaMigrations({
             { name: 'default_rate', type: 'number', isOptional: true },
             { name: 'default_duration', type: 'number', isOptional: true },
             { name: 'default_format', type: 'string', isOptional: true },
+          ],
+        }),
+      ],
+    },
+    {
+      toVersion: 12,
+      steps: [
+        addColumns({
+          table: 'profiles',
+          columns: [
+            // Persisted auth session (ADR-0005 §2 gate). Nullable → null reads as signed OUT.
+            { name: 'signed_in', type: 'boolean', isOptional: true },
           ],
         }),
       ],

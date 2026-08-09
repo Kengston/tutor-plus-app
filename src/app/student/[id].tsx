@@ -27,6 +27,7 @@ import { debtOf, payStatusOf } from '@/domain/aggregates';
 import type { LessonFormat, PayStatus, StudentStatus } from '@/domain/types';
 import { useT, type StringKey } from '@/i18n';
 import { formatRub } from '@/lib/format';
+import { backOrHome } from '@/lib/nav';
 import { hhmm, nowMs } from '@/lib/time';
 import { useTheme } from '@/theme';
 import { CatAvatar, Chip, Dot, Icon, Sheet, type DotTone } from '@/ui';
@@ -392,7 +393,7 @@ function Header({ title, onEdit }: { title: string; onEdit: (() => void) | null 
   return (
     <View style={[styles.header, { borderBottomColor: colors.hairline }]}>
       <Pressable
-        onPress={() => router.back()}
+        onPress={() => backOrHome()}
         hitSlop={10}
         style={({ pressed }) => [styles.headerBtn, pressed && styles.pressed]}
         accessibilityRole="button"

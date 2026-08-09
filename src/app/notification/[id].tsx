@@ -23,6 +23,7 @@ import type { NotificationKind } from '@/domain/types';
 import { useNow } from '@/hooks/use-now';
 import { plural, useT, type StringKey } from '@/i18n';
 import { formatRub } from '@/lib/format';
+import { useBack } from '@/lib/nav';
 import { DEFAULT_REMINDER_PREFS, reminderPrefsOf } from '@/lib/profile';
 import { hhmm } from '@/lib/time';
 import { useTheme } from '@/theme';
@@ -49,6 +50,7 @@ function useDateLabel(): (ms: number) => string {
 export default function NotificationDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const goBack = useBack();
   const t = useT();
   const { colors } = useTheme();
   const dateLabel = useDateLabel();
@@ -111,7 +113,7 @@ export default function NotificationDetailScreen() {
       lessonId: txn.lessonId,
       subjectId: txn.subjectId,
     });
-    router.back();
+    goBack();
   };
 
   const contact = () => {
@@ -134,7 +136,7 @@ export default function NotificationDetailScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
-      <Header title={t('notif.detailTitle')} onBack={() => router.back()} />
+      <Header title={t('notif.detailTitle')} onBack={() => goBack()} />
 
       {!item ? (
         <EmptyState icon="bell" text={t('common.none')} />
@@ -211,7 +213,7 @@ export default function NotificationDetailScreen() {
                       icon="close"
                       label={t('action.cancel')}
                       onPress={() => {
-                        void cancelLesson(lesson).then(() => router.back());
+                        void cancelLesson(lesson).then(() => goBack());
                       }}
                     />
                   </>
@@ -245,7 +247,7 @@ export default function NotificationDetailScreen() {
           title={t('action.reschedule')}
           onClose={() => setReschedOpen(false)}
           onPick={(ms) => {
-            void rescheduleLesson(lesson, ms).then(() => router.back());
+            void rescheduleLesson(lesson, ms).then(() => goBack());
           }}
         />
       ) : null}
