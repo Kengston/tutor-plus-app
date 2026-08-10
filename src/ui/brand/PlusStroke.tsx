@@ -14,11 +14,8 @@ import Svg, { G } from 'react-native-svg';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useTheme } from '@/theme';
 
-import { GLYPH_VIEWBOX, PLUS_GLYPHS, type PlusSize } from './glyph';
+import { GLYPH_VIEWBOX, PLUS_GLYPHS, VERTICAL_SHARE, type PlusSize } from './glyph';
 import { StrokePath } from './StrokePath';
-
-/** Доля токена `standard`, отданная вертикали; остальное — горизонталь (эталон 110/140 мс). */
-const VERTICAL_SHARE = 0.44;
 
 export interface PlusStrokeProps {
   size?: PlusSize;

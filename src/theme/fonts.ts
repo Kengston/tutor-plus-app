@@ -96,31 +96,3 @@ export function onestFor(weight: TextStyle['fontWeight']): string {
 export function displayFor(weight: TextStyle['fontWeight'] = '700'): string {
   return manropeByWeight[weightToNumber(weight)] ?? fontFamilies.manrope700;
 }
-
-/**
- * Шкала типографики (дизайн-система v2 §6). Держим её здесь, а не россыпью по экранам,
- * чтобы «одна рука» была проверяемой: размер + вес + трекинг одним объектом.
- * `display` — единственное место, где семейство прописано явно (Manrope).
- */
-export const typeScale = {
-  /** H1 экрана — 28–32/650, берём 30. */
-  h1: { fontSize: 30, fontWeight: '600', letterSpacing: -0.6 },
-  /** Заголовок шита — 17/500. */
-  sheetTitle: { fontSize: 17, fontWeight: '500', letterSpacing: -0.2 },
-  /** Строка списка — 15/500. */
-  row: { fontSize: 15, fontWeight: '500' },
-  /** Вторичная строка — 13/400. */
-  secondary: { fontSize: 13, fontWeight: '400' },
-  /** SectionLabel — 14/500 (янтарная черта живёт в самом компоненте). */
-  sectionLabel: { fontSize: 14, fontWeight: '500', letterSpacing: -0.1 },
-  /** Подписи-шёпот — 12.5. */
-  caption: { fontSize: 12.5, fontWeight: '400' },
-  /** Героическое число — 38–44 display + tabular-nums. */
-  hero: {
-    fontSize: 38,
-    fontWeight: '700',
-    letterSpacing: -0.8,
-    fontFamily: displayFor('700'),
-    fontVariant: ['tabular-nums'],
-  },
-} as const satisfies Record<string, TextStyle>;

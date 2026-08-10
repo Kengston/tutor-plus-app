@@ -17,12 +17,10 @@ import {
   MONOGRAM_VIEWBOX,
   PLUS_GLYPHS,
   T_RECTS,
+  VERTICAL_SHARE,
   type PlusGlyph,
 } from './glyph';
 import { StrokePath } from './StrokePath';
-
-/** Доля токена `standard`, отданная вертикали (см. `PlusStroke`). */
-const VERTICAL_SHARE = 0.44;
 
 /** Прямоугольники строгой T — общая часть монограммы и символа. */
 function TRects({ fill }: { fill: string }) {
@@ -91,7 +89,10 @@ export function TMark({ px = 64, colorT, colorPlus, animated = false, drawKey }:
       <G transform="translate(116,27) scale(0.52) translate(-50,-50)">
         <GlyphStrokes
           glyph={PLUS_GLYPHS.pen}
-          color={colorPlus ?? colors.brandPlusInk}
+          // Канон-дефолт монограммы — бренд-акцент (`kit.jsx`: `colorPlus = var(--accent)`),
+          // тот же, что у соседнего `TSymbol`: знаки одного ряда не могут светиться разным
+          // жёлтым. Глубокий `brandPlusInk` остаётся дефолтом вордмарка — там он и в каноне.
+          color={colorPlus ?? colors.accent}
           animate={animated && !reduced}
           standardMs={motion.standard}
           drawKey={drawKey}

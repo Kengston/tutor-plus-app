@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { HeaderAction } from '@/components/AppHeader';
+import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { useAllLessons, useAllTransactions, useStudentPrimarySubject, useStudents } from '@/db/hooks';
 import type { LessonModel, StudentModel, TransactionModel } from '@/db/models';
@@ -21,7 +22,7 @@ import type { StringKey } from '@/i18n';
 import { formatRub } from '@/lib/format';
 import { dayBounds, hhmm, nowMs } from '@/lib/time';
 import { useTheme } from '@/theme';
-import { Card, CatAvatar, Chip, Fab, Icon, MarginMark, type MarginMarkKind, Sheet, Text, TextInput } from '@/ui';
+import { Card, CatAvatar, Chip, Fab, Icon, Sheet, Text, TextInput } from '@/ui';
 
 const FILTERS: { key: StudentFilter; label: StringKey }[] = [
   { key: 'all', label: 'filter.all' },
@@ -157,26 +158,27 @@ export default function StudentsScreen() {
 
       {/* List / three empty states (spec 06 §6.1–6.2) */}
       {students.length === 0 ? (
-        <EmptyBlock
-          icon="plus_double"
-          title={t('students.emptyTitle')}
-          body={t('students.emptyBody')}
-          actionLabel={t('students.addFirst')}
+        <EmptyState
+          mark="plus_double"
+          text={t('students.emptyTitle')}
+          hint={t('students.emptyBody')}
+          action={t('students.addFirst')}
           onAction={() => router.push('/student/new')}
         />
       ) : visible.length === 0 && searching ? (
-        <EmptyBlock
-          icon="wave"
-          title={t('students.searchEmpty')}
-          body={`${t('students.searchEmptyBy')} «${query.trim()}» ${t('students.searchEmptyNo')}`}
-          actionLabel={t('students.clearSearch')}
+        <EmptyState
+          mark="wave"
+          text={t('students.searchEmpty')}
+          hint={`${t('students.searchEmptyBy')} «${query.trim()}» ${t('students.searchEmptyNo')}`}
+          action={t('students.clearSearch')}
+          actionKind="plain"
           onAction={() => {
             setQuery('');
             setSearchOpen(false);
           }}
         />
       ) : visible.length === 0 ? (
-        <EmptyBlock icon="underline" title={t('students.emptyFiltered')} body={t('students.emptyFilters')} />
+        <EmptyState mark="underline" text={t('students.emptyFiltered')} hint={t('students.emptyFilters')} />
       ) : (
         <View style={styles.list}>
           {visible.map((s) => {
@@ -263,38 +265,6 @@ function StudentRow({
   );
 }
 
-/** A centred empty state with an optional action button (spec 06 §6.2). */
-function EmptyBlock({
-  icon,
-  title,
-  body,
-  actionLabel,
-  onAction,
-}: {
-  /** Вид рукописной пометки канона (§10) вместо стоковой иконки. */
-  icon: MarginMarkKind;
-  title: string;
-  body: string;
-  actionLabel?: string;
-  onAction?: () => void;
-}) {
-  const { colors, radius } = useTheme();
-  return (
-    <View style={styles.emptyBlock}>
-      <MarginMark kind={icon} px={72} />
-      <Text style={[styles.emptyTitle, { color: colors.heading }]}>{title}</Text>
-      <Text style={[styles.emptyBody, { color: colors.muted }]}>{body}</Text>
-      {actionLabel && onAction ? (
-        <Pressable
-          onPress={onAction}
-          style={({ pressed }) => [styles.emptyAction, { backgroundColor: colors.primary, borderRadius: radius.field }, pressed && styles.pressed]}>
-          <Text style={[styles.emptyActionLabel, { color: colors.onTint }]}>{actionLabel}</Text>
-        </Pressable>
-      ) : null}
-    </View>
-  );
-}
-
 function SortSheet({
   visible,
   current,
@@ -354,11 +324,6 @@ const styles = StyleSheet.create({
   secondary: { fontSize: 13 },
 
   // empty states
-  emptyBlock: { alignItems: 'center', gap: 10, paddingTop: 40, paddingHorizontal: 24 },
-  emptyTitle: { fontSize: 16.5, fontWeight: '700', letterSpacing: -0.2, textAlign: 'center', marginTop: 4 },
-  emptyBody: { fontSize: 14, fontWeight: '500', textAlign: 'center', lineHeight: 20 },
-  emptyAction: { paddingHorizontal: 20, paddingVertical: 12, marginTop: 6 },
-  emptyActionLabel: { fontSize: 15, fontWeight: '600' },
 
   sortOption: {
     flexDirection: 'row',
