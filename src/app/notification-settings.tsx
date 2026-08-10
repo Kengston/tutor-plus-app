@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useProfile } from '@/db/hooks';
@@ -8,7 +8,7 @@ import { useT, type StringKey } from '@/i18n';
 import { useBack } from '@/lib/nav';
 import { scheduler } from '@/lib/notifications';
 import { useTheme } from '@/theme';
-import { Card, Icon, SectionLabel, Segmented } from '@/ui';
+import { Card, Icon, SectionLabel, Segmented, Text } from '@/ui';
 
 /**
  * Notification settings (spec 09 §9.3) — opened from the feed header. «Включить уведомления»

@@ -11,7 +11,7 @@
  * signs in against the Phase-0 stub.
  */
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useProfile } from '@/db/hooks';
@@ -22,7 +22,7 @@ import { useAuth } from '@/lib/auth';
 import { isStrongPassword, isValidContact, passwordChecks } from '@/lib/auth-validate';
 import { useBack } from '@/lib/nav';
 import { useTheme } from '@/theme';
-import { Icon, Segmented } from '@/ui';
+import { Icon, Segmented, Text, TextInput } from '@/ui';
 
 const TOTAL_STEPS = 5;
 

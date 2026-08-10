@@ -4,12 +4,12 @@
  * «экземпляр/повторение»; the «all» row is danger-tinted in cancel mode. Presentational
  * — the caller maps the chosen scope to a domain op.
  */
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useT, type StringKey } from '@/i18n';
 import type { Scope } from '@/domain/scope';
 import { useTheme } from '@/theme';
-import { Card, Icon } from '@/ui';
+import { Card, Icon, Text } from '@/ui';
 
 const SCOPES: Scope[] = ['one', 'following', 'all'];
 

@@ -1,8 +1,10 @@
-import { type ReactNode } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { initialFabScrollState, nextFabScrollState } from '@/lib/fab-scroll';
 import { useTheme } from '@/theme';
+import { FabVisibilityProvider } from '@/ui';
 
 import { AppHeader } from './AppHeader';
 import { DevBar } from './DevBar';
@@ -26,6 +28,14 @@ export interface ScreenProps {
  *  optional pinned FAB. The Phase-0 DevBar is kept under `__DEV__` only (ADR-0013). */
 export function Screen({ title, subtitle, actions, bell, children, scroll = true, floatingAction }: ScreenProps) {
   const { colors } = useTheme();
+  // Видимость FAB считает чистая функция (`lib/fab-scroll`); экран только скармливает ей
+  // смещение и раздаёт результат через контекст — сам `<Fab/>` в разметке не меняется.
+  const [fabScroll, setFabScroll] = useState(initialFabScrollState);
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = e.nativeEvent.contentOffset.y;
+    setFabScroll((state) => nextFabScrollState(state, y));
+  };
+
   return (
     <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
       <AppHeader title={title} subtitle={subtitle} actions={actions} bell={bell} />
@@ -33,13 +43,16 @@ export function Screen({ title, subtitle, actions, bell, children, scroll = true
       {scroll ? (
         <ScrollView
           contentContainerStyle={[styles.content, floatingAction ? styles.contentFab : null]}
+          onScroll={floatingAction ? onScroll : undefined}
+          // 16 мс — кадровый шаг; чаще считать направление незачем, реже — жест «запаздывает».
+          scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}>
           {children}
         </ScrollView>
       ) : (
         <View style={[styles.fill, styles.content, floatingAction ? styles.contentFab : null]}>{children}</View>
       )}
-      {floatingAction}
+      <FabVisibilityProvider value={fabScroll.visible}>{floatingAction}</FabVisibilityProvider>
     </SafeAreaView>
   );
 }

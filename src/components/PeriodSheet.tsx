@@ -5,12 +5,12 @@
  * Web-safe; strings via i18n, colours via theme. Custom range = two sequential date picks.
  */
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useT, type StringKey } from '@/i18n';
 import { customRange, monthOf, weekOf, yearOf, type Period, type PeriodType } from '@/lib/period';
 import { useTheme } from '@/theme';
-import { Icon, Sheet } from '@/ui';
+import { Icon, Sheet, Text } from '@/ui';
 
 import { DateTimePickerSheet } from './DateTimePickerSheet';
 

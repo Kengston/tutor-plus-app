@@ -3,13 +3,13 @@
  * for now (multi-currency arrives with sync, Phase 4); the row exists so the section matches
  * the spec structure and the value is honest.
  */
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useT } from '@/i18n';
 import { useBack } from '@/lib/nav';
 import { useTheme } from '@/theme';
-import { Card, Icon } from '@/ui';
+import { Card, Icon, Text } from '@/ui';
 
 export default function PaymentSettingsScreen() {
   const goBack = useBack();

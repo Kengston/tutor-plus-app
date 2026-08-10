@@ -1,44 +1,24 @@
 /**
- * Auth START screen (UI-v2 S17, spec 03 §3.1 / ADR-0014) — the prototype logo (T+ mark, not
- * the sparkle), «Tutor+» + subtitle, then the spec button order: «Войти» (primary, dark) →
- * «Создать аккаунт» (outline) → «или» → «Продолжить с Apple / Google» (brand glyphs). Social
- * taps open the DEMO dialog («Это демонстрационный переход») — real GoTrue lands in Phase 4;
- * «Продолжить» signs in against the Phase-0 stub.
+ * Auth START screen (UI-v2 S17, spec 03 §3.1 / ADR-0014) — вордмарк + таглайн, дальше
+ * порядок кнопок из спеки: «Войти» (primary) → «Создать аккаунт» (outline) → «или» →
+ * «Продолжить с Apple / Google». Соц-вход открывает ДЕМО-диалог — настоящий GoTrue в Ф4;
+ * «Продолжить» логинит через заглушку Фазы 0.
+ *
+ * КАНОН АЙДЕНТИКИ (слайс #77 спеки #68): на экранах входа и регистрации ПЛИТКИ-ИКОНКИ НЕТ —
+ * только вордмарк 30px и таглайн «Плюс к вашей практике». Плитка живёт в переходной заставке
+ * при входе и в сайдбаре веб-версии (дизайн-система v2 §10, PROJECT_STATE §5). Прежний
+ * самодельный знак (плашка + «галочка-росчерк» с точкой) заменён на зафиксированный глиф.
  */
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Circle, Path } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 
 import { useT } from '@/i18n';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/theme';
-import { Sheet } from '@/ui';
-
-/**
- * The prototype's T+ logo mark (crossbar + stem + the accent swoosh and dot).
- * The mark is brand-frozen as a WHOLE — glyphs and plaque keep the prototype hexes in both
- * themes; a theme-driven plaque would render the gold swoosh gold-on-gold in «Вечер».
- */
-const LOGO_PLAQUE = '#151E2D';
-
-function LogoMark() {
-  return (
-    <Svg width={36} height={36} viewBox="0 0 36 36" fill="none">
-      <Path d="M9 11.5h18" stroke="#FFFDF7" strokeWidth={3.2} strokeLinecap="round" />
-      <Path d="M18 11.5V26" stroke="#FFFDF7" strokeWidth={3.2} strokeLinecap="round" />
-      <Path
-        d="M11 24.5c3.5 0 5.5-4 7.2-7 1.6-2.8 3.4-6 6.8-6"
-        stroke="#FFD364"
-        strokeWidth={3.2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <Circle cx={25.8} cy={11.2} r={2.4} fill="#FFD364" />
-    </Svg>
-  );
-}
+import { Sheet, Text, Wordmark } from '@/ui';
 
 /** Apple brand glyph (prototype path). */
 function AppleMark({ color }: { color: string }) {
@@ -74,11 +54,8 @@ export default function StartScreen() {
   return (
     <SafeAreaView style={[styles.fill, { backgroundColor: colors.bg }]}>
       <View style={styles.hero}>
-        <View style={[styles.logo, { backgroundColor: LOGO_PLAQUE }]}>
-          <LogoMark />
-        </View>
-        <Text style={[styles.title, { color: colors.heading }]}>{t('auth.title')}</Text>
-        <Text style={[styles.subtitle, { color: colors.body }]}>{t('auth.subtitle')}</Text>
+        <Wordmark px={30} />
+        <Text style={[styles.tagline, { color: colors.muted }]}>{t('auth.tagline')}</Text>
       </View>
 
       {/* Button order per spec §3.1: Войти → Создать аккаунт → или → Apple → Google. */}
@@ -178,17 +155,9 @@ export default function StartScreen() {
 
 const styles = StyleSheet.create({
   fill: { flex: 1, paddingHorizontal: 24 },
-  hero: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
-  logo: {
-    width: 64,
-    height: 64,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  title: { fontSize: 30, fontWeight: '600', letterSpacing: -0.6 },
-  subtitle: { fontSize: 15, textAlign: 'center', lineHeight: 22, paddingHorizontal: 8 },
+  hero: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  // Таглайн канона: 12/1.45 muted под вордмарком.
+  tagline: { fontSize: 12, lineHeight: 17, textAlign: 'center', marginTop: 10, paddingHorizontal: 8 },
 
   actions: { gap: 10, paddingBottom: 28 },
   btn: { height: 52, alignItems: 'center', justifyContent: 'center' },

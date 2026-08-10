@@ -13,6 +13,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@expo-google-fonts/manrope": "^0.4.2",
+    "@expo-google-fonts/onest": "^0.4.1",
     "@morrowdigital/watermelondb-expo-plugin": "^2.3.3",
     "@nozbe/watermelondb": "^0.28.0",
     "@nozbe/with-observables": "^1.6.0",

@@ -5,13 +5,13 @@
  * Returns a UTC-instant ms (ADR-0005). All strings via i18n; colours via theme.
  */
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useT } from '@/i18n';
 import type { StringKey } from '@/i18n';
 import { nowMs } from '@/lib/time';
 import { useTheme } from '@/theme';
-import { Icon, Sheet } from '@/ui';
+import { Icon, Sheet, Text, TextInput } from '@/ui';
 
 export interface DateTimePickerSheetProps {
   visible: boolean;

@@ -5,14 +5,14 @@
  * backend show the «Скоро» chip; the sign-out-everywhere works against the Phase-0 stub.
  */
 import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useT } from '@/i18n';
 import { useAuth } from '@/lib/auth';
 import { useBack } from '@/lib/nav';
 import { useTheme } from '@/theme';
-import { Card, Chip, Icon, SectionLabel } from '@/ui';
+import { Card, Chip, Icon, SectionLabel, Text } from '@/ui';
 
 export default function SecurityScreen() {
   const router = useRouter();

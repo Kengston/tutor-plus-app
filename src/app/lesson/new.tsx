@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DateTimePickerSheet } from '@/components/DateTimePickerSheet';
@@ -9,9 +9,10 @@ import { createLesson, recordLessonPayment } from '@/db/mutations';
 import { DURATIONS, type Duration, type LessonFormat, type PayStatus } from '@/domain/types';
 import { useT } from '@/i18n';
 import { useBack } from '@/lib/nav';
+import { useSnack } from '@/lib/snack';
 import { dayBounds, hhmm, nowMs } from '@/lib/time';
 import { useTheme } from '@/theme';
-import { CatAvatar, Icon, Segmented, Sheet } from '@/ui';
+import { CatAvatar, Icon, Segmented, Sheet, Text, TextInput } from '@/ui';
 
 /** Today's next whole hour as a UTC-instant ms (device-local), via dayBounds + offset. */
 function defaultStartsAt(): number {
@@ -25,6 +26,7 @@ export default function LessonFormScreen() {
   const { studentId: preselect, at } = useLocalSearchParams<{ studentId?: string; at?: string }>();
   const goBack = useBack();
   const t = useT();
+  const snack = useSnack();
   const { colors, radius } = useTheme();
 
   const students = useStudents();
@@ -92,6 +94,8 @@ export default function LessonFormScreen() {
       await recordLessonPayment(lesson, { type: payStatus });
     }
     goBack();
+    // Подтверждение канона: рукописная галочка + одна строка, без экрана «Готово» (§8/§10).
+    snack.show(t('snack.lessonCreated'), { mark: 'check' });
   };
 
   const payLabels: Record<PayStatus, string> = {

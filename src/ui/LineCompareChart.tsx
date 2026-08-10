@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Svg, { Circle, G, Line, Path, Text as SvgText } from 'react-native-svg';
 
 import { useTheme } from '@/theme';
+import { Text } from './Text';
 
 export interface LineCompareChartProps {
   /** X-axis labels, one per point (day ranges — data, not UI copy). */

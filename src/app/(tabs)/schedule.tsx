@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { HeaderAction } from '@/components/AppHeader';
 import { EmptyState } from '@/components/EmptyState';
@@ -14,7 +14,7 @@ import type { LessonModel, StudentModel } from '@/db/models';
 import { formatRub } from '@/lib/format';
 import { dayBounds, hhmm, nowMs } from '@/lib/time';
 import { catColors, useTheme, type CatColor } from '@/theme';
-import { Card, CatAvatar, Chip, Dot, Fab, Icon, SectionLabel, Segmented, Sheet, type DotTone } from '@/ui';
+import { Card, CatAvatar, Chip, Dot, type DotTone, Fab, Icon, PlusStroke, SectionLabel, Segmented, Sheet, Text, TextInput } from '@/ui';
 import type { StringKey } from '@/i18n';
 
 type ViewKind = 'calendar' | 'list';
@@ -661,8 +661,18 @@ interface DayFeedProps {
 function DayFeed({ lessons, studentsById, txns, onOpen, emptyText, formatLabel, payLabel }: DayFeedProps) {
   const t = useT();
   const { colors } = useTheme();
+  const router = useRouter();
 
-  if (lessons.length === 0) return <EmptyState icon="calendar" text={emptyText} />;
+  if (lessons.length === 0) {
+    return (
+      <EmptyState
+        mark="circle_date"
+        text={emptyText}
+        action={t('lesson.create')}
+        onAction={() => router.push('/lesson/new')}
+      />
+    );
+  }
   return (
     <View style={styles.listWrap}>
       {lessons.map((l) => {
@@ -872,7 +882,8 @@ function TimelineGap({ seg, onNew }: { seg: { mins: number }; onNew?: () => void
           pressed && styles.pressed,
         ]}>
         <View style={[styles.gapPlus, { backgroundColor: colors.surface, borderColor: colors.stoneInactive }]}>
-          <Icon name="plus" size={17} sw={2} stroke={colors.primaryDeep} />
+          {/* Жест «добавить» — рукописный росчерк (канон §10, слайс #75). */}
+          <PlusStroke size="marker" px={17} color={colors.primaryDeep} />
         </View>
         <Text style={[styles.gapLabel, { color: colors.muted }]}>{label}</Text>
       </Pressable>

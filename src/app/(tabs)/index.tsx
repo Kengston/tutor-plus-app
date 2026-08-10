@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { DateTimePickerSheet } from '@/components/DateTimePickerSheet';
 import { EmptyState } from '@/components/EmptyState';
@@ -17,15 +17,7 @@ import { parseHomeBlocks } from '@/lib/home-blocks';
 import { useSnack } from '@/lib/snack';
 import { dayBounds, dayBoundsOffset, hhmm, minutesUntil, nowMs } from '@/lib/time';
 import { catColors, useTheme } from '@/theme';
-import {
-  Card,
-  CatAvatar,
-  Chip,
-  Fab,
-  Icon,
-  SectionLabel,
-  SwipeRow,
-} from '@/ui';
+import { Card, CatAvatar, Chip, Fab, Icon, SectionLabel, SwipeRow, Text } from '@/ui';
 
 /** Minutes phrasing forms for `plural()` — composed once per render via t(). */
 function minuteForms(t: ReturnType<typeof useT>) {
@@ -156,7 +148,13 @@ export default function TodayScreen() {
       floatingAction={<Fab onPress={() => setQuickOpen(true)} />}>
       {visibleToday.length === 0 ? (
         // Empty day (spec 04 AC): no placeholder cards — a single empty state.
-        <EmptyState icon="calendar" text={t('today.empty')} />
+        <EmptyState
+          mark="circle_date"
+          date={new Date(start).getDate()}
+          text={t('today.empty')}
+          action={t('lesson.create')}
+          onAction={() => router.push('/lesson/new')}
+        />
       ) : (
         <>
           {/* «Ваш день» (spec 04, prototype TodayScreen): counts + dot-timeline. */}
@@ -205,7 +203,10 @@ export default function TodayScreen() {
                   rightActions={[
                     {
                       label: t('action.reschedule'),
-                      color: colors.warning,
+                      // Канон §8: «Перенести» — слейт, НЕ янтарь. Раньше здесь стоял
+                      // `warning`, а в вечерней теме он равен бренд-акценту #FFD364 —
+                      // жёлтый оказывался цветом действия, что прямо запрещено §4.
+                      color: colors.catSlate,
                       icon: 'refresh',
                       onPress: () => {
                         setReschedulingLesson(l);

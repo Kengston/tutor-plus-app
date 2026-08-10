@@ -14,7 +14,7 @@
  */
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { EmptyState } from '@/components/EmptyState';
 import { HeaderAction } from '@/components/AppHeader';
@@ -57,20 +57,8 @@ import {
 } from '@/lib/period';
 import { nowMs } from '@/lib/time';
 import { chartColors, useTheme } from '@/theme';
-import {
-  Card,
-  CountUp,
-  Donut,
-  Icon,
-  KpiStat,
-  LineCompareChart,
-  MultiBarChart,
-  SectionLabel,
-  Segmented,
-  Sheet,
-  type BarDatum,
-  type DonutSegment,
-} from '@/ui';
+import { displayFor } from '@/theme/fonts';
+import { Card, CountUp, Donut, Icon, KpiStat, LineCompareChart, MultiBarChart, SectionLabel, Segmented, Sheet, Text, type BarDatum, type DonutSegment } from '@/ui';
 
 /** Which sub-tab is active (we keep the enum; labels come from i18n at render). */
 type Tab = 'overview' | 'dynamics' | 'debts';
@@ -206,7 +194,7 @@ export default function AnalyticsScreen() {
         </>
       ) : !hasData ? (
         <View style={styles.emptyWrap}>
-          <EmptyState icon="chart" text={t('analytics.empty')} hint={t('analytics.noDataHint')} />
+          <EmptyState mark="wave" text={t('analytics.empty')} hint={t('analytics.noDataHint')} />
           <Pressable
             onPress={resetPeriod}
             style={({ pressed }) => [
@@ -1078,7 +1066,15 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.7 },
 
   // big metric
-  metric: { fontSize: 38, fontWeight: '600', letterSpacing: -0.8, marginTop: 2, fontVariant: ['tabular-nums'] },
+  metric: {
+    fontSize: 38,
+    fontWeight: '600',
+    letterSpacing: -0.8,
+    marginTop: 2,
+    // Героическая цифра экрана — Manrope display (дизайн-система v2 §6).
+    fontFamily: displayFor('600'),
+    fontVariant: ['tabular-nums'],
+  },
 
   // empty coverage
   emptyWrap: { alignItems: 'center', gap: 4 },

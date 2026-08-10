@@ -6,7 +6,7 @@
  */
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/EmptyState';
@@ -18,7 +18,7 @@ import { useT, type StringKey } from '@/i18n';
 import { backOrHome } from '@/lib/nav';
 import { nowMs } from '@/lib/time';
 import { useTheme } from '@/theme';
-import { Icon, Segmented, Sheet } from '@/ui';
+import { Icon, PlusStroke, Segmented, Sheet, Text, TextInput } from '@/ui';
 
 /** «16:00» from minutes-since-midnight. */
 function timeLabel(timeMin: number): string {
@@ -61,7 +61,7 @@ export default function ScheduleSlotsScreen() {
     return (
       <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
         <Header title={t('slots.title')} />
-        <EmptyState icon="users" text={t('common.none')} />
+        <EmptyState mark="wave" text={t('common.notFound')} />
       </SafeAreaView>
     );
   }
@@ -77,7 +77,12 @@ export default function ScheduleSlotsScreen() {
       <Header title={t('slots.title')} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {active.length === 0 ? (
-          <EmptyState icon="calendar" text={t('slots.empty')} />
+          <EmptyState
+            mark="plus_pen"
+            text={t('slots.empty')}
+            action={t('slots.add')}
+            onAction={() => setAdding(true)}
+          />
         ) : (
           <View style={styles.list}>
             {active.map((slot) => (
@@ -111,7 +116,8 @@ export default function ScheduleSlotsScreen() {
             { backgroundColor: colors.primaryVlight, borderRadius: radius.field },
             pressed && styles.pressed,
           ]}>
-          <Icon name="plus" size={18} sw={2} stroke={colors.primaryDeep} />
+          {/* Жест «добавить» — рукописный росчерк (канон §10, слайс #75). */}
+          <PlusStroke size="marker" px={18} color={colors.primaryDeep} />
           <Text style={[styles.addLabel, { color: colors.primaryDeep }]}>{t('slots.add')}</Text>
         </Pressable>
       </ScrollView>
