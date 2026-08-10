@@ -19,6 +19,7 @@ import {
   MARGIN_STROKE_WIDTH,
   MARGIN_STROKES,
   PLUS_GLYPHS,
+  VERTICAL_SHARE,
 } from './glyph';
 import { PlusStroke } from './PlusStroke';
 import { StrokePath } from './StrokePath';
@@ -74,6 +75,10 @@ export function MarginMark({
   if (kind === 'plus_double') {
     // Два микро-плюса вразнобой — «пометка на полях», а не второй логотип.
     const glyph = PLUS_GLYPHS.micro;
+    // Тот же порядок руки, что у `PlusStroke` и у канона: вертикаль, следом горизонталь.
+    // Обе фазы делят токен `standard` в пропорции эталона — иначе двойной плюс рисуется
+    // «другой рукой», чем все остальные росчерки ветки.
+    const verticalMs = Math.round(motion.standard * VERTICAL_SHARE);
     const pair = (transform: string, key: string) => (
       <G key={key} transform={transform}>
         <StrokePath
@@ -81,7 +86,7 @@ export function MarginMark({
           color={ink}
           strokeWidth={glyph.sw}
           animate={animate}
-          durationMs={motion.standard}
+          durationMs={verticalMs}
           drawKey={drawKey}
         />
         <StrokePath
@@ -89,7 +94,8 @@ export function MarginMark({
           color={ink}
           strokeWidth={glyph.sw}
           animate={animate}
-          durationMs={motion.standard}
+          durationMs={motion.standard - verticalMs}
+          delayMs={verticalMs}
           drawKey={drawKey}
         />
       </G>

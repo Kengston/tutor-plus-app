@@ -81,7 +81,7 @@ function WebFrame({ bg, children }: { bg: string; children: ReactNode }) {
 function NavigationRoot() {
   const { colors, scheme } = useTheme();
   const t = useT();
-  const { session } = useAuth();
+  const { entryCount } = useAuth();
   useThemeMode(); // subscribe so the nav theme updates on toggle
   useAuthGate();
 
@@ -128,8 +128,10 @@ function NavigationRoot() {
           {/* Single global snack host — inside the WebFrame column (ADR-0010) so the bar
               tracks the app width, above the Stack so it overlays every screen. */}
           <SnackHost />
-          {/* Переходная заставка: монтируется вместе с активной сессией и уходит по таймеру. */}
-          {session ? <TransitionVeil /> : null}
+          {/* Переходная заставка: монтируется на ПЕРЕХОДЕ auth→app и уходит по таймеру.
+              Ключ — счётчик входов: при холодном старте с сохранённой сессией он нулевой,
+              поэтому вуаль не накрывает готовый экран; повторный вход её перемонтирует. */}
+          {entryCount > 0 ? <TransitionVeil key={entryCount} /> : null}
         </WebFrame>
       </SnackProvider>
     </ThemeProvider>

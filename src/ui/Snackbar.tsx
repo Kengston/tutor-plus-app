@@ -80,7 +80,12 @@ export function Snackbar({ message, actionLabel, onAction, bottom = 108, mark }:
         settled ? REST : animatedStyle,
         { bottom, backgroundColor: colors.heading, borderRadius: radius.row, boxShadow: shadow.snack },
       ]}>
-      {mark === 'check' ? <CheckStroke px={22} color={colors.accent} /> : null}
+      {/* Цвет по ПОВЕРХНОСТИ, а не по теме: плашка снека инвертирована (`bg = heading`),
+          поэтому её содержимое красится штатной парой `colors.bg` — той же, что и текст
+          рядом. Янтарь тут не работает ни в каком оттенке: вечером плашка становится ivory
+          #F3ECDD, и #FFD364 даёт 1.21:1, а более глубокий #E0A93A — 1.81:1, обе ниже порога
+          3:1 для графики. Одного янтаря, читаемого на обоих полюсах, не существует. */}
+      {mark === 'check' ? <CheckStroke px={22} color={colors.bg} /> : null}
       <Text style={[styles.message, { color: colors.bg }]} numberOfLines={2}>
         {message}
       </Text>
