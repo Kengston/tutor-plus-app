@@ -197,7 +197,10 @@ export default function TodayScreen() {
                   rightActions={[
                     {
                       label: t('action.reschedule'),
-                      color: colors.warning,
+                      // Канон §8: «Перенести» — слейт, НЕ янтарь. Раньше здесь стоял
+                      // `warning`, а в вечерней теме он равен бренд-акценту #FFD364 —
+                      // жёлтый оказывался цветом действия, что прямо запрещено §4.
+                      color: colors.catSlate,
                       icon: 'refresh',
                       onPress: () => {
                         setReschedulingLesson(l);

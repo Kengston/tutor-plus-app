@@ -211,7 +211,9 @@ export default function NotificationsScreen() {
         ) : (
           sections.map(({ group, rows }) => (
             <View key={group} style={styles.section}>
-              <SectionLabel>{GROUP_LABEL[group]}</SectionLabel>
+              {/* Черта выключена точечно: здесь лейбл — группировка списка (Сегодня/Вчера/
+                  Ранее), а не заголовок секции; канон §8 оставляет группы без черты. */}
+              <SectionLabel accent={false}>{GROUP_LABEL[group]}</SectionLabel>
               <View style={styles.list}>
                 {rows.map((it) => (
                   <Row key={it.id} item={it} onOpen={openItem} />
