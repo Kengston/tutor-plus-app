@@ -58,6 +58,8 @@ export interface Theme {
   radius: { card: number; sheet: number; control: number; pill: number; field: number; row: number; group: number };
   /** Cross-platform boxShadow string (RN 0.85+ supports `boxShadow`). */
   shadow: { card: string; fab: string; sheet: string; control: string; marker: string; barGlow: string; pill: string; snack: string };
+  /** Длительности анимаций, мс (дизайн-система v2 §11). */
+  motion: { micro: number; standard: number; sheet: number };
 }
 
 export const lightColors: ColorTokens = {
@@ -154,10 +156,19 @@ export const darkColors: ColorTokens = {
 
 const radius = { card: 22, sheet: 26, control: 12, pill: 999, field: 14, row: 16, group: 18 } as const;
 
+/**
+ * Моушн-токены (дизайн-система v2 §11, слайс #71): micro — мгновенная реакция на
+ * нажатие/переключение; standard — рисование росчерка и переходы состояний; sheet —
+ * появление шита. Тема-независимы, но живут в теме, чтобы у потребителя была ОДНА точка
+ * входа (`useTheme().motion`) и длительности не расползались по компонентам литералами.
+ */
+const motion = { micro: 130, standard: 250, sheet: 350 } as const;
+
 export const lightTheme: Theme = {
   scheme: 'light',
   colors: lightColors,
   radius,
+  motion,
   shadow: {
     card: '0px 12px 32px -22px rgba(0,0,0,0.18)',
     fab: '0px 10px 24px -6px rgba(0,0,0,0.35)',
@@ -174,6 +185,7 @@ export const darkTheme: Theme = {
   scheme: 'dark',
   colors: darkColors,
   radius,
+  motion,
   shadow: {
     card: '0px 14px 34px -22px rgba(0,0,0,0.55)',
     fab: '0px 10px 24px -6px rgba(0,0,0,0.35)',
