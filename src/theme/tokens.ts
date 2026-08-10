@@ -98,40 +98,52 @@ export const lightColors: ColorTokens = {
   catLavender: '#534A75',
 };
 
-/** «Вечер» — the prototype's `html[data-theme="evening"]` palette VERBATIM (UI-v2 S16, spec 00:
- *  фон #1A1613, акцент #EBB65C; the previous blue-ish dark set diverged from the mockups). */
+/**
+ * «Вечер» — канон v4.1 (дизайн-система v2 §3), похексно. Сине-чернильная палитра
+ * ЗАМЕНИЛА прежний тёплый коричневый набор (#1A1613/#EBB65C): тот расходился с
+ * макетами v4.1 — см. слайс #70 спеки #68.
+ *
+ * Фирменный приём канона: вечером ЯНТАРЬ БЕРЁТ РОЛЬ ДЕЙСТВИЯ — `primary` = `accent`
+ * = #FFD364, а не белые кнопки. Это же единственное осознанное исключение из «правила
+ * жёлтого» (§4): днём жёлтый — только бренд-акцент, вечером он ещё и primary/warning.
+ *
+ * Значения сняты ПОБУКВЕННО с `html[data-theme="evening"]` прототипа v4.1 (`Tutor+.html`),
+ * включая alpha-ступени поверх ivory-заголовка #F3ECDD (.84 / .70 / .46 / .13) — не
+ * пересчитывать «на глаз»: канон здесь и есть источник правды.
+ */
 export const darkColors: ColorTokens = {
-  bg: '#1A1613',
-  surface: '#242019',
-  elev: '#2C2620',
-  heading: '#F1E8D8',
-  body: 'rgba(241,232,216,0.85)',
-  muted: 'rgba(241,232,216,0.66)',
-  label3: 'rgba(241,232,216,0.44)',
-  hairline: 'rgba(241,232,216,0.11)',
-  primary: '#EBB65C',
-  onTint: '#23190A',
-  primaryLight: 'rgba(235,182,92,0.22)',
-  primaryVlight: 'rgba(241,232,216,0.055)',
-  primaryDeep: '#EBB65C',
-  accent: '#EBB65C',
-  accentSoft: 'rgba(235,182,92,0.20)',
-  // Same chromatic family as the evening `accent` (#EBB65C), lighter/darker shades —
-  // top lifts toward cream, bottom deepens toward amber, mirroring the day pair's spread.
-  accentGradTop: '#F5D08A',
-  accentGradBottom: '#D9A24B',
-  paid: '#93B183',
-  warning: '#E7B25A',
-  warningLight: 'rgba(231,178,90,0.18)',
-  danger: '#D98A63',
-  dangerLight: 'rgba(217,138,99,0.16)',
-  stoneInactive: 'rgba(241,232,216,0.44)',
-  stoneLight: 'rgba(241,232,216,0.06)',
-  stone700: 'rgba(241,232,216,0.70)',
+  bg: '#13161D',
+  surface: '#222A38',
+  elev: '#2B3547',
+  heading: '#F3ECDD',
+  body: 'rgba(243,236,221,0.84)',
+  muted: 'rgba(243,236,221,0.70)',
+  label3: 'rgba(243,236,221,0.46)',
+  hairline: 'rgba(243,236,221,0.13)',
+  primary: '#FFD364',
+  onTint: '#1B1407',
+  primaryLight: 'rgba(255,211,100,0.20)',
+  primaryVlight: 'rgba(243,236,221,0.06)',
+  primaryDeep: '#FFD364',
+  accent: '#FFD364',
+  accentSoft: 'rgba(255,211,100,0.22)',
+  // Вечерний `accent` совпадает с дневным (#FFD364), поэтому и стопы градиента те же:
+  // верх уходит в сливочный, низ — в тёмный янтарь.
+  accentGradTop: '#FFE6A6',
+  accentGradBottom: '#E8B43C',
+  paid: '#9CB87E',
+  warning: '#FFD364',
+  warningLight: 'rgba(255,211,100,0.18)',
+  danger: '#E08A6A',
+  dangerLight: 'rgba(224,138,106,0.16)',
+  stoneInactive: 'rgba(243,236,221,0.46)',
+  stoneLight: 'rgba(243,236,221,0.06)',
+  stone700: 'rgba(243,236,221,0.70)',
   // not overridden in the evening theme — inherit day values
   terracotta: '#C97F5D',
-  tabbar: 'rgba(26,22,19,0.66)',
-  sheetScrim: 'rgba(0,0,0,0.55)',
+  tabbar: 'rgba(20,24,32,0.66)',
+  // Канон §3: вечерний скрим глубже дневного — 0.6.
+  sheetScrim: 'rgba(0,0,0,0.60)',
   catTerracotta: '#9A4B28',
   catSlate: '#3D566D',
   catOchre: '#7B6328',
