@@ -171,10 +171,6 @@ export const messages = {
   'auth.defDuration': 'Длительность по умолчанию',
   'auth.defFormat': 'Формат по умолчанию',
   'auth.next': 'Далее',
-  'activity.teacherFull': 'Учитель / репетитор',
-  'activity.mentorFull': 'Ментор',
-  'activity.consultant': 'Консультант',
-  'activity.otherFull': 'Другой специалист',
 
   // ── Profile / Settings ───────────────────────────────────────────────────
   'profile.title': 'Профиль',
@@ -353,6 +349,8 @@ export const messages = {
   'slots.weekday': 'День недели',
   'slots.time': 'Время',
   'slots.close': 'Закрыть слот',
+  'slots.removeConfirm': 'Слот и его будущие уроки будут убраны из расписания. Проведённые и оплаченные уроки останутся',
+  'slots.removeConfirm_client': 'Слот и его будущие встречи будут убраны из расписания. Проведённые и оплаченные встречи останутся',
   'slots.manage': 'Настроить расписание',
   'form.subjectsHint': 'Выберите предметы',
   'form.subjectsHint_client': 'Выберите направления',
@@ -416,6 +414,8 @@ export const messages = {
   'snack.protectedDone': 'Проведённый урок уже нельзя изменить',
   'snack.protectedDone_client': 'Проведённую встречу уже нельзя изменить',
   'snack.noChanges': 'Изменений нет',
+  'snack.seriesDayViaEditor': 'Перенести серию на другой день можно в расписании ученика',
+  'snack.seriesDayViaEditor_client': 'Перенести серию на другой день можно в расписании клиента',
   'snack.undone': 'Отменено',
 
   // ── Quick actions (FAB on «Сегодня», spec 04-today) ──────────────────────
@@ -433,7 +433,8 @@ export const messages = {
 
   // ── Meeting link (delta v2.1 §3.1; prototype openMeetingLink/meetHost) ───
   'lesson.join': 'Подключиться',
-  'lesson.openMeeting': 'Открыть встречу',
+  'lesson.openMeeting': 'Открыть урок',
+  'lesson.openMeeting_client': 'Открыть встречу',
   'lesson.linkField': 'Ссылка на подключение',
   'lesson.payStatus': 'Статус оплаты',
   'field.link': 'Ссылка',
@@ -772,11 +773,13 @@ export const messages = {
   'settings.themeDark': 'Вечер',
 
   // ── Настройки: вид деятельности ──────────────────────────────────────────
-  'activity.teacher': 'Преподаватель',
+  // Canon = registration wizard's full forms (mastered spec 03 §3.4 / ADR-0014 §7); resolve
+  // via `activityLabel` (src/i18n/index.tsx) instead of hardcoding these keys per screen.
+  'activity.teacher': 'Учитель / репетитор',
   'activity.psychologist': 'Психолог',
   'activity.coach': 'Коуч',
-  'activity.mentor': 'Наставник',
-  'activity.trainer': 'Тренер',
+  'activity.mentor': 'Ментор',
+  'activity.trainer': 'Консультант',
 
   // ── Настройки: напоминания (lead-time + тумблеры) ────────────────────────
   'lead.10': 'За 10 минут',
@@ -826,7 +829,7 @@ export const messages = {
   'set.whoYouLead': 'Кого вы ведёте',
   'set.whoHint': 'Названия разделов изменятся. Все существующие данные сохранятся',
   'set.phoneMessenger': 'Телефон / мессенджер',
-  'activity.other': 'Другое',
+  'activity.other': 'Другой специалист',
 
   // ── Настройки: вход и безопасность (каркас, spec 10 §10.2) ────────────────
   'set.changePassword': 'Изменить пароль',

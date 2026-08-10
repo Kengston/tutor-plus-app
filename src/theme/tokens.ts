@@ -25,6 +25,11 @@ export interface ColorTokens {
   // accent & status
   accent: string;
   accentSoft: string;
+  // accent gradient stops (MultiBarChart highlighted-bar top stop, DayLane past-fill end
+  // stop) — review fix TP-REVIEW-0810: both used to hardcode the DAY-theme stop verbatim,
+  // so the «Вечер» gradient paired a themed `accent` with a day-lit stop.
+  accentGradTop: string;
+  accentGradBottom: string;
   paid: string;
   warning: string;
   warningLight: string;
@@ -72,6 +77,8 @@ export const lightColors: ColorTokens = {
   primaryDeep: '#151E2D',
   accent: '#FFD364',
   accentSoft: 'rgba(255,211,100,0.30)',
+  accentGradTop: '#FFE6A6',
+  accentGradBottom: '#E8B43C',
   paid: '#27360D',
   warning: '#E0A93A',
   warningLight: 'rgba(224,169,58,0.18)',
@@ -109,6 +116,10 @@ export const darkColors: ColorTokens = {
   primaryDeep: '#EBB65C',
   accent: '#EBB65C',
   accentSoft: 'rgba(235,182,92,0.20)',
+  // Same chromatic family as the evening `accent` (#EBB65C), lighter/darker shades —
+  // top lifts toward cream, bottom deepens toward amber, mirroring the day pair's spread.
+  accentGradTop: '#F5D08A',
+  accentGradBottom: '#D9A24B',
   paid: '#93B183',
   warning: '#E7B25A',
   warningLight: 'rgba(231,178,90,0.18)',
@@ -177,6 +188,19 @@ export const catColors = {
 } as const;
 
 export type CatColor = keyof typeof catColors;
+
+/**
+ * Ring's gradient stops (`ui/Ring.tsx`) — intentionally FROZEN brand colours (top-left →
+ * bottom-right), matched verbatim from the prototype. INVARIANT: Ring stays deliberately
+ * OUTSIDE the light/dark theme system — do NOT wire these to `accentGrad*`/`accent` above;
+ * this constant exists only so the exception lives in tokens.ts instead of a component
+ * comment (review fix TP-REVIEW-0810).
+ */
+export const brandGradient = {
+  from: '#FFE6A6',
+  mid: '#FFD364',
+  to: '#E8B43C',
+} as const;
 
 /** Multi-series chart palette — DERIVED from the categorical accents so avatars, calendar
  *  markers and charts share ONE source of truth (UI-v2 S16 «сведение двух наборов»). */

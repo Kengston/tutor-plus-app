@@ -131,16 +131,24 @@ export default function LessonCardScreen() {
       setPendingStartsAt(ms);
       setRescheduleScopeOpen(true);
     } else {
-      void rescheduleLesson(lesson, ms);
-      goBack();
+      // The mutation refuses for done/cancelled/money-carrying lessons — report the
+      // refusal instead of silently navigating away as if the move happened.
+      void rescheduleLesson(lesson, ms).then((moved) => {
+        if (!moved) {
+          snack.show(refusalText());
+          return;
+        }
+        goBack();
+      });
     }
   };
   const onRescheduleScopePick = (scope: Scope) => {
     setRescheduleScopeOpen(false);
     if (!lesson || pendingStartsAt === null) return;
-    void scopeReschedule(lesson, scope, pendingStartsAt).then(({ affected, undo }) => {
+    void scopeReschedule(lesson, scope, pendingStartsAt).then(({ affected, undo, reason }) => {
       if (affected === 0) {
-        snack.show(refusalText()); // same protection rules as the cancel path
+        // A day-change refusal is not a protection: name the supported path instead.
+        snack.show(reason === 'weekday' ? t('snack.seriesDayViaEditor') : refusalText());
         return;
       }
       snack.show(t('snack.rescheduled'), { actionLabel: t('action.undo'), onAction: () => void undo() });
@@ -152,6 +160,12 @@ export default function LessonCardScreen() {
   const recordPaymentWithUndo = (type: Exclude<TxnType, 'expected'>) => {
     if (!lesson) return;
     void recordLessonPayment(lesson, { type }).then((txn) => {
+      // null → the effective ledger already carries this state (double tap / stale sheet):
+      // nothing was written, so no success snack and nothing to undo.
+      if (!txn) {
+        snack.show(t('snack.noChanges'));
+        return;
+      }
       snack.show(t('snack.paymentRecorded'), {
         actionLabel: t('action.cancel'),
         onAction: () => {
@@ -248,11 +262,15 @@ export default function LessonCardScreen() {
               </Pressable>
             )}
 
+            {/* Paid → no further money action exists; opening a sheet of two disabled
+                choices is a dead end, so the entry point itself goes quiet. */}
             <Pressable
               onPress={() => setPayingOpen(true)}
+              disabled={pay === 'paid'}
               style={({ pressed }) => [
                 styles.action,
                 { backgroundColor: colors.stoneLight, borderRadius: radius.field },
+                pay === 'paid' && styles.disabled,
                 pressed && styles.pressed,
               ]}>
               <Icon name="wallet" size={18} sw={1.8} stroke={colors.body} />
@@ -335,8 +353,12 @@ export default function LessonCardScreen() {
 
           {payingOpen ? (
             <Sheet title={t('lesson.recordPayment')} onClose={() => setPayingOpen(false)}>
+              {/* Choices mirror the mutation's idempotency rule (belt + suspenders): a paid
+                  lesson takes no further money action; an open debt only takes «Оплачено»
+                  (settlement). The mutation still refuses if a stale sheet slips through. */}
               <View style={styles.paySheet}>
                 <Pressable
+                  disabled={pay === 'paid'}
                   onPress={() => {
                     recordPaymentWithUndo('paid');
                     setPayingOpen(false);
@@ -344,12 +366,14 @@ export default function LessonCardScreen() {
                   style={({ pressed }) => [
                     styles.payChoice,
                     { backgroundColor: colors.stoneLight, borderRadius: radius.field },
+                    pay === 'paid' && styles.disabled,
                     pressed && styles.pressed,
                   ]}>
                   <Dot tone="green" />
                   <Text style={[styles.payChoiceLabel, { color: colors.heading }]}>{t('pay.paid')}</Text>
                 </Pressable>
                 <Pressable
+                  disabled={pay !== 'expected'}
                   onPress={() => {
                     recordPaymentWithUndo('debt');
                     setPayingOpen(false);
@@ -357,6 +381,7 @@ export default function LessonCardScreen() {
                   style={({ pressed }) => [
                     styles.payChoice,
                     { backgroundColor: colors.stoneLight, borderRadius: radius.field },
+                    pay !== 'expected' && styles.disabled,
                     pressed && styles.pressed,
                   ]}>
                   <Dot tone="red" />

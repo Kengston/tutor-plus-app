@@ -17,7 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useProfile } from '@/db/hooks';
 import { updateProfile } from '@/db/mutations';
 import { DURATIONS, type Duration, type LessonFormat } from '@/domain/types';
-import { activityDefaultClientType, useMode, useT, type Activity, type ClientType, type StringKey } from '@/i18n';
+import { activityDefaultClientType, activityLabel, useMode, useT, type Activity, type ClientType, type StringKey } from '@/i18n';
 import { useAuth } from '@/lib/auth';
 import { isStrongPassword, isValidContact, passwordChecks } from '@/lib/auth-validate';
 import { useBack } from '@/lib/nav';
@@ -26,15 +26,13 @@ import { Icon, Segmented } from '@/ui';
 
 const TOTAL_STEPS = 5;
 
-/** Spec-verbatim activity labels (§3.4 шаг 3), mapped onto the Activity union. */
-const ACTIVITIES: { key: Activity; label: StringKey }[] = [
-  { key: 'teacher', label: 'activity.teacherFull' },
-  { key: 'psychologist', label: 'activity.psychologist' },
-  { key: 'coach', label: 'activity.coach' },
-  { key: 'mentor', label: 'activity.mentorFull' },
-  { key: 'trainer', label: 'activity.consultant' },
-  { key: 'other', label: 'activity.otherFull' },
-];
+/** Spec-verbatim activity labels (§3.4 шаг 3), mapped onto the Activity union. The wizard is
+ *  the label CANON (ADR-0014 §7) — `activityLabel` (src/i18n/index.tsx) is the one enum→key
+ *  mapping every screen resolves through, so the profile editor can't diverge again. */
+const ACTIVITIES: { key: Activity; label: StringKey }[] = (Object.keys(activityLabel) as Activity[]).map((key) => ({
+  key,
+  label: activityLabel[key],
+}));
 
 /** Reminder lead-times (reused from notification settings). */
 const LEADS: { key: number; label: StringKey }[] = [
