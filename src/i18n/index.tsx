@@ -30,6 +30,22 @@ export const activityDefaultClientType: Record<Activity, ClientType> = {
   other: 'Клиент',
 };
 
+/**
+ * ONE canonical enum→dict-key mapping for activity labels (review fix, TP-REVIEW-0810):
+ * the registration wizard (spec 03 §3.4 / ADR-0014 §7) and the profile editor used to render
+ * TWO diverging label sets for the same `Activity` value (e.g. `trainer` showed «Консультант»
+ * at sign-up but «Тренер» in the profile). The wizard is canon — every caller resolves labels
+ * through this map instead of hardcoding its own `activity.*` key per screen.
+ */
+export const activityLabel: Record<Activity, StringKey> = {
+  teacher: 'activity.teacher',
+  psychologist: 'activity.psychologist',
+  coach: 'activity.coach',
+  mentor: 'activity.mentor',
+  trainer: 'activity.trainer',
+  other: 'activity.other',
+};
+
 interface DualModeContextValue {
   clientType: ClientType;
   mode: Mode;

@@ -1,4 +1,4 @@
-import { useEffect, useId, type ReactNode } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
@@ -8,17 +8,13 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle, Defs, G, LinearGradient, Stop } from 'react-native-svg';
 
-import { useTheme } from '@/theme';
+import { brandGradient, useTheme } from '@/theme';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-// Ring gradient stops are intentionally fixed brand colours (top-left → bottom-right),
-// independent of light/dark theme — matched from the prototype.
-const GRAD_FROM = '#FFE6A6';
-const GRAD_MID = '#FFD364';
-const GRAD_TO = '#E8B43C';
-
 const FILL_DURATION = 1000;
+/** By this point the fill is at rest one way or another — see the frame-safety note below. */
+const FILL_DEADLINE_MS = FILL_DURATION + 80;
 
 export interface RingProps {
   /** 0..1 progress. */
@@ -48,6 +44,15 @@ export function Ring(props: RingProps) {
   // the offset on the UI thread keeps the fill smooth on web and native alike.
   const fill = useSharedValue(run ? 0 : target);
 
+  // Frame-safety insurance (same pattern as ui/Snackbar, ui/Sheet — see their file headers):
+  // the arc starts at `strokeDashoffset = circ` (fully empty) and only reaches its target via
+  // `withTiming`, which rides on the frame loop. A backgrounded tab stalls that loop — with
+  // zero frames delivered the ring would stay empty forever. `settled` is a TIMER's guarantee,
+  // independent of frames, that the arc ends up at its target regardless. Triggered from the
+  // effect (fires with or without frames), never from `onLayout` (rides on ResizeObserver,
+  // which starves alongside `requestAnimationFrame`).
+  const [settled, setSettled] = useState(false);
+
   useEffect(() => {
     if (run) {
       fill.value = 0;
@@ -58,11 +63,21 @@ export function Ring(props: RingProps) {
     } else {
       fill.value = target;
     }
+    const deadline = setTimeout(() => setSettled(true), FILL_DEADLINE_MS);
+    // Re-arm on the NEXT run (progress/`run` change) or unmount — mirrors Sheet's re-arm in
+    // its effect cleanup, not the body, so this isn't a synchronous setState-in-effect.
+    return () => {
+      clearTimeout(deadline);
+      setSettled(false);
+    };
   }, [fill, run, target]);
 
   const animatedProps = useAnimatedProps(() => ({
     strokeDashoffset: circ * (1 - fill.value),
   }));
+  // Flat fallback once `settled`: a plain prop, not a shared-value read, so it renders
+  // correctly even if the animated path above never delivered a single frame.
+  const restOffset = circ * (1 - target);
 
   // Unique, deterministic gradient id per instance (SSR-safe under react-native-web).
   const gradId = `ring-grad-${useId()}`;
@@ -72,9 +87,9 @@ export function Ring(props: RingProps) {
       <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <Defs>
           <LinearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
-            <Stop offset="0%" stopColor={GRAD_FROM} />
-            <Stop offset="55%" stopColor={GRAD_MID} />
-            <Stop offset="100%" stopColor={GRAD_TO} />
+            <Stop offset="0%" stopColor={brandGradient.from} />
+            <Stop offset="55%" stopColor={brandGradient.mid} />
+            <Stop offset="100%" stopColor={brandGradient.to} />
           </LinearGradient>
         </Defs>
         {/* Rotate -90° via the SVG transform string (rotate about the centre) —
@@ -98,7 +113,7 @@ export function Ring(props: RingProps) {
             strokeWidth={stroke}
             strokeLinecap="round"
             strokeDasharray={[circ, circ]}
-            animatedProps={animatedProps}
+            {...(settled ? { strokeDashoffset: restOffset } : { animatedProps })}
           />
         </G>
       </Svg>

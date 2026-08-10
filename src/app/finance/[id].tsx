@@ -1,11 +1,12 @@
 import { useLocalSearchParams } from 'expo-router';
-import { type ReactNode, useMemo } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/EmptyState';
-import { useExpectation, useStudent, useSubjects, useTransaction } from '@/db/hooks';
+import { useExpectation, useStudent, useStudentTransactions, useSubjects, useTransaction } from '@/db/hooks';
 import { createTransaction, settleExpectationPaid } from '@/db/mutations';
+import { openStandaloneDebts } from '@/domain/aggregates';
 import type { PayMethod, PayStatus } from '@/domain/types';
 import { useT } from '@/i18n';
 import { formatRub } from '@/lib/format';
@@ -58,6 +59,24 @@ export default function OperationDetailScreen() {
   const txn = useTransaction(isExpectation ? '' : id);
   const expectation = useExpectation(isExpectation ? id : '');
 
+  // The row's CURRENT state comes from the effective ledger, not the row itself: a debt txn
+  // never mutates when settled (append-only), so «settled since» must be derived — same rule
+  // as notification/[id].tsx (review fix S14). Without it the screen re-offered «Отметить
+  // оплату» on an already-settled debt, appending income twice. For a standalone debt the
+  // OUTSTANDING amount matters too: the Finance list shows the FIFO remainder (ADR-0011),
+  // and the amount this screen shows/settles must be that same remainder — settling the
+  // original full amount over a partial payment would mint phantom credit.
+  const studentTxns = useStudentTransactions(txn?.studentId ?? '');
+  const outstanding =
+    txn?.type === 'debt'
+      ? txn.lessonId != null
+        ? studentTxns.some((x) => x.type === 'paid' && x.lessonId === txn.lessonId)
+          ? 0
+          : txn.amount
+        : (openStandaloneDebts(studentTxns).get(txn.id) ?? 0)
+      : 0;
+  const debtSettled = txn?.type === 'debt' && outstanding === 0;
+
   // Normalise txn / expectation to one view — `canSettle` drives the «Отметить оплату» action.
   const view = useMemo<
     | { studentId: string; amount: number; dateMs: number; kind: PayStatus; method: PayMethod | null; subjectId: string | null; canSettle: boolean }
@@ -72,21 +91,24 @@ export default function OperationDetailScreen() {
         kind: 'expected',
         method: null, // an expectation has no payment method until settled
         subjectId: null,
-        canSettle: true,
+        // A closed expectation is history — its `paid` txn already shows in the list.
+        canSettle: expectation.status === 'open',
       };
     }
     if (!txn) return null;
-    // A real txn is paid | debt (`expected` is never stored, ADR-0008/0011); debt is settleable.
+    // A real txn is paid | debt (`expected` is never stored, ADR-0008/0011); a debt is
+    // settleable only while the effective ledger still carries it open, and it shows the
+    // OUTSTANDING remainder — the exact amount «Отметить оплату» will append.
     return {
       studentId: txn.studentId,
-      amount: txn.amount,
+      amount: txn.type === 'debt' && !debtSettled ? outstanding : txn.amount,
       dateMs: txn.occurredAt,
-      kind: txn.type,
+      kind: txn.type === 'debt' && debtSettled ? 'paid' : txn.type,
       method: txn.method,
       subjectId: txn.subjectId,
-      canSettle: txn.type === 'debt',
+      canSettle: txn.type === 'debt' && !debtSettled,
     };
-  }, [isExpectation, expectation, txn]);
+  }, [isExpectation, expectation, txn, debtSettled, outstanding]);
 
   // Owner + optional subject name (live subjects table; FK → row, no ORM join, ADR-0007).
   const student = useStudent(view?.studentId ?? '');
@@ -98,17 +120,26 @@ export default function OperationDetailScreen() {
 
   const amountColor = view ? kindColor(view.kind, colors) : colors.heading;
 
+  // In-flight guard: the derived `canSettle` flips only after the txn lands, so a double
+  // tap before `goBack()` would append two settlements without it.
+  const [settling, setSettling] = useState(false);
+
   /** Settle a debt or an expectation: APPEND a `paid` txn (an expectation also flips closed), then pop. */
   const markPaid = async () => {
+    if (settling) return;
     if (isExpectation) {
       if (!expectation) return;
+      setSettling(true);
       await settleExpectationPaid(expectation, { method: 'transfer' });
     } else {
-      if (!txn) return;
+      if (!txn || outstanding <= 0) return;
+      setSettling(true);
       await createTransaction({
         studentId: txn.studentId,
         type: 'paid',
-        amount: txn.amount,
+        // The FIFO remainder, not the original row amount — over a partial payment the
+        // full amount would overpay and mint phantom standalone credit (ADR-0011).
+        amount: outstanding,
         method: 'transfer',
         lessonId: txn.lessonId,
         subjectId: txn.subjectId,
@@ -171,10 +202,11 @@ export default function OperationDetailScreen() {
           {view.canSettle ? (
             <Pressable
               onPress={markPaid}
+              disabled={settling}
               style={({ pressed }) => [
                 styles.action,
                 { backgroundColor: colors.primary, borderRadius: radius.field },
-                pressed && styles.pressed,
+                (pressed || settling) && styles.pressed,
               ]}>
               <Icon name="check" size={18} sw={1.9} stroke={colors.onTint} />
               <Text style={[styles.actionLabel, { color: colors.onTint }]}>{t('finance.markPaidCta')}</Text>

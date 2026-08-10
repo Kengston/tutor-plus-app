@@ -33,9 +33,6 @@ const TRACK_THICKNESS = 4;
 const DOT_SIZE = 11;
 const NOW_SIZE = 13;
 
-/** Past-fill gradient — prototype hardcodes `accent → #E8B43C`. */
-const FILL_GRADIENT_END = '#E8B43C';
-
 const clamp01 = (f: number) => Math.min(Math.max(f, 0), 1);
 const pct = (f: number) => `${clamp01(f) * 100}%` as const;
 
@@ -77,9 +74,11 @@ export function DayLane(props: DayLaneProps) {
           width="100%"
           height={LANE_HEIGHT}>
           <Defs>
+            {/* Themed end stop (review fix TP-REVIEW-0810) — was a day-only hardcoded hex
+                paired with the already-themed `colors.accent` start stop. */}
             <LinearGradient id="dayLanePast" x1="0%" y1="0%" x2="100%" y2="0%">
               <Stop offset="0%" stopColor={colors.accent} />
-              <Stop offset="100%" stopColor={FILL_GRADIENT_END} />
+              <Stop offset="100%" stopColor={colors.accentGradBottom} />
             </LinearGradient>
           </Defs>
           <Line

@@ -11,20 +11,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useProfile } from '@/db/hooks';
 import type { ProfileModel } from '@/db/models';
 import { updateProfile } from '@/db/mutations';
-import { useMode, useT, type Activity, type ClientType, type StringKey } from '@/i18n';
+import { activityLabel, useMode, useT, type Activity, type ClientType, type StringKey } from '@/i18n';
 import { useBack } from '@/lib/nav';
 import { useTheme } from '@/theme';
 import { Card, Icon, SectionLabel, Segmented, Sheet } from '@/ui';
 
-/** Activities offered in the picker (spec 10 §10.2 — 6 вариантов), labels via i18n `activity.*`. */
-const ACTIVITIES: { key: Activity; label: StringKey }[] = [
-  { key: 'teacher', label: 'activity.teacher' },
-  { key: 'psychologist', label: 'activity.psychologist' },
-  { key: 'coach', label: 'activity.coach' },
-  { key: 'mentor', label: 'activity.mentor' },
-  { key: 'trainer', label: 'activity.trainer' },
-  { key: 'other', label: 'activity.other' },
-];
+/** Activities offered in the picker (spec 10 §10.2 — 6 вариантов). Labels resolve through the
+ *  ONE canonical `activityLabel` map (src/i18n/index.tsx, review fix TP-REVIEW-0810) — the
+ *  registration wizard is canon, so this picker can no longer diverge from it. */
+const ACTIVITIES: { key: Activity; label: StringKey }[] = (Object.keys(activityLabel) as Activity[]).map((key) => ({
+  key,
+  label: activityLabel[key],
+}));
 
 export default function ProfileEditScreen() {
   const profile = useProfile();
@@ -58,7 +56,7 @@ function ProfileEditForm({ profile }: { profile: ProfileModel }) {
     void updateProfile(profile, { clientType: next });
   };
 
-  const activityLabel = ACTIVITIES.find((a) => a.key === profile.activity)?.label ?? 'activity.teacher';
+  const currentActivityLabel = activityLabel[profile.activity];
 
   return (
     <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
@@ -90,7 +88,7 @@ function ProfileEditForm({ profile }: { profile: ProfileModel }) {
             style={({ pressed }) => [styles.pickRow, pressed && styles.pressed]}>
             <Text style={[styles.rowLabel, { color: colors.muted }]}>{t('settings.activity')}</Text>
             <Text numberOfLines={1} style={[styles.rowValue, { color: colors.heading }]}>
-              {t(activityLabel)}
+              {t(currentActivityLabel)}
             </Text>
             <Icon name="chevronRight" size={18} stroke={colors.stoneInactive} />
           </Pressable>

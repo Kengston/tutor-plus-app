@@ -267,6 +267,40 @@ export function debtors(
   return out;
 }
 
+/**
+ * Remaining amount of every still-open standalone debt txn, netted PER STUDENT against
+ * that student's standalone payments OLDEST-FIRST (FIFO — mirrors `unsettledDebts`).
+ * A fully covered debt is absent from the map. Shared by `financeEntries` (list rows)
+ * and the operation-detail screen, so the amount a row SHOWS is exactly the amount its
+ * «Отметить оплату» will append — the two must never diverge.
+ */
+export function openStandaloneDebts(
+  transactions: readonly Pick<TxnSlice, 'id' | 'studentId' | 'type' | 'amount' | 'lessonId' | 'occurredAt'>[],
+): Map<string, number> {
+  const byStudent = new Map<string, { debts: { id: string; amount: number; occurredAt: number }[]; credit: number }>();
+  for (const t of transactions) {
+    if (t.lessonId != null) continue;
+    const e = byStudent.get(t.studentId) ?? { debts: [], credit: 0 };
+    if (t.type === 'debt') e.debts.push({ id: t.id, amount: t.amount, occurredAt: t.occurredAt });
+    else if (t.type === 'paid') e.credit += t.amount;
+    byStudent.set(t.studentId, e);
+  }
+  const out = new Map<string, number>();
+  for (const { debts, credit } of byStudent.values()) {
+    debts.sort((a, b) => a.occurredAt - b.occurredAt);
+    let remaining = credit;
+    for (const d of debts) {
+      if (remaining >= d.amount) {
+        remaining -= d.amount;
+        continue; // fully settled
+      }
+      out.set(d.id, d.amount - remaining);
+      remaining = 0;
+    }
+  }
+  return out;
+}
+
 // ── Finance entries (view-model union, ADR-0011) ─────────────────────────────
 
 /** Per-lesson linked-txn presence — internal cache so financeEntries is O(L+T), not O(L·T). */
@@ -338,20 +372,26 @@ export function financeEntries(
     });
   }
 
+  // Standalone debts are NETTED per student (ADR-0011 §2/§4: «Долги» показывает
+  // непогашенные — погашенное выпадает): a fully covered debt row disappears, a
+  // partially covered one shows its remainder. Without this a settled prepayment-debt
+  // sat in the list forever while Analytics (`debtors`) already counted it as gone.
+  const open = openStandaloneDebts(transactions);
   for (const t of transactions) {
-    if (t.lessonId == null && t.type === 'debt') {
-      entries.push({
-        id: t.id,
-        kind: 'debt',
-        studentId: t.studentId,
-        lessonId: null,
-        subjectId: t.subjectId,
-        amount: t.amount,
-        occurredAt: t.occurredAt,
-        method: t.method,
-        source: 'txn',
-      });
-    }
+    if (t.lessonId != null || t.type !== 'debt') continue;
+    const remaining = open.get(t.id);
+    if (remaining == null) continue;
+    entries.push({
+      id: t.id,
+      kind: 'debt',
+      studentId: t.studentId,
+      lessonId: null,
+      subjectId: t.subjectId,
+      amount: remaining,
+      occurredAt: t.occurredAt,
+      method: t.method,
+      source: 'txn',
+    });
   }
 
   for (const x of expectations) {

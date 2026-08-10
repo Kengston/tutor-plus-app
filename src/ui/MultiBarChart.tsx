@@ -28,9 +28,6 @@ export interface MultiBarChartProps {
   calm?: boolean;
 }
 
-/** Prototype-hardcoded gradient top stop for the highlighted ("on") bar. */
-const ACCENT_TOP = '#FFE6A6';
-
 const clamp01 = (n: number) => Math.min(Math.max(n, 0), 1);
 
 /** Single vertical bar with a top→base gradient fill (SVG, web-safe). */
@@ -65,7 +62,9 @@ export function MultiBarChart(props: MultiBarChartProps) {
         {data.map((b, i) => {
           // `on` → amber accent; `calm` → neutral stone (so the current bar pops); else categorical.
           const base = b.on ? colors.accent : calm ? colors.stoneInactive : chartColors[i % chartColors.length];
-          const top = b.on ? ACCENT_TOP : base;
+          // Themed gradient top stop (review fix TP-REVIEW-0810) — was a day-only hardcoded
+          // hex, which paired wrong with the evening `accent` base stop below.
+          const top = b.on ? colors.accentGradTop : base;
           const frac = clamp01(b.v);
           const cmp = showCompare && compare ? compare[i] : null;
           const showCmp = cmp != null;

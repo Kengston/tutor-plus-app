@@ -8,7 +8,7 @@ const TODAY = day(0);
 
 /** Sibling lesson stub for slot `s1` on day `offset`. */
 function les(id: string, offset: number, over: Partial<ScopeLessonSlice> = {}): ScopeLessonSlice {
-  return { id, slotId: 's1', slotDate: day(offset), lifecycleStatus: 'upcoming', ...over };
+  return { id, slotId: 's1', slotDate: day(offset), lifecycleStatus: 'upcoming', modified: false, ...over };
 }
 
 const NONE = new Set<string>();
@@ -59,7 +59,7 @@ describe('scopeAffectedLessons', () => {
   });
 
   it('a standalone (non-series) anchor is cancellable only as «one»', () => {
-    const standalone: ScopeLessonSlice = { id: 'x', slotId: null, slotDate: null, lifecycleStatus: 'upcoming' };
+    const standalone: ScopeLessonSlice = { id: 'x', slotId: null, slotDate: null, lifecycleStatus: 'upcoming', modified: false };
     expect(scopeAffectedLessons({ anchor: standalone, siblings: [], scope: 'one', today: TODAY, protectedIds: NONE })).toEqual(['x']);
   });
 
@@ -78,14 +78,36 @@ describe('scopeAffectedLessons', () => {
     expect(out).toEqual(['pastAnchor', 'future']);
   });
 
-  it('a protected anchor yields nothing (money/history stays intact)', () => {
-    const out = scopeAffectedLessons({ anchor: les('anchor', 0), siblings, scope: 'following', today: TODAY, protectedIds: new Set(['anchor']) });
+  it('«one» on a protected anchor yields nothing (money/history stays intact)', () => {
+    const out = scopeAffectedLessons({ anchor: les('anchor', 0), siblings, scope: 'one', today: TODAY, protectedIds: new Set(['anchor']) });
     expect(out).toEqual([]);
+  });
+
+  it('a protected anchor blocks only ITSELF — following/all still affect free siblings', () => {
+    // A paid-for occurrence must not make the whole remaining series uncancellable: the
+    // pre-fix behaviour returned [] here, so a series with money on today's lesson could
+    // never be cancelled from it (the review's M3 over-blocking).
+    const out = scopeAffectedLessons({ anchor: les('anchor', 0), siblings, scope: 'following', today: TODAY, protectedIds: new Set(['anchor']) });
+    expect(out).toEqual(['next', 'later']);
+    expect(out).not.toContain('anchor');
   });
 
   it('always includes the anchor in following/all even if siblings are protected', () => {
     const list = [les('anchor', 0), les('next', 7, { lifecycleStatus: 'done' })];
     const out = scopeAffectedLessons({ anchor: les('anchor', 0), siblings: list, scope: 'following', today: TODAY, protectedIds: NONE });
     expect(out).toEqual(['anchor']);
+  });
+
+  it('a manually edited (`modified`) sibling is detached — series edits skip it (ADR-0016 §6)', () => {
+    const list = [les('anchor', 0), les('moved', 7, { modified: true }), les('later', 14)];
+    const out = scopeAffectedLessons({ anchor: les('anchor', 0), siblings: list, scope: 'all', today: TODAY, protectedIds: NONE });
+    expect(out).toEqual(['anchor', 'later']);
+    expect(out).not.toContain('moved');
+  });
+
+  it('a modified ANCHOR is still included — the user explicitly chose it', () => {
+    const list = [les('anchor', 0, { modified: true }), les('later', 7)];
+    const out = scopeAffectedLessons({ anchor: les('anchor', 0, { modified: true }), siblings: list, scope: 'following', today: TODAY, protectedIds: NONE });
+    expect(out).toEqual(['anchor', 'later']);
   });
 });

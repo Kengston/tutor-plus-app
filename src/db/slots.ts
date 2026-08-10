@@ -16,10 +16,11 @@ import { Q } from '@nozbe/watermelondb';
 
 import { materializeSlots, type ExistingOccurrence } from '@/domain/schedule-slots';
 import type { Duration, LessonFormat, ScheduleSlot } from '@/domain/types';
+import { withoutReversals } from '@/domain/undo';
 import { parseScheduleString } from '@/lib/schedule-parse';
 
 import { database } from '.';
-import { LessonModel, ScheduleSlotModel, StudentModel } from './models';
+import { LessonModel, ScheduleSlotModel, StudentModel, TransactionModel } from './models';
 
 const DAY = 86_400_000;
 /** How far ahead lessons are materialized (ADR-0016: 2–4 weeks). */
@@ -81,9 +82,39 @@ export async function createSlot(input: SlotInput): Promise<ScheduleSlotModel> {
   );
 }
 
-/** Patch a slot (schedule editor). */
+/**
+ * Future occurrences of a slot that are still PURE PROJECTIONS of it — upcoming, never
+ * manually edited (`modified`), carrying no effective money — from `fromDay` on. These are
+ * the rows a slot-config change may rewrite or drop; everything else (past, conducted,
+ * cancelled, manually moved, paid/debt-anchored) is untouchable (ADR-0016 §3–4).
+ * Must be called INSIDE `database.write` (it is a read+decide step of a writer).
+ */
+async function regenerableLessons(slotId: string, fromDay: number): Promise<LessonModel[]> {
+  const linked = await lessonsC()
+    .query(Q.where('slot_id', slotId), Q.where('slot_date', Q.gte(fromDay)))
+    .fetch();
+  const candidates = linked.filter((l) => !l.modified && l.lifecycleStatus === 'upcoming');
+  if (candidates.length === 0) return [];
+  const txns = await database
+    .get<TransactionModel>('transactions')
+    .query(Q.where('lesson_id', Q.oneOf(candidates.map((l) => l.id))))
+    .fetch();
+  const moneyed = new Set(withoutReversals(txns).map((t) => t.lessonId));
+  return candidates.filter((l) => !moneyed.has(l.id));
+}
+
+/**
+ * Patch a slot (schedule editor) AND re-target its already-materialized future occurrences
+ * (ADR-0016 §3 «перегенерация будущих немодифицированных занятий»). Without this, a weekday
+ * change leaves the old-day lessons alive while materialization adds the new day — doubling
+ * the week — and a time change «succeeds» on the slot while every lesson keeps the old time.
+ * A weekday change DELETES the regenerable occurrences (they are pure projections; the
+ * caller's `materializeSchedule` recreates them on the new day); other field changes rewrite
+ * the occurrences in place.
+ */
 export async function updateSlot(slot: ScheduleSlotModel, patch: Partial<SlotInput>): Promise<void> {
   await database.write(async () => {
+    const dayChanged = patch.weekday !== undefined && patch.weekday !== slot.weekday;
     await slot.update((s) => {
       if (patch.weekday !== undefined) s.weekday = patch.weekday;
       if (patch.timeMin !== undefined) s.timeMin = patch.timeMin;
@@ -94,15 +125,53 @@ export async function updateSlot(slot: ScheduleSlotModel, patch: Partial<SlotInp
       if (patch.activeFrom !== undefined) s.activeFrom = patch.activeFrom;
       if (patch.activeTo !== undefined) s.activeTo = patch.activeTo;
     });
+    for (const l of await regenerableLessons(slot.id, startOfDay(Date.now()))) {
+      if (dayChanged) {
+        await l.destroyPermanently();
+      } else {
+        await l.update((m) => {
+          if (patch.timeMin !== undefined && l.slotDate != null) m.startsAt = l.slotDate + patch.timeMin * 60_000;
+          if (patch.durationMin !== undefined) m.durationMin = patch.durationMin;
+          if (patch.format !== undefined) m.format = patch.format;
+          if (patch.price !== undefined) m.price = patch.price;
+          if (patch.subjectId !== undefined) m.subjectId = patch.subjectId;
+        });
+      }
+    }
   });
 }
 
-/** Close a slot from today (stops future materialization; past lessons are untouched). */
+/**
+ * Close a slot from today: stop future materialization AND drop the future occurrences it
+ * already materialized (pure projections only — see `regenerableLessons`). Leaving them
+ * alive kept up to 28 days of lessons, and their expected income, for a series the user
+ * just removed. Past/conducted/moneyed/modified lessons are untouched.
+ */
 export async function closeSlot(slot: ScheduleSlotModel): Promise<void> {
   await database.write(async () => {
+    const today = startOfDay(Date.now());
     await slot.update((s) => {
-      s.activeTo = startOfDay(Date.now());
+      s.activeTo = today;
     });
+    // Same boundary as the generator (`activeTo` is exclusive): today's occurrence goes too.
+    for (const l of await regenerableLessons(slot.id, today)) await l.destroyPermanently();
+  });
+}
+
+/**
+ * Drop every future materialized projection of a student's slots (pure projections only —
+ * see `regenerableLessons`). Called when the student leaves the `active` status: a paused/
+ * archived student must not keep 4 weeks of lessons on the timeline and in the expected
+ * income, and `materializeSchedule` (active-only) would no longer regenerate them anyway —
+ * without this sweep a later slot edit would delete them one-sidedly instead.
+ */
+export async function dropStudentProjections(studentId: string): Promise<void> {
+  await database.write(async () => {
+    const today = startOfDay(Date.now());
+    const slots = await slotsC().query(Q.where('student_id', studentId)).fetch();
+    for (const s of slots) {
+      for (const l of await regenerableLessons(s.id, today)) await l.destroyPermanently();
+    }
   });
 }
 
@@ -147,27 +216,38 @@ export async function ensureSlotsFromSchedule(): Promise<void> {
  * Returns the number of lessons created.
  */
 export async function materializeSchedule(): Promise<number> {
-  const slotModels = await slotsC().query().fetch();
-  if (slotModels.length === 0) return 0;
+  // The snapshot (slots + existing occurrences) is read INSIDE `write()` — the same
+  // StrictMode/HMR double-mount guard `ensureSlotsFromSchedule` documents: two concurrent
+  // runs must not both see an empty occurrence set and double-create (the schema has no
+  // unique index on (slot_id, slot_date) to catch it after the fact).
+  return database.write(async () => {
+    const slotModels = await slotsC().query().fetch();
+    if (slotModels.length === 0) return 0;
 
-  const now = Date.now();
-  const windowStart = startOfDay(now);
-  const windowEnd = windowStart + WINDOW_DAYS * DAY;
+    // Only ACTIVE students generate lessons — a paused/archived student's slots stay
+    // stored (their editor keeps them) but must not keep filling the schedule and the
+    // expected-income figures.
+    const students = await studentsC().query().fetch();
+    const activeIds = new Set(students.filter((s) => s.status === 'active').map((s) => s.id));
+    const eligible = slotModels.filter((s) => activeIds.has(s.studentId));
+    if (eligible.length === 0) return 0;
 
-  // Existing (slot_id, slot_date) occurrences — only slot-linked lessons matter.
-  const linked = await lessonsC().query(Q.where('slot_id', Q.notEq(null))).fetch();
-  const existing: ExistingOccurrence[] = linked.map((l) => ({ slotId: l.slotId, slotDate: l.slotDate }));
+    const now = Date.now();
+    const windowStart = startOfDay(now);
+    const windowEnd = windowStart + WINDOW_DAYS * DAY;
 
-  const specs = materializeSlots({
-    slots: slotModels.map(toSlot),
-    existing,
-    windowStart,
-    windowEnd,
-    now, // never create a past-dated «upcoming» lesson (a slot's time today already gone)
-  });
-  if (specs.length === 0) return 0;
+    // Existing (slot_id, slot_date) occurrences — only slot-linked lessons matter.
+    const linked = await lessonsC().query(Q.where('slot_id', Q.notEq(null))).fetch();
+    const existing: ExistingOccurrence[] = linked.map((l) => ({ slotId: l.slotId, slotDate: l.slotDate }));
 
-  await database.write(async () => {
+    const specs = materializeSlots({
+      slots: eligible.map(toSlot),
+      existing,
+      windowStart,
+      windowEnd,
+      now, // never create a past-dated «upcoming» lesson (a slot's time today already gone)
+    });
+
     for (const spec of specs) {
       await lessonsC().create((l) => {
         l.studentId = spec.studentId;
@@ -184,6 +264,6 @@ export async function materializeSchedule(): Promise<number> {
         l.lifecycleStatus = 'upcoming';
       });
     }
+    return specs.length;
   });
-  return specs.length;
 }
