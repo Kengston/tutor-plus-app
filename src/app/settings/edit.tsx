@@ -4,7 +4,6 @@
  * мессенджер» (v9 column), «Часовой пояс» (informational, ADR-0005). Writes go DB→context
  * one-way (ADR-0013 C): mode changes hit BOTH the context setter (instant) and the row.
  */
-import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,6 +12,7 @@ import { useProfile } from '@/db/hooks';
 import type { ProfileModel } from '@/db/models';
 import { updateProfile } from '@/db/mutations';
 import { useMode, useT, type Activity, type ClientType, type StringKey } from '@/i18n';
+import { useBack } from '@/lib/nav';
 import { useTheme } from '@/theme';
 import { Card, Icon, SectionLabel, Segmented, Sheet } from '@/ui';
 
@@ -33,7 +33,7 @@ export default function ProfileEditScreen() {
 }
 
 function ProfileEditForm({ profile }: { profile: ProfileModel }) {
-  const router = useRouter();
+  const goBack = useBack();
   const t = useT();
   const { colors } = useTheme();
   const { clientType, setClientType } = useMode();
@@ -62,7 +62,7 @@ function ProfileEditForm({ profile }: { profile: ProfileModel }) {
 
   return (
     <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
-      <Header title={t('set.editTitle')} onBack={() => router.back()} />
+      <Header title={t('set.editTitle')} onBack={() => goBack()} />
 
       <ScrollView
         contentContainerStyle={styles.content}

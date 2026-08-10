@@ -1,4 +1,3 @@
-import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -6,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useProfile } from '@/db/hooks';
 import { updateProfile } from '@/db/mutations';
 import { useT, type StringKey } from '@/i18n';
+import { useBack } from '@/lib/nav';
 import { scheduler } from '@/lib/notifications';
 import { useTheme } from '@/theme';
 import { Card, Icon, SectionLabel, Segmented } from '@/ui';
@@ -27,7 +27,7 @@ const LEADS: { key: number; label: StringKey }[] = [
 ];
 
 export default function NotificationSettingsScreen() {
-  const router = useRouter();
+  const goBack = useBack();
   const t = useT();
   const { colors, radius } = useTheme();
   const profile = useProfile();
@@ -56,7 +56,7 @@ export default function NotificationSettingsScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
-      <Header title={t('nset.title')} onBack={() => router.back()} />
+      <Header title={t('nset.title')} onBack={() => goBack()} />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Master switch — everything below is inert while off. */}

@@ -41,11 +41,15 @@
  * v11 (UI-v2 S17, spec 03 §3.4 шаг «Значения по умолчанию»): `profiles.default_rate` /
  * `default_duration` / `default_format` — the registration-wizard defaults seeded into a new
  * lesson. Nullable — null falls back to the pre-wizard behaviour (student rate / 60 / online).
+ *
+ * v12 (TP-FIX-0719, п. 6): `profiles.signed_in` — the auth session PERSISTS, so a reload or a
+ * direct link to an inner route no longer drops the user on `/sign-in`. Nullable, and null
+ * reads as signed out; the Phase-4 backend replaces it with a real GoTrue session (ADR-0014).
  */
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export const schema = appSchema({
-  version: 11,
+  version: 12,
   tables: [
     tableSchema({
       name: 'students',
@@ -159,6 +163,8 @@ export const schema = appSchema({
         { name: 'default_rate', type: 'number', isOptional: true },
         { name: 'default_duration', type: 'number', isOptional: true },
         { name: 'default_format', type: 'string', isOptional: true },
+        // v12: persisted auth session (null → signed out).
+        { name: 'signed_in', type: 'boolean', isOptional: true },
         { name: 'push_granted', type: 'boolean' },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },

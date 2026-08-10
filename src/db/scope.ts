@@ -122,6 +122,12 @@ export async function scopeCancel(anchor: LessonModel, scope: Scope, reason: str
   const affected = siblings.filter((l) => affectedIds.has(l.id)).map((l) => (l.id === anchor.id ? anchor : l));
   if (!affected.some((l) => l.id === anchor.id) && affectedIds.has(anchor.id)) affected.push(anchor);
 
+  // Everything was protected (money/conducted/cancelled) or fell outside the window → the
+  // operation is a NO-OP, and that has to include the SLOT. Closing the series here would
+  // stop future materialization for good while the caller reports «изменение не применено»
+  // — and a refusal carries no «Вернуть», so the damage would be silent and unrecoverable.
+  if (affected.length === 0) return { affected: 0, undo: async () => {} };
+
   const lessonSnaps = snapshot(affected);
   // Close the slot for series-wide scopes (following: from the anchor day; all: from today).
   const slot = scope !== 'one' && anchor.slotId ? await slotsC().find(anchor.slotId).catch(() => null) : null;
@@ -166,6 +172,10 @@ export async function scopeReschedule(anchor: LessonModel, scope: Scope, newStar
   const affectedIds = new Set(scopeAffectedLessons({ anchor, siblings, scope, today, protectedIds }));
   // Mutate the observed `anchor` instance for its own id (see scopeCancel) for a live re-render.
   const affected = siblings.filter((l) => affectedIds.has(l.id)).map((l) => (l.id === anchor.id ? anchor : l));
+
+  // Same no-op rule as `scopeCancel`: with nothing affected the slot's time-of-day must stay
+  // put too, or a refused reschedule would silently re-time the whole future series.
+  if (affected.length === 0) return { affected: 0, undo: async () => {} };
 
   const newTimeMin = timeOfDayMin(newStartsAt);
   const lessonSnaps = snapshot(affected);

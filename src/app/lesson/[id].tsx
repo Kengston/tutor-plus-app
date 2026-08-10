@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { type ReactNode, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,8 +21,9 @@ import type { Scope } from '@/domain/scope';
 import { type PayStatus, type TxnType } from '@/domain/types';
 import { lifecycleSnapshot } from '@/domain/undo';
 import { useT } from '@/i18n';
-import { useSnack } from '@/lib/snack';
 import { formatRub } from '@/lib/format';
+import { useBack } from '@/lib/nav';
+import { useSnack } from '@/lib/snack';
 import { hhmm } from '@/lib/time';
 import { useTheme } from '@/theme';
 import { Card, Dot, Icon, Sheet, type DotTone } from '@/ui';
@@ -41,7 +42,7 @@ const PAY_TONE: Record<PayStatus, DotTone> = { paid: 'green', debt: 'red', expec
 
 export default function LessonCardScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
+  const goBack = useBack();
   const t = useT();
   const { colors, radius } = useTheme();
   const dateLabel = useDateLabel();
@@ -64,6 +65,7 @@ export default function LessonCardScreen() {
 
   const series = lesson ? isSeriesLesson(lesson) : false;
   const conducted = lesson?.lifecycleStatus === 'done';
+  const cancelled = lesson?.lifecycleStatus === 'cancelled';
 
   // «Готово» + undo: snapshot BEFORE the mutation, «Вернуть» restores it.
   const conductWithUndo = () => {
@@ -93,15 +95,32 @@ export default function LessonCardScreen() {
     setCancelScopeOpen(false);
     setReasonOpen(true);
   };
+  /**
+   * A scope edit can touch NOTHING: `domain/scope` protects an occurrence that carries a
+   * money operation or is already done/cancelled, and «all» can land on an empty window
+   * (ADR-0016 §4). Reporting success there is a lie (the lesson stays put), and reporting
+   * the wrong reason is only marginally better — so name the one that actually applies.
+   * `txns` is the same reversal-filtered ledger the protection is computed from.
+   */
+  const refusalText = () => {
+    if (txns.length > 0) return t('snack.protectedByMoney');
+    if (lesson?.lifecycleStatus === 'done') return t('snack.protectedDone');
+    return t('snack.noChanges');
+  };
+
   const confirmCancel = () => {
     if (!lesson) return;
     setReasonOpen(false);
-    void scopeCancel(lesson, pendingCancelScope, reason.trim()).then(({ undo }) => {
+    void scopeCancel(lesson, pendingCancelScope, reason.trim()).then(({ affected, undo }) => {
+      if (affected === 0) {
+        snack.show(refusalText());
+        return;
+      }
       snack.show(t('snack.lessonCancelled'), { actionLabel: t('action.undo'), onAction: () => void undo() });
+      // Return to the schedule after the action (prototype pattern) — the cancelled lesson
+      // leaves the timeline, and the detail is a transient action screen.
+      goBack();
     });
-    // Return to the schedule after the action (prototype pattern) — the cancelled lesson
-    // leaves the timeline, and the detail is a transient action screen.
-    router.back();
   };
 
   // Reschedule: pick the new time, then a series lesson asks the scope; a standalone one
@@ -113,17 +132,21 @@ export default function LessonCardScreen() {
       setRescheduleScopeOpen(true);
     } else {
       void rescheduleLesson(lesson, ms);
-      router.back();
+      goBack();
     }
   };
   const onRescheduleScopePick = (scope: Scope) => {
     setRescheduleScopeOpen(false);
     if (!lesson || pendingStartsAt === null) return;
-    void scopeReschedule(lesson, scope, pendingStartsAt).then(({ undo }) => {
+    void scopeReschedule(lesson, scope, pendingStartsAt).then(({ affected, undo }) => {
+      if (affected === 0) {
+        snack.show(refusalText()); // same protection rules as the cancel path
+        return;
+      }
       snack.show(t('snack.rescheduled'), { actionLabel: t('action.undo'), onAction: () => void undo() });
+      // Return to the schedule, which reflects the new time (prototype pattern).
+      goBack();
     });
-    // Return to the schedule, which reflects the new time (prototype pattern).
-    router.back();
   };
   // Money undo (ADR-0002): «Отменить» appends the COMPENSATING row — never deletes.
   const recordPaymentWithUndo = (type: Exclude<TxnType, 'expected'>) => {
@@ -140,7 +163,7 @@ export default function LessonCardScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
-      <Header title={t('lesson.nom')} onBack={() => router.back()} />
+      <Header title={t('lesson.nom')} onBack={() => goBack()} />
 
       {!lesson ? (
         <EmptyState icon="calendar" text={t('common.none')} />
@@ -253,12 +276,15 @@ export default function LessonCardScreen() {
                 <Text style={[styles.actionLabel, { color: colors.body }]}>{t('action.reschedule')}</Text>
               </Pressable>
 
+              {/* Already cancelled → nothing left to cancel; the domain would refuse anyway. */}
               <Pressable
                 onPress={onCancelPress}
+                disabled={cancelled}
                 style={({ pressed }) => [
                   styles.action,
                   styles.actionGhost,
                   { backgroundColor: colors.dangerLight, borderRadius: radius.field },
+                  cancelled && styles.disabled,
                   pressed && styles.pressed,
                 ]}>
                 <Icon name="close" size={17} sw={2} stroke={colors.danger} />
@@ -432,4 +458,5 @@ const styles = StyleSheet.create({
   },
   payChoiceLabel: { fontSize: 15, fontWeight: '600' },
   pressed: { opacity: 0.85 },
+  disabled: { opacity: 0.45 },
 });

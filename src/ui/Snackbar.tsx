@@ -5,12 +5,16 @@
  * as in the prototype — dismissal is instant). Presentational only — queueing/auto-
  * dismiss live in the `useSnack()` provider (lib/snack).
  *
- * The entrance uses the Sheet-scrim pattern (shared value + `withTiming` kicked off
- * in `onLayout`) rather than a layout-animation `entering` prop: reanimated's web
- * entering leaves the element `visibility:hidden` without ever attaching the
- * keyframes (observed on RNW; the Sheet scrim pattern renders correctly).
+ * The entrance follows the same rule as `Sheet` (TP-FIX-0719, пп. 2/3/5): it must never be
+ * the ONLY way the bar becomes visible. The bar starts transparent and 14px low, and both an
+ * animation and a TIMER race to land it — because the frame loop stops whenever the tab/app
+ * is backgrounded, and this bar carries «Вернуть». Measured before the fix, with zero frames
+ * delivered: the snack mounted with the right text, stayed at `opacity: 0` for its whole life
+ * and auto-dismissed 3.5 s later — the action reported nothing and its undo was unreachable.
+ * (Its trigger used to be `onLayout`, which rides on ResizeObserver and starves along with
+ * `requestAnimationFrame`, so the entrance did not even start.)
  */
-import { useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 import Animated, {
   Easing,
@@ -31,9 +35,14 @@ export interface SnackbarProps {
 }
 
 /** Prototype `om-snack .28s cubic-bezier(.22,.61,.36,1)` — rise + fade in. */
-const ENTER: WithTimingConfig = { duration: 280, easing: Easing.bezier(0.22, 0.61, 0.36, 1) };
+const ENTER_MS = 280;
+const ENTER: WithTimingConfig = { duration: ENTER_MS, easing: Easing.bezier(0.22, 0.61, 0.36, 1) };
 /** Slide-up distance of the entrance (px). */
 const RISE = 14;
+/** By this point the bar is visible one way or another — a timer fires with or without frames. */
+const ENTER_DEADLINE_MS = ENTER_MS + 120;
+/** Flat resting style; plain values override whatever inline state the animation left behind. */
+const REST = { opacity: 1, transform: [{ translateY: 0 }] } as const;
 
 export function Snackbar({ message, actionLabel, onAction, bottom = 108 }: SnackbarProps) {
   const { colors, radius, shadow } = useTheme();
@@ -44,19 +53,23 @@ export function Snackbar({ message, actionLabel, onAction, bottom = 108 }: Snack
     opacity: opacity.value,
     transform: [{ translateY: translateY.value }],
   }));
-  // Kick the entrance off first layout (Sheet-scrim pattern) — runs once per mount;
-  // the host re-mounts the bar per `show` via a monotonic key, replaying the rise.
-  const onLayout = useCallback(() => {
+  // The entrance runs once per mount (the host re-mounts the bar per `show` via a monotonic
+  // key) and starts in an EFFECT, which needs no frame to fire — unlike the previous
+  // `onLayout` trigger. `settled` is the timer's guarantee that the bar ends up visible even
+  // if not a single frame is ever painted.
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
     opacity.value = withTiming(1, ENTER);
     translateY.value = withTiming(0, ENTER);
+    const deadline = setTimeout(() => setSettled(true), ENTER_DEADLINE_MS);
+    return () => clearTimeout(deadline);
   }, [opacity, translateY]);
 
   return (
     <Animated.View
-      onLayout={onLayout}
       style={[
         styles.bar,
-        animatedStyle,
+        settled ? REST : animatedStyle,
         { bottom, backgroundColor: colors.heading, borderRadius: radius.row, boxShadow: shadow.snack },
       ]}>
       <Text style={[styles.message, { color: colors.bg }]} numberOfLines={2}>

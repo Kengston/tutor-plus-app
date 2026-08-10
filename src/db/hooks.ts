@@ -27,7 +27,12 @@ import {
 } from './models';
 
 /** Minimal structural shape of a WatermelonDB/rxjs observable (avoids an rxjs import). */
-type Observableish<T> = { subscribe: (next: (value: T) => void) => { unsubscribe: () => void } };
+type Observableish<T> = {
+  subscribe: (next: (value: T) => void, error?: (e: unknown) => void) => { unsubscribe: () => void };
+};
+
+/** An observable that never emits — what a record hook subscribes to while its id is empty. */
+const NEVER: Observableish<never> = { subscribe: () => ({ unsubscribe: () => {} }) };
 
 /**
  * Subscribe to an observable, re-subscribing when `deps` change. Each emission is stored
@@ -40,11 +45,27 @@ type Observableish<T> = { subscribe: (next: (value: T) => void) => { unsubscribe
 export function useObservable<T>(factory: () => Observableish<T>, deps: unknown[], initial: T): T {
   const [box, setBox] = useState<{ v: T }>(() => ({ v: initial }));
   useEffect(() => {
-    const sub = factory().subscribe((value) => setBox({ v: value }));
+    const sub = factory().subscribe(
+      (value) => setBox({ v: value }),
+      // A stream can error — a record deleted mid-subscription, a database reset. Without a
+      // handler rxjs RETHROWS it outside React, where it lands as an app-level uncaught
+      // error (TP-FIX-0719, п. 5). The screen keeps its last value; the cause gets logged.
+      (e) => console.error('[db] observable failed', e),
+    );
     return () => sub.unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
   return box.v;
+}
+
+/**
+ * Single-record variant. A detail screen renders once BEFORE its parent record resolves, so
+ * it passes an empty id (`useStudent(lesson?.studentId ?? '')`) — and `findAndObserve('')`
+ * errors with «Record students# not found» (TP-FIX-0719, п. 5). An empty id subscribes to
+ * nothing and simply reads as «not loaded yet».
+ */
+function useRecord<T>(factory: () => Observableish<T>, id: string): T | undefined {
+  return useObservable<T | undefined>(() => (id ? factory() : NEVER), [id], undefined);
 }
 
 const studentsC = () => database.get<StudentModel>('students');
@@ -73,7 +94,7 @@ export function useStudents(): StudentModel[] {
 
 /** A single student (reactive); undefined until loaded. */
 export function useStudent(id: string): StudentModel | undefined {
-  return useObservable<StudentModel | undefined>(() => studentsC().findAndObserve(id), [id], undefined);
+  return useRecord<StudentModel>(() => studentsC().findAndObserve(id), id);
 }
 
 export function useSubjects(): SubjectModel[] {
@@ -95,7 +116,9 @@ export function useLessonsInRange(start: number, end: number): LessonModel[] {
 /** Wrap a txn-list observable so subscribers see the EFFECTIVE ledger — reversal pairs
  *  (undo, `domain/undo`) dropped in one place; aggregates/screens stay reversal-blind. */
 function effective(obs: Observableish<TransactionModel[]>): Observableish<TransactionModel[]> {
-  return { subscribe: (next) => obs.subscribe((rows) => next(withoutReversals(rows))) };
+  // `error` is forwarded, not dropped — otherwise a wrapped stream loses the handler that
+  // keeps a failing subscription from escaping React as an uncaught error.
+  return { subscribe: (next, error) => obs.subscribe((rows) => next(withoutReversals(rows)), error) };
 }
 
 /** Whole ledger (reactive) — cross-student debt + Finance/Analytics aggregates. Append-only,
@@ -127,7 +150,7 @@ export function useAllLessons(): LessonModel[] {
  *  Intentionally NOT reversal-filtered: list rows come from `useAllTransactions` (effective),
  *  so no in-app path leads to a reversal's detail — a by-id read needs no pair lookup. */
 export function useTransaction(id: string): TransactionModel | undefined {
-  return useObservable<TransactionModel | undefined>(() => txnsC().findAndObserve(id), [id], undefined);
+  return useRecord<TransactionModel>(() => txnsC().findAndObserve(id), id);
 }
 
 /** One student's transactions (reactive). */
@@ -157,7 +180,7 @@ export function useExpectations(): ExpectationModel[] {
 
 /** A single expectation (reactive); undefined until loaded — the settle detail (ADR-0015). */
 export function useExpectation(id: string): ExpectationModel | undefined {
-  return useObservable<ExpectationModel | undefined>(() => expectationsC().findAndObserve(id), [id], undefined);
+  return useRecord<ExpectationModel>(() => expectationsC().findAndObserve(id), id);
 }
 
 /** Subjects/directions linked to a student via the M:N join (reactive on membership). */
@@ -224,7 +247,7 @@ export function useStudentLessons(studentId: string): LessonModel[] {
 
 /** A single lesson (reactive); undefined until loaded. */
 export function useLesson(id: string): LessonModel | undefined {
-  return useObservable<LessonModel | undefined>(() => lessonsC().findAndObserve(id), [id], undefined);
+  return useRecord<LessonModel>(() => lessonsC().findAndObserve(id), id);
 }
 
 /** Transactions linked to one lesson (reactive) — for its derived payStatus. */
