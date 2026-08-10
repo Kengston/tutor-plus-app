@@ -349,7 +349,17 @@ function YourDayCard({
               {i === nextIdx ? (
                 // No numberOfLines: on web it ellipsizes to the 20px slot width («с...»);
                 // the fixed-width caption is MEANT to overhang the slot, centred on the dot.
-                <Text style={[styles.tlCaption, { color: colors.muted }]}>
+                // At the ENDS of the lane it may only overhang INWARDS: the first and last
+                // dots sit flush with the card, so a centred caption hung 50px past the edge
+                // and got cut off by the screen — which is every morning, before the first
+                // lesson of the day, when the next dot IS the first one.
+                <Text
+                  style={[
+                    styles.tlCaption,
+                    { color: colors.muted },
+                    i === lessons.length - 1 && i !== 0 ? styles.tlCaptionEnd : null,
+                    i === 0 ? styles.tlCaptionStart : null,
+                  ]}>
                   {t('today.nextAt')} {hhmm(s.nextAt as number)}
                 </Text>
               ) : null}
@@ -457,6 +467,10 @@ const styles = StyleSheet.create({
   tlDotFuture: { width: 12, height: 12, borderRadius: 6, borderWidth: 1.5 },
   tlCaptionRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6, height: 15 },
   tlCaption: { fontSize: 12, fontWeight: '500', fontVariant: ['tabular-nums'], width: 120, textAlign: 'center' },
+  // Half the overhang ((120 − 20) / 2) pushed back inwards, so an end caption starts/ends
+  // flush with its dot instead of hanging outside the card.
+  tlCaptionStart: { textAlign: 'left', transform: [{ translateX: 50 }] },
+  tlCaptionEnd: { textAlign: 'right', transform: [{ translateX: -50 }] },
   allLink: { fontSize: 14, fontWeight: '600' },
 
   nearest: {
