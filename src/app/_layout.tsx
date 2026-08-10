@@ -14,6 +14,7 @@ import { DualModeProvider, useT } from '@/i18n';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { ProfileGate, ReminderSync } from '@/lib/profile';
 import { SnackHost, SnackProvider } from '@/lib/snack';
+import { TransitionVeil } from '@/components/TransitionVeil';
 import { ThemeProvider as TutorThemeProvider, useTheme, useThemeMode } from '@/theme';
 import { brandFontMap, onestFor } from '@/theme/fonts';
 
@@ -80,6 +81,7 @@ function WebFrame({ bg, children }: { bg: string; children: ReactNode }) {
 function NavigationRoot() {
   const { colors, scheme } = useTheme();
   const t = useT();
+  const { session } = useAuth();
   useThemeMode(); // subscribe so the nav theme updates on toggle
   useAuthGate();
 
@@ -126,6 +128,8 @@ function NavigationRoot() {
           {/* Single global snack host — inside the WebFrame column (ADR-0010) so the bar
               tracks the app width, above the Stack so it overlays every screen. */}
           <SnackHost />
+          {/* Переходная заставка: монтируется вместе с активной сессией и уходит по таймеру. */}
+          {session ? <TransitionVeil /> : null}
         </WebFrame>
       </SnackProvider>
     </ThemeProvider>
