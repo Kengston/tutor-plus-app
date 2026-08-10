@@ -11,7 +11,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useT } from '@/i18n';
 import { formatRub } from '@/lib/format';
 import { chartColors, useTheme } from '@/theme';
-import { Card, CatAvatar, Chip, CountUp, DayLane, Donut, Dot, Fab, Icon, KpiStat, MultiBarChart, Ring, Segmented, Sheet, SwipeRow, Text } from '@/ui';
+import { Card, CatAvatar, CheckStroke, Chip, CountUp, DayLane, Donut, Dot, Fab, Icon, KpiStat, MultiBarChart, PlusStroke, Ring, Segmented, Sheet, SwipeRow, Text } from '@/ui';
 
 /** Phase-0 showcase of the ported UI kit (also a smoke test for the workflow ports). */
 export default function Gallery() {
@@ -19,10 +19,40 @@ export default function Gallery() {
   const t = useT();
   const [tab, setTab] = useState(t('analytics.overview'));
   const [sheet, setSheet] = useState(false);
+  // Ключ перезапуска рисования: кнопка «Нарисовать заново» просто инкрементит его.
+  const [drawKey, setDrawKey] = useState(0);
 
   return (
     <View style={[styles.fill, { backgroundColor: colors.bg }]}>
       <ScrollView contentContainerStyle={styles.content}>
+        <Section title="Бренд · росчерк и галочка">
+          <View style={styles.brandRow}>
+            <BrandCell label="перо 72">
+              <PlusStroke size="pen" px={72} animated drawKey={drawKey} />
+            </BrandCell>
+            <BrandCell label="маркер 44">
+              <PlusStroke size="marker" px={44} animated drawKey={drawKey} />
+            </BrandCell>
+            <BrandCell label="микро 18">
+              <PlusStroke size="micro" px={18} animated drawKey={drawKey} />
+            </BrandCell>
+            <BrandCell label="галочка 44">
+              <CheckStroke px={44} color={colors.paid} drawKey={drawKey} />
+            </BrandCell>
+            <BrandCell label="статика">
+              <PlusStroke size="pen" px={44} />
+            </BrandCell>
+          </View>
+          <Pressable
+            onPress={() => setDrawKey((k) => k + 1)}
+            style={({ pressed }) => [
+              styles.replay,
+              { backgroundColor: colors.primaryVlight, opacity: pressed ? 0.7 : 1 },
+            ]}>
+            <Text style={{ color: colors.heading, fontWeight: '600' }}>Нарисовать заново</Text>
+          </Pressable>
+        </Section>
+
         <Section title="Кольцо · пончик">
           <View style={styles.rowCenter}>
             <Ring progress={0.62} centerTop={<Text style={[styles.big, { color: colors.heading }]}>5/8</Text>} />
@@ -128,6 +158,17 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
+/** Ячейка витрины бренда: сам знак + подпись, чтобы размеры сравнивались глазом. */
+function BrandCell({ label, children }: { label: string; children: ReactNode }) {
+  const { colors } = useTheme();
+  return (
+    <View style={styles.brandCell}>
+      <View style={styles.brandArt}>{children}</View>
+      <Text style={[styles.brandLabel, { color: colors.muted }]}>{label}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   content: { padding: 16, gap: 22, paddingBottom: 80 },
@@ -141,4 +182,10 @@ const styles = StyleSheet.create({
   chips: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   kpis: { flexDirection: 'row' },
   swipeInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16 },
+
+  brandRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', gap: 18 },
+  brandCell: { alignItems: 'center', gap: 6 },
+  brandArt: { height: 72, justifyContent: 'center' },
+  brandLabel: { fontSize: 11 },
+  replay: { alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12 },
 });

@@ -1,6 +1,7 @@
 /** Tutor+ UI kit — ported from the prototype's hand-written kit (t+/kit.jsx,
  *  t+/components.jsx). Components read colour/spacing through `useTheme()`. */
 export * from './Text';
+export * from './brand';
 export * from './Icon';
 export * from './Card';
 export * from './Chip';
