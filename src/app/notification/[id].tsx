@@ -24,6 +24,7 @@ import { useNow } from '@/hooks/use-now';
 import { plural, useT, type StringKey } from '@/i18n';
 import { formatRub } from '@/lib/format';
 import { useBack } from '@/lib/nav';
+import { useSnack } from '@/lib/snack';
 import { DEFAULT_REMINDER_PREFS, reminderPrefsOf } from '@/lib/profile';
 import { hhmm } from '@/lib/time';
 import { useTheme } from '@/theme';
@@ -93,6 +94,10 @@ export default function NotificationDetailScreen() {
   const student = useStudent(lesson?.studentId ?? txn?.studentId ?? '');
 
   const [reschedOpen, setReschedOpen] = useState(false);
+  // In-flight guard for «Отметить оплату»: `debtSettled` re-derives only after the txn
+  // lands, so a double tap before navigation would append two settlements without it.
+  const [settling, setSettling] = useState(false);
+  const snack = useSnack();
 
   const TITLE: Record<NotificationKind, string> = {
     reminder: t('notif.reminder'),
@@ -104,7 +109,8 @@ export default function NotificationDetailScreen() {
 
   /** Settle the debt txn: APPEND a paid row carrying its links (mirrors finance/[id].tsx). */
   const markPaid = async () => {
-    if (!txn) return;
+    if (!txn || settling) return;
+    setSettling(true);
     await createTransaction({
       studentId: txn.studentId,
       type: 'paid',
@@ -213,7 +219,15 @@ export default function NotificationDetailScreen() {
                       icon="close"
                       label={t('action.cancel')}
                       onPress={() => {
-                        void cancelLesson(lesson).then(() => goBack());
+                        // Refused for a money-carrying lesson — the row here is upcoming,
+                        // so money is the only possible blocker (mirrors the Today swipe).
+                        void cancelLesson(lesson).then((done) => {
+                          if (!done) {
+                            snack.show(t('snack.protectedByMoney'));
+                            return;
+                          }
+                          goBack();
+                        });
                       }}
                     />
                   </>
@@ -247,7 +261,13 @@ export default function NotificationDetailScreen() {
           title={t('action.reschedule')}
           onClose={() => setReschedOpen(false)}
           onPick={(ms) => {
-            void rescheduleLesson(lesson, ms).then(() => goBack());
+            void rescheduleLesson(lesson, ms).then((moved) => {
+              if (!moved) {
+                snack.show(t('snack.protectedByMoney'));
+                return;
+              }
+              goBack();
+            });
           }}
         />
       ) : null}

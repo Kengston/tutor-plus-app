@@ -8,12 +8,13 @@ import { Q } from '@nozbe/watermelondb';
 
 import { settleExpectation } from '@/domain/expectations';
 import type { Duration, LessonFormat, PayMethod, StudentStatus, TxnType } from '@/domain/types';
-import { reversalOf, type LessonLifecycleSnapshot } from '@/domain/undo';
+import { reversalOf, withoutReversals, type LessonLifecycleSnapshot } from '@/domain/undo';
 import type { Activity, ClientType } from '@/i18n';
 import { initialsOf } from '@/lib/format';
 import type { CatColor, ThemeMode } from '@/theme';
 
 import { database } from '.';
+import { dropStudentProjections, materializeSchedule } from './slots';
 import {
   ExpectationModel,
   LessonModel,
@@ -60,6 +61,7 @@ export async function createStudent(input: StudentInput): Promise<StudentModel> 
 }
 
 export async function updateStudent(student: StudentModel, patch: Partial<StudentInput>): Promise<void> {
+  const prevStatus = student.status;
   await database.write(async () => {
     await student.update((s) => {
       if (patch.name !== undefined) {
@@ -87,15 +89,31 @@ export async function updateStudent(student: StudentModel, patch: Partial<Studen
       }
     }
   });
+  if (patch.status !== undefined && patch.status !== prevStatus) {
+    await syncProjectionsToStatus(student.id, patch.status);
+  }
+}
+
+/**
+ * Keep materialized future lessons in step with the student's status (SEQUENTIAL writers,
+ * never nested): leaving `active` sweeps the future projections (a paused/archived student
+ * must not fill the timeline and expected income), returning to `active` regenerates them —
+ * `materializeSchedule` itself only generates for active students.
+ */
+async function syncProjectionsToStatus(studentId: string, status: StudentStatus): Promise<void> {
+  if (status === 'active') await materializeSchedule();
+  else await dropStudentProjections(studentId);
 }
 
 /** Archive/pause/reactivate (lifecycleStatus of the student, not a lesson). */
 export async function setStudentStatus(student: StudentModel, status: StudentStatus): Promise<void> {
+  const prevStatus = student.status;
   await database.write(async () => {
     await student.update((s) => {
       s.status = status;
     });
   });
+  if (status !== prevStatus) await syncProjectionsToStatus(student.id, status);
 }
 
 export interface LessonInput {
@@ -143,18 +161,38 @@ export async function markLessonConducted(lesson: LessonModel): Promise<void> {
   });
 }
 
+/** The lesson's transactions as the EFFECTIVE ledger (reversal pairs dropped). Read it
+ *  INSIDE `database.write` when it gates a write — the writer queue serializes the
+ *  check+append, so a double-tap can't slip two rows through. */
+async function effectiveLessonTxns(lessonId: string): Promise<TransactionModel[]> {
+  const rows = await database
+    .get<TransactionModel>('transactions')
+    .query(Q.where('lesson_id', lessonId))
+    .fetch();
+  return withoutReversals(rows);
+}
+
 /**
  * Record a payment against a lesson — APPENDS a linked transaction (ADR-0008/0009).
  * Append-only: a correction is a NEW compensating row, never an in-place edit. Debt is
  * always explicit (chosen here), never auto-derived from a conducted-but-unpaid lesson.
  * Returns the created row so the caller's undo snack can `reverseTransaction` it.
+ *
+ * Idempotent against the EFFECTIVE ledger (returns null, writing nothing): a second
+ * «Оплачено» on a paid lesson would double the income, a second «Долг» would double the
+ * student's debt vs the lesson price (`debtOf` sums txns, the Finance row shows `price` —
+ * the two would diverge). `paid` over an open `debt` stays allowed — that IS settlement.
  */
 export async function recordLessonPayment(
   lesson: LessonModel,
   pay: { type: Exclude<TxnType, 'expected'>; method?: PayMethod },
-): Promise<TransactionModel> {
-  return database.write(async () =>
-    database.get<TransactionModel>('transactions').create((t) => {
+): Promise<TransactionModel | null> {
+  return database.write(async () => {
+    const effective = await effectiveLessonTxns(lesson.id);
+    const paid = effective.some((t) => t.type === 'paid');
+    const debt = effective.some((t) => t.type === 'debt');
+    if (pay.type === 'paid' ? paid : paid || debt) return null;
+    return database.get<TransactionModel>('transactions').create((t) => {
       t.studentId = lesson.studentId;
       t.lessonId = lesson.id;
       t.amount = lesson.price;
@@ -162,8 +200,8 @@ export async function recordLessonPayment(
       t.method = pay.method ?? null;
       t.subjectId = lesson.subjectId;
       t.occurredAt = Date.now();
-    }),
-  );
+    });
+  });
 }
 
 export interface TransactionInput {
@@ -201,25 +239,40 @@ export async function createTransaction(input: TransactionInput): Promise<Transa
   );
 }
 
-export async function cancelLesson(lesson: LessonModel, reason?: string, comment?: string): Promise<void> {
-  await database.write(async () => {
+/**
+ * Cancel / reschedule share one protection rule (ADR-0016 §4 + ADR-0008/0009): conducted,
+ * already-cancelled and money-carrying lessons are history — every entry point (card,
+ * swipe, notification) must refuse, not just the ScopeSheet path. Both return `false` on
+ * refusal so the caller can say «защищено», not lie about success.
+ */
+async function lessonEditBlocked(lesson: LessonModel): Promise<boolean> {
+  if (lesson.lifecycleStatus === 'done' || lesson.lifecycleStatus === 'cancelled') return true;
+  return (await effectiveLessonTxns(lesson.id)).length > 0;
+}
+
+export async function cancelLesson(lesson: LessonModel, reason?: string, comment?: string): Promise<boolean> {
+  return database.write(async () => {
+    if (await lessonEditBlocked(lesson)) return false;
     await lesson.update((l) => {
       l.lifecycleStatus = 'cancelled';
       // Neutral by default — never persist a UI label as data (ADR-0006). A typed reason can be passed explicitly.
       l.cancelReason = reason ?? '';
       if (comment !== undefined) l.comment = comment;
     });
+    return true;
   });
 }
 
-export async function rescheduleLesson(lesson: LessonModel, startsAt: number): Promise<void> {
-  await database.write(async () => {
+export async function rescheduleLesson(lesson: LessonModel, startsAt: number): Promise<boolean> {
+  return database.write(async () => {
+    if (await lessonEditBlocked(lesson)) return false;
     await lesson.update((l) => {
       l.startsAt = startsAt;
       l.lifecycleStatus = 'upcoming';
       // Manual reschedule detaches a materialized lesson from regeneration (ADR-0016).
       l.modified = true;
     });
+    return true;
   });
 }
 
@@ -246,8 +299,14 @@ export async function restoreLessonLifecycle(
  */
 export async function reverseTransaction(txn: TransactionModel): Promise<TransactionModel> {
   const input = reversalOf(txn);
-  return database.write(async () =>
-    database.get<TransactionModel>('transactions').create((t) => {
+  return database.write(async () => {
+    // Idempotent: a double-tapped «Вернуть» must not append a second compensation. The
+    // extra row would not skew aggregates (`withoutReversals` drops it too), but it leaves
+    // an unpaired reversal that any 1:1-pairing consumer (Phase-4 sync, audit) would trip on.
+    const coll = database.get<TransactionModel>('transactions');
+    const existing = await coll.query(Q.where('reverses_id', txn.id)).fetch();
+    if (existing.length > 0) return existing[0];
+    return coll.create((t) => {
       t.studentId = input.studentId;
       t.lessonId = input.lessonId;
       t.amount = input.amount;
@@ -256,8 +315,8 @@ export async function reverseTransaction(txn: TransactionModel): Promise<Transac
       t.subjectId = input.subjectId;
       t.occurredAt = Date.now();
       t.reversesId = input.reversesId;
-    }),
-  );
+    });
+  });
 }
 
 export async function createSubject(name: string): Promise<SubjectModel> {
@@ -308,6 +367,13 @@ export async function settleExpectationPaid(
     occurredAt: pay.occurredAt ?? Date.now(),
   });
   await database.write(async () => {
+    // Status is re-read INSIDE the writer: a queued second tap (or a stale detail screen)
+    // must not append a second `paid` for an expectation the first call already closed.
+    const fresh = await database
+      .get<ExpectationModel>('expectations')
+      .find(expectation.id)
+      .catch(() => null);
+    if (!fresh || fresh.status !== 'open') return;
     await database.get<TransactionModel>('transactions').create((t) => {
       t.studentId = payment.studentId;
       t.lessonId = null;
@@ -318,7 +384,7 @@ export async function settleExpectationPaid(
       t.occurredAt = payment.occurredAt;
       t.comment = payment.comment;
     });
-    await expectation.update((x) => {
+    await fresh.update((x) => {
       x.status = nextStatus;
     });
   });

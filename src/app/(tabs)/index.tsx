@@ -73,7 +73,13 @@ export default function TodayScreen() {
   };
   const cancelWithUndo = (l: LessonModel) => {
     const snap = lifecycleSnapshot(l);
-    void cancelLesson(l).then(() => {
+    void cancelLesson(l).then((done) => {
+      // Refused: the lesson carries money (rows here are upcoming, so done/cancelled is
+      // out) — cancelling it would desync the Finance list from the debt aggregates.
+      if (!done) {
+        snack.show(t('snack.protectedByMoney'));
+        return;
+      }
       snack.show(t('snack.lessonCancelled'), {
         actionLabel: t('action.undo'),
         onAction: () => void restoreLessonLifecycle(l, snap),
@@ -267,7 +273,10 @@ export default function TodayScreen() {
         title={t('action.reschedule')}
         onClose={() => setReschedulingLesson(null)}
         onPick={(ms) => {
-          if (reschedulingLesson) void rescheduleLesson(reschedulingLesson, ms);
+          if (reschedulingLesson)
+            void rescheduleLesson(reschedulingLesson, ms).then((moved) => {
+              if (!moved) snack.show(t('snack.protectedByMoney'));
+            });
         }}
       />
 

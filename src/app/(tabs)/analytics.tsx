@@ -20,7 +20,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { HeaderAction } from '@/components/AppHeader';
 import { PeriodSheet } from '@/components/PeriodSheet';
 import { Screen } from '@/components/Screen';
-import { useAllLessons, useAllTransactions, useStudents, useSubjects } from '@/db/hooks';
+import { useAllLessons, useAllTransactions, useExpectations, useStudents, useSubjects } from '@/db/hooks';
 import type { LessonModel } from '@/db/models';
 import {
   activeStudentsInPeriod,
@@ -109,6 +109,9 @@ export default function AnalyticsScreen() {
   const txns = useAllTransactions();
   const students = useStudents();
   const subjects = useSubjects();
+  // Open expectations feed the export (ADR-0015): the CSV must show the same «Ожидается»
+  // union the Finance screen does — expected-lessons PLUS open expectations.
+  const expectations = useExpectations();
 
   // Name lookups (id → display name) for donut / top / debtors / CSV rows.
   const studentName = useMemo(() => {
@@ -246,6 +249,7 @@ export default function AnalyticsScreen() {
         <ExportSheet
           lessons={lessons}
           txns={txns}
+          expectations={expectations}
           period={period}
           studentName={studentName}
           subjectName={subjectName}
@@ -864,6 +868,7 @@ function ComparisonCard({
 function ExportSheet({
   lessons,
   txns,
+  expectations,
   period,
   studentName,
   subjectName,
@@ -871,6 +876,7 @@ function ExportSheet({
 }: {
   lessons: Parameters<typeof financeEntries>[0];
   txns: Parameters<typeof financeEntries>[1];
+  expectations: Parameters<typeof financeEntries>[2];
   period: Period;
   studentName: (id: string) => string;
   subjectName: (id: string | null) => string;
@@ -891,10 +897,19 @@ function ExportSheet({
 
   const toggle = (k: keyof ExportSections) => setSections((s) => ({ ...s, [k]: !s[k] }));
 
+  // ONE entry population for both the file and the «Предпросмотр»: the same reversal-filtered,
+  // expectation-aware union the Finance screen shows, sliced to the period. Preview figures
+  // computed from anything else (whole-ledger debtors, conducted-lesson counts) described a
+  // different report than the one being downloaded.
+  const periodEntries = useMemo(
+    () => entriesInPeriod(financeEntries(lessons, txns, expectations), period),
+    [lessons, txns, expectations, period],
+  );
+
   // Build the CSV from the in-period finance entries, honouring the «Разделы» toggles
   // (Доходы→paid · Занятия→expected · Задолженности→debt).
   const generate = () => {
-    const rows = entriesInPeriod(financeEntries(lessons, txns), period).filter(
+    const rows = periodEntries.filter(
       (e) =>
         (e.kind === 'paid' && sections.income) ||
         (e.kind === 'expected' && sections.lessons) ||
@@ -959,9 +974,18 @@ function ExportSheet({
       {/* Предпросмотр (spec 08 §8.4) — the report's four sections summarised BEFORE download. */}
       <Text style={[styles.exportLabel, { color: colors.muted }]}>{t('export.preview')}</Text>
       <Card style={styles.sectionsCard}>
-        <PreviewRow label={t('export.income')} value={formatRub(incomeInPeriod(txns, period))} />
+        {/* Each figure summarises ITS OWN CSV section over `periodEntries` — what the row
+            promises is exactly what the file delivers (income Σpaid · count of expected
+            rows · Σdebt in period), not a lookalike metric over another population. */}
+        <PreviewRow
+          label={t('export.income')}
+          value={formatRub(periodEntries.reduce((s, e) => (e.kind === 'paid' ? s + e.amount : s), 0))}
+        />
         <View style={[styles.sectionsSep, { backgroundColor: colors.hairline }]} />
-        <PreviewRow label={t('export.lessons')} value={formatNumberRu(lessonsConductedInPeriod(lessons, period))} />
+        <PreviewRow
+          label={t('export.lessons')}
+          value={formatNumberRu(periodEntries.filter((e) => e.kind === 'expected').length)}
+        />
         <View style={[styles.sectionsSep, { backgroundColor: colors.hairline }]} />
         <PreviewRow
           label={t('export.structure')}
@@ -974,7 +998,7 @@ function ExportSheet({
         <View style={[styles.sectionsSep, { backgroundColor: colors.hairline }]} />
         <PreviewRow
           label={t('export.debts')}
-          value={formatRub(debtors(txns).reduce((s, d) => s + d.amount, 0))}
+          value={formatRub(periodEntries.reduce((s, e) => (e.kind === 'debt' ? s + e.amount : s), 0))}
         />
       </Card>
 

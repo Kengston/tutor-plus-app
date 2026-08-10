@@ -180,7 +180,7 @@ export async function seedIfEmpty(): Promise<void> {
         x.studentId = annaId;
         x.amount = 6000;
         x.dueAt = at(4, 12); // in ~4 days
-        x.comment = 'Предоплата за пакет из 4 занятий';
+        x.comment = 'Предоплата за пакет из 4 уроков';
         x.status = 'open';
       });
     }

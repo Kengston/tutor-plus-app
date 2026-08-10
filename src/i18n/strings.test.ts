@@ -19,6 +19,20 @@ const NEUTRAL_ALLOWLIST = new Set<string>([
 const entries = Object.entries(messages as Record<string, string>);
 const keys = new Set(entries.map(([k]) => k));
 const TUTOR_LEXICON = /урок|ученик/i;
+const CLIENT_LEXICON = /встреч|клиент/i;
+
+/** Base strings that legitimately NAME the client axis itself (the mode picker's «Клиент»
+ *  option, the a11y description of the mode switch) rather than leaking client-mode wording
+ *  into the tutor-mode UI. Keep this minimal — anything else here is a mirror-test failure. */
+const CLIENT_LEXICON_ALLOWLIST = new Set<string>([
+  'mode.client', // the «Клиент» option label — both options are always shown side by side
+  'a11y.clientMode', // describes the switch («Режим (ученик/клиент)») — covers both modes
+]);
+
+/** `_client` overrides that legitimately keep tutor lexicon — currently none. Kept as an
+ *  explicit (empty) allowlist so a genuine future exception has a documented home instead of
+ *  a silent regex tweak. */
+const CLIENT_OVERRIDE_TUTOR_LEXICON_ALLOWLIST = new Set<string>([]);
 
 describe('i18n dual-mode dictionary', () => {
   it('no base string says «занятие» — tutor lexicon is «урок»', () => {
@@ -46,6 +60,25 @@ describe('i18n dual-mode dictionary', () => {
       .filter(([k]) => k.endsWith('_client') && !keys.has(k.slice(0, -'_client'.length)))
       .map(([k]) => k);
     expect(orphans).toEqual([]);
+  });
+
+  it('no base string leaks client lexicon («встреча»/«клиент») outside axis-naming keys', () => {
+    const offenders = entries
+      .filter(
+        ([k, v]) => !k.endsWith('_client') && CLIENT_LEXICON.test(v) && !CLIENT_LEXICON_ALLOWLIST.has(k),
+      )
+      .map(([k]) => k);
+    expect(offenders).toEqual([]);
+  });
+
+  it('no _client override leaks tutor lexicon («урок»/«ученик»)', () => {
+    const offenders = entries
+      .filter(
+        ([k, v]) =>
+          k.endsWith('_client') && TUTOR_LEXICON.test(v) && !CLIENT_OVERRIDE_TUTOR_LEXICON_ALLOWLIST.has(k),
+      )
+      .map(([k]) => k);
+    expect(offenders).toEqual([]);
   });
 
   it('allowlist entries exist and are still lexicon-bearing (no stale exceptions)', () => {

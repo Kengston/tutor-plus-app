@@ -53,6 +53,9 @@ export default function ScheduleSlotsScreen() {
 
   const [editing, setEditing] = useState<ScheduleSlotModel | null>(null);
   const [adding, setAdding] = useState(false);
+  // Slot pending close confirmation: closing a slot also drops its future materialized
+  // lessons (db/slots.closeSlot), so the «×» must not fire from a single stray tap.
+  const [closing, setClosing] = useState<ScheduleSlotModel | null>(null);
 
   if (!student) {
     return (
@@ -63,8 +66,10 @@ export default function ScheduleSlotsScreen() {
     );
   }
 
-  const onClose = (slot: ScheduleSlotModel) => {
-    void closeSlot(slot).then(materializeSchedule);
+  const confirmClose = () => {
+    if (!closing) return;
+    void closeSlot(closing).then(materializeSchedule);
+    setClosing(null);
   };
 
   return (
@@ -87,7 +92,7 @@ export default function ScheduleSlotsScreen() {
                   </Text>
                 </Pressable>
                 <Pressable
-                  onPress={() => onClose(slot)}
+                  onPress={() => setClosing(slot)}
                   hitSlop={8}
                   accessibilityRole="button"
                   accessibilityLabel={t('slots.close')}
@@ -129,6 +134,32 @@ export default function ScheduleSlotsScreen() {
             setAdding(false);
           }}
         />
+      ) : null}
+
+      {closing ? (
+        <Sheet title={t('slots.close')} onClose={() => setClosing(null)}>
+          <Text style={[styles.confirmText, { color: colors.body }]}>{t('slots.removeConfirm')}</Text>
+          <View style={styles.confirmRow}>
+            <Pressable
+              onPress={() => setClosing(null)}
+              style={({ pressed }) => [
+                styles.confirmBtn,
+                { backgroundColor: colors.stoneLight, borderRadius: radius.field },
+                pressed && styles.pressed,
+              ]}>
+              <Text style={[styles.confirmLabel, { color: colors.heading }]}>{t('common.cancel')}</Text>
+            </Pressable>
+            <Pressable
+              onPress={confirmClose}
+              style={({ pressed }) => [
+                styles.confirmBtn,
+                { backgroundColor: colors.danger, borderRadius: radius.field },
+                pressed && styles.pressed,
+              ]}>
+              <Text style={[styles.confirmLabel, { color: colors.onTint }]}>{t('common.delete')}</Text>
+            </Pressable>
+          </View>
+        </Sheet>
       ) : null}
 
       {editing ? (
@@ -340,6 +371,11 @@ const styles = StyleSheet.create({
   colon: { fontSize: 20, fontWeight: '700' },
   submitBtn: { paddingVertical: 15, alignItems: 'center', marginTop: 4 },
   submitLabel: { fontSize: 16, fontWeight: '600' },
+
+  confirmText: { fontSize: 14.5, lineHeight: 20, marginBottom: 16 },
+  confirmRow: { flexDirection: 'row', gap: 10 },
+  confirmBtn: { flex: 1, paddingVertical: 14, alignItems: 'center' },
+  confirmLabel: { fontSize: 15, fontWeight: '600' },
 
   pressed: { opacity: 0.7 },
 });

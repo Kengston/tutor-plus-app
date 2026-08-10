@@ -58,6 +58,9 @@ interface SlotSnapshot {
 export interface ScopeUndo {
   affected: number;
   undo: () => Promise<void>;
+  /** Why a refusal (affected === 0) happened, when the generic protection text would lie:
+   *  'weekday' — a series-wide reschedule picked another day (supported via the slot editor). */
+  reason?: 'weekday';
 }
 
 /** Snapshot the current state of a set of lessons (for batched undo). */
@@ -155,6 +158,14 @@ export async function scopeCancel(anchor: LessonModel, scope: Scope, reason: str
  */
 export async function scopeReschedule(anchor: LessonModel, scope: Scope, newStartsAt: number): Promise<ScopeUndo> {
   if (scope === 'one' || anchor.slotId == null) {
+    // Same protection as the cancel path (ADR-0016 §4 + ADR-0008/0009): a conducted,
+    // cancelled or money-carrying occurrence must not be silently flipped back to
+    // «upcoming» with a new time while its payment stays anchored to the old reality.
+    if (anchor.lifecycleStatus === 'done' || anchor.lifecycleStatus === 'cancelled') {
+      return { affected: 0, undo: async () => {} };
+    }
+    const protectedIds = await protectedLessonIds();
+    if (protectedIds.has(anchor.id)) return { affected: 0, undo: async () => {} };
     const snap = snapshot([anchor]);
     await database.write(async () => {
       await anchor.update((m) => {
@@ -177,14 +188,27 @@ export async function scopeReschedule(anchor: LessonModel, scope: Scope, newStar
   // put too, or a refused reschedule would silently re-time the whole future series.
   if (affected.length === 0) return { affected: 0, undo: async () => {} };
 
+  // Without the slot a series-wide retime has nothing to re-configure — refuse whole.
+  const slot = await slotsC().find(anchor.slotId).catch(() => null);
+  if (!slot) return { affected: 0, undo: async () => {} };
+  // Series-wide reschedule changes the TIME-OF-DAY only. Moving the series to another
+  // weekday is a slot-config change (ADR-0016 §3 wants a slot split from the watershed)
+  // — not implemented yet, so refuse COMPLETELY rather than «succeed» while silently
+  // keeping every occurrence on the old weekday (the old behaviour lied about success).
+  // The slot editor (student → Расписание) is the supported way to move the weekday.
+  if (new Date(newStartsAt).getDay() !== slot.weekday) {
+    return { affected: 0, undo: async () => {}, reason: 'weekday' };
+  }
+
   const newTimeMin = timeOfDayMin(newStartsAt);
   const lessonSnaps = snapshot(affected);
-  const slot = await slotsC().find(anchor.slotId).catch(() => null);
   const slotSnap: SlotSnapshot | null = slot ? { id: slot.id, timeMin: slot.timeMin, activeTo: slot.activeTo } : null;
 
   await database.write(async () => {
     for (const l of affected) {
-      const dayMs = l.slotDate ?? startOfDay(l.startsAt);
+      // A `modified` occurrence here can only be the force-included anchor: apply the new
+      // time on the day the user manually moved it to, not its original slot day.
+      const dayMs = l.modified ? startOfDay(l.startsAt) : (l.slotDate ?? startOfDay(l.startsAt));
       await l.update((m) => {
         m.startsAt = dayMs + newTimeMin * 60_000;
         m.lifecycleStatus = 'upcoming';

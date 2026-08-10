@@ -81,6 +81,9 @@ const STUDENT_COLS = ['name', 'initials', 'category', 'status', 'format', 'rate'
 const SLOT_COLS = ['student_id', 'weekday', 'time_min', 'duration_min', 'format', 'price', 'subject_id', 'active_from', 'active_to'];
 const LESSON_COLS = [
   'student_id', 'subject_id', 'topic', 'starts_at', 'duration_min', 'format', 'price', 'link', 'lifecycle_status',
+  // Series/scope fields (ADR-0016): without them a detach («one»-edit sets `modified`) or a
+  // recorded cancel reason changed the row silently — observers never re-emitted.
+  'slot_id', 'slot_date', 'modified', 'cancel_reason',
 ];
 
 /** All students, sorted by name (reactive). Filter/search/sort further in the screen. */

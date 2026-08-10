@@ -17,6 +17,8 @@ export interface ScopeLessonSlice {
   /** Local-midnight ms of the occurrence (the watershed axis). */
   slotDate: number | null;
   lifecycleStatus: LifecycleStatus;
+  /** Manually edited occurrence — detached from series-wide edits (ADR-0016 §6). */
+  modified: boolean;
 }
 
 /**
@@ -47,6 +49,10 @@ export function seriesLessonsFrom(
     if (l.slotId !== slotId) continue;
     if (l.slotDate == null || l.slotDate < fromDate) continue;
     if (isProtected(l, protectedIds)) continue;
+    // A manually edited occurrence is detached — the slot no longer overwrites it
+    // (ADR-0016 §6). The anchor itself may still be force-included by the caller:
+    // the user explicitly chose it, so their intent overrides the detachment.
+    if (l.modified) continue;
     out.push(l.id);
   }
   return out;
@@ -55,8 +61,9 @@ export function seriesLessonsFrom(
 /**
  * The full set of lesson ids a scope op affects, given the anchor lesson. `one` → just the
  * anchor (when not protected). `following` → the anchor's day forward. `all` → `today`
- * forward (the whole remaining series). The anchor is always included in following/all
- * because its own day is ≥ the watershed. Returns [] if the anchor is standalone/protected.
+ * forward (the whole remaining series). A PROTECTED anchor blocks only itself — its free
+ * future siblings are still affected by following/all (a paid-for occurrence must not make
+ * the whole series uncancellable); `one` on a protected anchor returns [].
  */
 export function scopeAffectedLessons(params: {
   anchor: ScopeLessonSlice;
@@ -66,17 +73,19 @@ export function scopeAffectedLessons(params: {
   protectedIds: ReadonlySet<string>;
 }): string[] {
   const { anchor, siblings, scope, today, protectedIds } = params;
-  if (anchor.slotId == null || isProtected(anchor, protectedIds)) {
-    // A standalone or protected anchor: only «one» acts, and only if it is cancellable.
-    return anchor.slotId == null && !isProtected(anchor, protectedIds) ? [anchor.id] : [];
+  const anchorProtected = isProtected(anchor, protectedIds);
+  if (scope === 'one' || anchor.slotId == null) {
+    // Single-occurrence edit (or a standalone lesson, where only «one» is meaningful):
+    // acts iff the anchor itself is untouched by money/history.
+    return anchorProtected ? [] : [anchor.id];
   }
-  if (scope === 'one') return [anchor.id];
   const fromDate = scope === 'all' ? today : (anchor.slotDate ?? today);
   const ids = seriesLessonsFrom(siblings, anchor.slotId, fromDate, protectedIds);
-  // Force-include the anchor ONLY when its own day is on/after the watershed — for «all»
-  // (watershed = today) a past-but-still-«upcoming» anchor must stay untouched (the past
-  // is inviolable, ADR-0016 §4); `seriesLessonsFrom` already excluded it below `fromDate`.
+  // Force-include the anchor ONLY when it is unprotected and its own day is on/after the
+  // watershed — for «all» (watershed = today) a past-but-still-«upcoming» anchor must stay
+  // untouched (the past is inviolable, ADR-0016 §4). This also re-admits a `modified`
+  // anchor that `seriesLessonsFrom` skipped: the user explicitly chose it.
   const anchorInWindow = anchor.slotDate != null && anchor.slotDate >= fromDate;
-  if (anchorInWindow && !ids.includes(anchor.id)) return [anchor.id, ...ids];
+  if (!anchorProtected && anchorInWindow && !ids.includes(anchor.id)) return [anchor.id, ...ids];
   return ids;
 }

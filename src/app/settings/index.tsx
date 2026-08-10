@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { database } from '@/db';
 import { useProfile } from '@/db/hooks';
 import type { ProfileModel } from '@/db/models';
-import { useT, type StringKey } from '@/i18n';
+import { activityLabel, useT, type StringKey } from '@/i18n';
 import { useAuth } from '@/lib/auth';
 import { initialsOf } from '@/lib/format';
 import { nowMs } from '@/lib/time';
@@ -40,7 +40,9 @@ function SettingsHome({ profile }: { profile: ProfileModel }) {
 
   const [deleteConfirm, setDeleteConfirm] = useState(false);
 
-  const activityLabel = t(`activity.${profile.activity}` as StringKey);
+  // Canonical enum→key map (src/i18n/index.tsx, review fix TP-REVIEW-0810) — same source the
+  // registration wizard and profile editor resolve through, so this card never diverges again.
+  const activityLabelText = t(activityLabel[profile.activity]);
   const themeLabel =
     themeMode === 'system' ? t('settings.themeSystem') : themeMode === 'light' ? t('settings.themeLight') : t('settings.themeDark');
   const notifValue = profile.notifEnabled !== false ? t('set.on') : t('set.off');
@@ -81,7 +83,7 @@ function SettingsHome({ profile }: { profile: ProfileModel }) {
               {profile.name || t('set.namePlaceholder')}
             </Text>
             <Text numberOfLines={1} style={[styles.profileActivity, { color: colors.muted }]}>
-              {activityLabel}
+              {activityLabelText}
             </Text>
           </View>
           <Pressable
