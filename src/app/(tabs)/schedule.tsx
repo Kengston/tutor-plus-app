@@ -14,7 +14,7 @@ import type { LessonModel, StudentModel } from '@/db/models';
 import { formatRub } from '@/lib/format';
 import { dayBounds, hhmm, nowMs } from '@/lib/time';
 import { catColors, useTheme, type CatColor } from '@/theme';
-import { Card, CatAvatar, Chip, Dot, Fab, Icon, SectionLabel, Segmented, Sheet, Text, TextInput, type DotTone } from '@/ui';
+import { Card, CatAvatar, Chip, Dot, type DotTone, Fab, Icon, PlusStroke, SectionLabel, Segmented, Sheet, Text, TextInput } from '@/ui';
 import type { StringKey } from '@/i18n';
 
 type ViewKind = 'calendar' | 'list';
@@ -872,7 +872,8 @@ function TimelineGap({ seg, onNew }: { seg: { mins: number }; onNew?: () => void
           pressed && styles.pressed,
         ]}>
         <View style={[styles.gapPlus, { backgroundColor: colors.surface, borderColor: colors.stoneInactive }]}>
-          <Icon name="plus" size={17} sw={2} stroke={colors.primaryDeep} />
+          {/* Жест «добавить» — рукописный росчерк (канон §10, слайс #75). */}
+          <PlusStroke size="marker" px={17} color={colors.primaryDeep} />
         </View>
         <Text style={[styles.gapLabel, { color: colors.muted }]}>{label}</Text>
       </Pressable>

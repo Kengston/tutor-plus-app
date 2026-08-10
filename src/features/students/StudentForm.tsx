@@ -16,7 +16,7 @@ import { useSubjects } from '@/db/hooks';
 import type { LessonFormat, StudentStatus } from '@/domain/types';
 import { useT } from '@/i18n';
 import { catColors, useTheme, type CatColor } from '@/theme';
-import { Icon, Text, TextInput } from '@/ui';
+import { Icon, PlusStroke, Text, TextInput } from '@/ui';
 
 const CATEGORIES = Object.keys(catColors) as CatColor[];
 const STATUSES: StudentStatus[] = ['active', 'paused', 'archived'];
@@ -270,12 +270,8 @@ export function StudentForm({ initial, studentId, onSave, onDone }: StudentFormP
                   borderRadius: radius.control,
                 },
               ]}>
-              <Icon
-                name="plus"
-                size={20}
-                sw={2.2}
-                stroke={newSubject.trim() ? colors.onTint : colors.label3}
-              />
+              {/* Жест «добавить» — рукописный росчерк (канон §10, слайс #75). */}
+              <PlusStroke size="marker" px={20} color={newSubject.trim() ? colors.onTint : colors.label3} />
             </Pressable>
           </View>
         </Field>

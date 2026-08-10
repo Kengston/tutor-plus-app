@@ -420,6 +420,9 @@ export const messages = {
   'snack.seriesDayViaEditor': 'Перенести серию на другой день можно в расписании ученика',
   'snack.seriesDayViaEditor_client': 'Перенести серию на другой день можно в расписании клиента',
   'snack.undone': 'Отменено',
+  // Подтверждение создания — рукописная галочка + одна строка (слайс #75, канон §8).
+  'snack.lessonCreated': 'Урок создан',
+  'snack.lessonCreated_client': 'Встреча создана',
 
   // ── Quick actions (FAB on «Сегодня», spec 04-today) ──────────────────────
   'quick.title': 'Быстрое действие',

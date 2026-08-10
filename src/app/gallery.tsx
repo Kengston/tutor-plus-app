@@ -118,12 +118,11 @@ export default function Gallery() {
 
         <Section title="Бренд · создание и пустое состояние">
           <View style={styles.createRow}>
-            <CreateButton label={t('common.add')} onPress={() => setDrawKey((k) => k + 1)} drawKey={drawKey} />
+            <CreateButton label={t('common.add')} onPress={() => setDrawKey((k) => k + 1)} />
             <CreateButton
               label={t('common.add')}
               tone="ghost"
               onPress={() => setDrawKey((k) => k + 1)}
-              drawKey={drawKey}
             />
           </View>
           <Card>

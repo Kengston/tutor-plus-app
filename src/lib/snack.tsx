@@ -15,6 +15,8 @@ export interface SnackOptions {
   onAction?: () => void;
   /** Auto-dismiss delay, ms (prototype default 3500). */
   duration?: number;
+  /** Рукописная галочка перед текстом — подтверждение создания (слайс #75). */
+  mark?: 'check';
 }
 
 interface SnackState extends SnackOptions {
@@ -79,6 +81,7 @@ export function SnackHost() {
     <Snackbar
       key={snack.key}
       message={snack.message}
+      mark={snack.mark}
       actionLabel={snack.actionLabel}
       onAction={() => {
         snack.onAction?.();

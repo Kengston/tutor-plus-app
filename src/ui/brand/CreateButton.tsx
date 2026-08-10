@@ -18,8 +18,6 @@ export interface CreateButtonProps {
   /** Кегль росчерка в px. */
   glyphPx?: number;
   style?: ViewStyle;
-  /** Смена значения перерисовывает росчерк. */
-  drawKey?: string | number;
 }
 
 export function CreateButton({
@@ -28,7 +26,6 @@ export function CreateButton({
   tone = 'primary',
   glyphPx = 20,
   style,
-  drawKey,
 }: CreateButtonProps) {
   const { colors, radius } = useTheme();
   const primary = tone === 'primary';
@@ -49,7 +46,7 @@ export function CreateButton({
         pressed ? styles.pressed : null,
         style,
       ]}>
-      <PlusStroke size="marker" px={glyphPx} color={fg} animated drawKey={drawKey} />
+      <PlusStroke size="marker" px={glyphPx} color={fg} />
       <Text style={[primary ? styles.primaryLabel : styles.ghostLabel, { color: fg }]}>{label}</Text>
     </Pressable>
   );
