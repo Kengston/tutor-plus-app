@@ -25,6 +25,13 @@ export interface ColorTokens {
   // accent & status
   accent: string;
   accentSoft: string;
+  /**
+   * Чернила рукописного плюса В ЛОГОТИПЕ (`--brand-plus-ink` канона, §10). Днём это
+   * ГЛУБОКИЙ янтарь, а не бренд-акцент: на светлой бумаге #FFD364 выцветает и росчерк
+   * перестаёт читаться как «пометка». Вечером роль берёт сам акцент. Это НЕ нарушение
+   * правила жёлтого (§4) — токен именует бренд-роль, а не предупреждение.
+   */
+  brandPlusInk: string;
   // accent gradient stops (MultiBarChart highlighted-bar top stop, DayLane past-fill end
   // stop) — review fix TP-REVIEW-0810: both used to hardcode the DAY-theme stop verbatim,
   // so the «Вечер» gradient paired a themed `accent` with a day-lit stop.
@@ -79,6 +86,7 @@ export const lightColors: ColorTokens = {
   primaryDeep: '#151E2D',
   accent: '#FFD364',
   accentSoft: 'rgba(255,211,100,0.30)',
+  brandPlusInk: '#E0A93A',
   accentGradTop: '#FFE6A6',
   accentGradBottom: '#E8B43C',
   paid: '#27360D',
@@ -129,6 +137,7 @@ export const darkColors: ColorTokens = {
   primaryDeep: '#FFD364',
   accent: '#FFD364',
   accentSoft: 'rgba(255,211,100,0.22)',
+  brandPlusInk: '#FFD364',
   // Вечерний `accent` совпадает с дневным (#FFD364), поэтому и стопы градиента те же:
   // верх уходит в сливочный, низ — в тёмный янтарь.
   accentGradTop: '#FFE6A6',
@@ -224,6 +233,17 @@ export const brandGradient = {
   from: '#FFE6A6',
   mid: '#FFD364',
   to: '#E8B43C',
+} as const;
+
+/**
+ * Плитка приложения (`--brand-plate` канона, §10) — знак ЗАМОРОЖЕН ЦЕЛИКОМ: чернильная
+ * подложка одинакова в обеих темах, потому что это иконка приложения, а не элемент
+ * интерфейса. Меняется только T на плитке — ivory дневной бумаги / ivory вечернего
+ * заголовка, чтобы знак не грелся и не холодел вместе с фоном экрана.
+ */
+export const brandPlate = {
+  bg: '#151E2D',
+  mark: { light: '#FFFDF7', dark: '#F3ECDD' },
 } as const;
 
 /** Multi-series chart palette — DERIVED from the categorical accents so avatars, calendar

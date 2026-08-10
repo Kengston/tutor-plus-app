@@ -63,6 +63,24 @@ export const T_RECTS = [
 /** Общий viewBox всего брендового слоя. */
 export const GLYPH_VIEWBOX = '0 0 100 100';
 
+/** Монограмма T⁺ шире квадрата: T и плюс стоят рядом, а не друг на друге. */
+export const MONOGRAM_VIEWBOX = '0 0 160 100';
+
+/**
+ * «Пометки на полях» — единственные разрешённые рукописные иллюстрации (§10).
+ * Длины путей посчитаны так же заранее, как у глифа.
+ */
+export const MARGIN_STROKES = {
+  underline: { d: 'M 16 58 C 40 64, 68 61, 86 55', length: 70.9 },
+  wave: { d: 'M 14 58 C 24 50, 32 66, 42 58 C 52 50, 60 66, 70 58 C 76 53, 82 55, 86 56', length: 76.71 },
+  circleDate: { d: 'M 38 30 C 16 36, 12 64, 34 71 C 58 78, 88 68, 87 49 C 86 32, 60 24, 44 29', length: 175.32 },
+} as const;
+
+export const MARGIN_STROKE_WIDTH = { underline: 4.6, wave: 4, circleDate: 4.2 } as const;
+
+/** Маркерная заливка «highlight» — единственная пометка без штриха. */
+export const HIGHLIGHT_RECT = { x: 14, y: 38, width: 72, height: 26, rx: 4, opacity: 0.55, rotate: -1.5 } as const;
+
 /**
  * Ниже 20px глиф переключается на оптический размер «микро»: на маленьком кегле
  * тонкие штрихи «маркера» схлопываются в кашу (дизайн-система v2 §10).

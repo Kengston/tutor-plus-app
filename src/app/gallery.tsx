@@ -11,7 +11,34 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useT } from '@/i18n';
 import { formatRub } from '@/lib/format';
 import { chartColors, useTheme } from '@/theme';
-import { Card, CatAvatar, CheckStroke, Chip, CountUp, DayLane, Donut, Dot, Fab, Icon, KpiStat, MultiBarChart, PlusStroke, Ring, Segmented, Sheet, SwipeRow, Text } from '@/ui';
+import {
+  AppPlate,
+  Card,
+  CatAvatar,
+  CheckStroke,
+  Chip,
+  CountUp,
+  CreateButton,
+  DayLane,
+  Donut,
+  Dot,
+  EmptyMark,
+  Fab,
+  Icon,
+  KpiStat,
+  MARGIN_MARK_KINDS,
+  MarginMark,
+  MultiBarChart,
+  PlusStroke,
+  Ring,
+  Segmented,
+  Sheet,
+  SwipeRow,
+  Text,
+  TMark,
+  TSymbol,
+  Wordmark,
+} from '@/ui';
 
 /** Phase-0 showcase of the ported UI kit (also a smoke test for the workflow ports). */
 export default function Gallery() {
@@ -44,6 +71,7 @@ export default function Gallery() {
             </BrandCell>
           </View>
           <Pressable
+            accessibilityRole="button"
             onPress={() => setDrawKey((k) => k + 1)}
             style={({ pressed }) => [
               styles.replay,
@@ -51,6 +79,62 @@ export default function Gallery() {
             ]}>
             <Text style={{ color: colors.heading, fontWeight: '600' }}>Нарисовать заново</Text>
           </Pressable>
+        </Section>
+
+        <Section title="Бренд · знаки">
+          <View style={styles.brandRow}>
+            <BrandCell label="монограмма 44">
+              <TMark px={44} animated drawKey={drawKey} />
+            </BrandCell>
+            <BrandCell label="символ 44">
+              <TSymbol px={44} colorT={colors.heading} animated drawKey={drawKey} />
+            </BrandCell>
+            <BrandCell label="символ 18 (микро)">
+              <TSymbol px={18} colorT={colors.heading} />
+            </BrandCell>
+            <BrandCell label="плитка 64">
+              <AppPlate px={64} animated drawKey={drawKey} />
+            </BrandCell>
+            <BrandCell label="плитка 40">
+              <AppPlate px={40} />
+            </BrandCell>
+          </View>
+          <View style={styles.wordmarks}>
+            <Wordmark px={30} animated drawKey={drawKey} />
+            <Wordmark px={20} animated drawKey={drawKey} />
+            <Wordmark px={44} />
+          </View>
+        </Section>
+
+        <Section title="Бренд · пометки на полях">
+          <View style={styles.brandRow}>
+            {MARGIN_MARK_KINDS.map((kind) => (
+              <BrandCell key={kind} label={kind}>
+                <MarginMark kind={kind} px={64} date={11} drawKey={drawKey} />
+              </BrandCell>
+            ))}
+          </View>
+        </Section>
+
+        <Section title="Бренд · создание и пустое состояние">
+          <View style={styles.createRow}>
+            <CreateButton label={t('common.add')} onPress={() => setDrawKey((k) => k + 1)} drawKey={drawKey} />
+            <CreateButton
+              label={t('common.add')}
+              tone="ghost"
+              onPress={() => setDrawKey((k) => k + 1)}
+              drawKey={drawKey}
+            />
+          </View>
+          <Card>
+            <EmptyMark
+              mark="plus_double"
+              title={t('today.empty')}
+              hint={t('today.nothingNext')}
+              action={t('common.add')}
+              onAction={() => setDrawKey((k) => k + 1)}
+            />
+          </Card>
         </Section>
 
         <Section title="Кольцо · пончик">
@@ -188,4 +272,6 @@ const styles = StyleSheet.create({
   brandArt: { height: 72, justifyContent: 'center' },
   brandLabel: { fontSize: 11 },
   replay: { alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12 },
+  wordmarks: { gap: 12, alignItems: 'flex-start' },
+  createRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
 });

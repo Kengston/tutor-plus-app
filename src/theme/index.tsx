@@ -94,5 +94,5 @@ export function useThemeMode(): {
   return { mode, scheme, setMode, cycle };
 }
 
-export { brandGradient, catColors, chartColors, darkColors, darkTheme, lightColors, lightTheme } from './tokens';
+export { brandGradient, brandPlate, catColors, chartColors, darkColors, darkTheme, lightColors, lightTheme } from './tokens';
 export type { CatColor, ColorTokens, Theme } from './tokens';
