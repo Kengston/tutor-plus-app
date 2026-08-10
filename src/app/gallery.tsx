@@ -6,28 +6,12 @@
  * (ADR-0003 регулирует продуктовые строки). Исключить из i18n-аудита; удалить перед Phase 1.
  */
 import { type ReactNode, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { useT } from '@/i18n';
 import { formatRub } from '@/lib/format';
 import { chartColors, useTheme } from '@/theme';
-import {
-  Card,
-  CatAvatar,
-  Chip,
-  CountUp,
-  DayLane,
-  Donut,
-  Dot,
-  Fab,
-  Icon,
-  KpiStat,
-  MultiBarChart,
-  Ring,
-  Segmented,
-  Sheet,
-  SwipeRow,
-} from '@/ui';
+import { Card, CatAvatar, Chip, CountUp, DayLane, Donut, Dot, Fab, Icon, KpiStat, MultiBarChart, Ring, Segmented, Sheet, SwipeRow, Text } from '@/ui';
 
 /** Phase-0 showcase of the ported UI kit (also a smoke test for the workflow ports). */
 export default function Gallery() {

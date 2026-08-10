@@ -5,7 +5,7 @@
  * one-way (ADR-0013 C): mode changes hit BOTH the context setter (instant) and the row.
  */
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useProfile } from '@/db/hooks';
@@ -14,7 +14,7 @@ import { updateProfile } from '@/db/mutations';
 import { activityLabel, useMode, useT, type Activity, type ClientType, type StringKey } from '@/i18n';
 import { useBack } from '@/lib/nav';
 import { useTheme } from '@/theme';
-import { Card, Icon, SectionLabel, Segmented, Sheet } from '@/ui';
+import { Card, Icon, SectionLabel, Segmented, Sheet, Text, TextInput } from '@/ui';
 
 /** Activities offered in the picker (spec 10 §10.2 — 6 вариантов). Labels resolve through the
  *  ONE canonical `activityLabel` map (src/i18n/index.tsx, review fix TP-REVIEW-0810) — the

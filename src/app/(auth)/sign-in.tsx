@@ -7,14 +7,14 @@
  */
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 
 import { useT } from '@/i18n';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/theme';
-import { Sheet } from '@/ui';
+import { Sheet, Text } from '@/ui';
 
 /**
  * The prototype's T+ logo mark (crossbar + stem + the accent swoosh and dot).

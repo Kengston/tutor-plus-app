@@ -22,7 +22,7 @@
  * distance, and `FALLBACK_TRAVEL` covers the window before it arrives.
  */
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
@@ -37,6 +37,7 @@ import { useT } from '@/i18n';
 import { useTheme } from '@/theme';
 
 import { Icon } from './Icon';
+import { Text } from './Text';
 
 export interface SheetProps {
   title?: string;

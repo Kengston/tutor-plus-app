@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
@@ -12,6 +12,7 @@ import Animated, {
 import { useTheme } from '@/theme';
 
 import { Icon, type IconName } from './Icon';
+import { Text } from './Text';
 
 export interface SwipeAction {
   label: string;

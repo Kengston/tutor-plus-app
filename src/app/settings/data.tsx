@@ -4,14 +4,14 @@
  * stub until sync, Phase 4), «Помощь», «Документы». Backend-dependent rows carry «Скоро».
  */
 import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useT, type StringKey } from '@/i18n';
 import { useBack } from '@/lib/nav';
 import { nowMs } from '@/lib/time';
 import { useTheme } from '@/theme';
-import { Card, Chip, Icon } from '@/ui';
+import { Card, Chip, Icon, Text } from '@/ui';
 
 export default function DataSupportScreen() {
   const router = useRouter();

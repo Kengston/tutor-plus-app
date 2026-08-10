@@ -8,14 +8,14 @@
  */
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useT } from '@/i18n';
 import { isStrongPassword, isValidCode, isValidContact, passwordChecks } from '@/lib/auth-validate';
 import { useBack } from '@/lib/nav';
 import { useTheme } from '@/theme';
-import { Icon } from '@/ui';
+import { Icon, Text, TextInput, type TextInputHandle } from '@/ui';
 
 /** Demo code TTL — after this the step shows «Код устарел. Запросите новый». */
 const CODE_TTL_MS = 60_000;
@@ -38,7 +38,7 @@ export default function RecoverScreen() {
   const [mismatch, setMismatch] = useState(false);
 
   // Tapping the visual cells refocuses the hidden input after the keyboard is dismissed.
-  const codeInput = useRef<TextInput>(null);
+  const codeInput = useRef<TextInputHandle>(null);
 
   // Expiry timer for the demo code (spec: «при истечении — Код устарел»).
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);

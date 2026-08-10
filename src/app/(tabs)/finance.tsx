@@ -9,7 +9,7 @@
  */
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { HeaderAction } from '@/components/AppHeader';
 import { EmptyState } from '@/components/EmptyState';
@@ -24,7 +24,8 @@ import { formatRub } from '@/lib/format';
 import { currentMonth, shiftPeriod, startOfDay, type Period } from '@/lib/period';
 import { hhmm, nowMs } from '@/lib/time';
 import { useTheme } from '@/theme';
-import { Card, CatAvatar, Fab, Icon, Segmented, Sheet } from '@/ui';
+import { displayFor } from '@/theme/fonts';
+import { Card, CatAvatar, Fab, Icon, Segmented, Sheet, Text, TextInput } from '@/ui';
 
 /** Finance tabs — a stable key drives filtering; the visible label is the i18n string. */
 type FinTab = 'all' | 'paid' | 'debts' | 'expected';
@@ -447,7 +448,14 @@ const styles = StyleSheet.create({
 
   // Summary card — three figures (spec 07 §7.1)
   summaryCard: { paddingVertical: 16, paddingHorizontal: 16 },
-  summaryReceived: { fontSize: 30, fontWeight: '700', letterSpacing: -0.8, fontVariant: ['tabular-nums'] },
+  summaryReceived: {
+    fontSize: 30,
+    fontWeight: '700',
+    letterSpacing: -0.8,
+    // Героическая цифра экрана — Manrope display (дизайн-система v2 §6).
+    fontFamily: displayFor('700'),
+    fontVariant: ['tabular-nums'],
+  },
   receivedCaptionRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 5 },
   receivedHint: { fontSize: 12.5, marginTop: 6, lineHeight: 17 },
   summarySplit: {

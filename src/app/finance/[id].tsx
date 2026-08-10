@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import { type ReactNode, useMemo, useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/EmptyState';
@@ -13,7 +13,8 @@ import { formatRub } from '@/lib/format';
 import { useBack } from '@/lib/nav';
 import { hhmm } from '@/lib/time';
 import { useTheme } from '@/theme';
-import { Card, Chip, type ChipTone, Icon } from '@/ui';
+import { displayFor } from '@/theme/fonts';
+import { Card, Chip, Icon, Text, type ChipTone } from '@/ui';
 
 /**
  * Finance entry detail (ADR-0011/0015) — drill-down for a TXN-sourced row OR an OPEN
@@ -276,7 +277,14 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 20, fontWeight: '700', letterSpacing: -0.4 },
   content: { paddingHorizontal: 16, paddingTop: 4, gap: 14 },
   hero: { alignItems: 'center', paddingTop: 10, paddingBottom: 6, gap: 12 },
-  amount: { fontSize: 38, fontWeight: '700', letterSpacing: -0.6, fontVariant: ['tabular-nums'] },
+  amount: {
+    fontSize: 38,
+    fontWeight: '700',
+    letterSpacing: -0.6,
+    // Героическая цифра экрана — Manrope display (дизайн-система v2 §6).
+    fontFamily: displayFor('700'),
+    fontVariant: ['tabular-nums'],
+  },
   chipRow: { flexDirection: 'row', justifyContent: 'center' },
   card: { paddingHorizontal: 16, paddingVertical: 4 },
   field: {

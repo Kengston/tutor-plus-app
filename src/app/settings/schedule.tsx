@@ -3,7 +3,7 @@
  * profile's `work_days` CSV (v9; null reads as Пн–Пт via lib/work-days). The picked set
  * labels the settings-home row («Пн–Пт» / «Пн, Ср, Пт»).
  */
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useProfile } from '@/db/hooks';
@@ -12,7 +12,7 @@ import { useT } from '@/i18n';
 import { useBack } from '@/lib/nav';
 import { parseWorkDays, serializeWorkDays, WORK_DAY_KEYS, WORK_DAY_ORDER, workDaysLabel } from '@/lib/work-days';
 import { useTheme } from '@/theme';
-import { Card, Icon, SectionLabel } from '@/ui';
+import { Card, Icon, SectionLabel, Text } from '@/ui';
 
 export default function WorkScheduleScreen() {
   const goBack = useBack();

@@ -15,7 +15,7 @@
  * `requestAnimationFrame`, so the entrance did not even start.)
  */
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -25,6 +25,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { useTheme } from '@/theme';
+import { Text } from './Text';
 
 export interface SnackbarProps {
   message: string;

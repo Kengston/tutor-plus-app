@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useRouter } from 'expo-router';
 
@@ -21,7 +21,7 @@ import type { StringKey } from '@/i18n';
 import { formatRub } from '@/lib/format';
 import { dayBounds, hhmm, nowMs } from '@/lib/time';
 import { useTheme } from '@/theme';
-import { CatAvatar, Card, Chip, Fab, Icon, Sheet } from '@/ui';
+import { Card, CatAvatar, Chip, Fab, Icon, Sheet, Text, TextInput } from '@/ui';
 
 const FILTERS: { key: StudentFilter; label: StringKey }[] = [
   { key: 'all', label: 'filter.all' },

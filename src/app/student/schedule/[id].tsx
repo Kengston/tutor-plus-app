@@ -6,7 +6,7 @@
  */
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/EmptyState';
@@ -18,7 +18,7 @@ import { useT, type StringKey } from '@/i18n';
 import { backOrHome } from '@/lib/nav';
 import { nowMs } from '@/lib/time';
 import { useTheme } from '@/theme';
-import { Icon, Segmented, Sheet } from '@/ui';
+import { Icon, Segmented, Sheet, Text, TextInput } from '@/ui';
 
 /** «16:00» from minutes-since-midnight. */
 function timeLabel(timeMin: number): string {

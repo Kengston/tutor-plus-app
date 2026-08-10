@@ -1,6 +1,7 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { catColors, useTheme, type CatColor } from '@/theme';
+import { Text } from './Text';
 
 export type PayTone = 'paid' | 'debt' | 'pending';
 

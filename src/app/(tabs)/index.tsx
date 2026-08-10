@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { DateTimePickerSheet } from '@/components/DateTimePickerSheet';
 import { EmptyState } from '@/components/EmptyState';
@@ -17,15 +17,7 @@ import { parseHomeBlocks } from '@/lib/home-blocks';
 import { useSnack } from '@/lib/snack';
 import { dayBounds, dayBoundsOffset, hhmm, minutesUntil, nowMs } from '@/lib/time';
 import { catColors, useTheme } from '@/theme';
-import {
-  Card,
-  CatAvatar,
-  Chip,
-  Fab,
-  Icon,
-  SectionLabel,
-  SwipeRow,
-} from '@/ui';
+import { Card, CatAvatar, Chip, Fab, Icon, SectionLabel, SwipeRow, Text } from '@/ui';
 
 /** Minutes phrasing forms for `plural()` — composed once per render via t(). */
 function minuteForms(t: ReturnType<typeof useT>) {

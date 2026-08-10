@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import { type ReactNode, useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DateTimePickerSheet } from '@/components/DateTimePickerSheet';
@@ -26,7 +26,7 @@ import { useBack } from '@/lib/nav';
 import { useSnack } from '@/lib/snack';
 import { hhmm } from '@/lib/time';
 import { useTheme } from '@/theme';
-import { Card, Dot, Icon, Sheet, type DotTone } from '@/ui';
+import { Card, Dot, Icon, Sheet, Text, TextInput, type DotTone } from '@/ui';
 
 /** RU date «8 июня» (genitive day-month) from a UTC-instant ms (device-local), via i18n month keys. */
 function useDateLabel(): (ms: number) => string {

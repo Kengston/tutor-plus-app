@@ -7,7 +7,7 @@
  */
 import { useRouter } from 'expo-router';
 import { useMemo, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import {
   useAllLessons,
@@ -22,7 +22,7 @@ import { useT } from '@/i18n';
 import { initialsOf } from '@/lib/format';
 import { DEFAULT_REMINDER_PREFS, reminderPrefsOf } from '@/lib/profile';
 import { useTheme } from '@/theme';
-import { Icon, type IconName } from '@/ui';
+import { Icon, Text, type IconName } from '@/ui';
 
 export function AppHeader({
   title,

@@ -1,7 +1,7 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { useTheme } from '@/theme';
-import { Icon, type IconName } from '@/ui';
+import { Icon, Text, type IconName } from '@/ui';
 
 export interface EmptyStateProps {
   icon?: IconName;

@@ -1,5 +1,6 @@
 import '@/lib/silence-rnw-warnings';
 
+import { useFonts } from 'expo-font';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, type ReactNode } from 'react';
@@ -14,8 +15,17 @@ import { AuthProvider, useAuth } from '@/lib/auth';
 import { ProfileGate, ReminderSync } from '@/lib/profile';
 import { SnackHost, SnackProvider } from '@/lib/snack';
 import { ThemeProvider as TutorThemeProvider, useTheme, useThemeMode } from '@/theme';
+import { brandFontMap, onestFor } from '@/theme/fonts';
 
 export default function RootLayout() {
+  // Синхронный вызов на верхнем уровне корневого layout — условие статической
+  // оптимизации шрифтов Expo Router: при `expo export -p web` он инлайнит @font-face и
+  // <link rel="preload"> прямо в HTML (research #67, вопрос 3). Флаг загрузки НЕ
+  // блокирует первый рендер: до готовности лиц текст рисуется системным шрифтом
+  // (штатный FOUT), иначе экран был бы пустым — а это ровно инвариант «анимация/загрузка
+  // не единственный путь в рабочее состояние».
+  useFonts(brandFontMap);
+
   useEffect(() => {
     // Seed dev data once, then (ADR-0016) back-fill schedule slots from legacy strings
     // and materialize the rolling window of series lessons. All three are idempotent.
@@ -93,7 +103,14 @@ function NavigationRoot() {
       <ReminderSync />
       <SnackProvider>
         <WebFrame bg={colors.bg}>
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: colors.bg },
+              // Заголовки нативной навигации рисует react-navigation своим <Text>, мимо
+              // кита — семейство ему нужно отдать явно, иначе шапки останутся системными.
+              headerTitleStyle: { fontFamily: onestFor('600') },
+            }}>
             <Stack.Screen name="(auth)" />
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="student" />

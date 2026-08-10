@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -10,6 +10,7 @@ import Animated, {
 import Svg, { Defs, LinearGradient, Line, Stop } from 'react-native-svg';
 
 import { catColors, useTheme, type CatColor } from '@/theme';
+import { Text } from './Text';
 
 export interface DayLaneItem {
   /** 0..1 position within [start, end]. */

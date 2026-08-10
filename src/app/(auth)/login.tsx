@@ -5,7 +5,7 @@
  */
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useT } from '@/i18n';
@@ -13,7 +13,7 @@ import { useAuth } from '@/lib/auth';
 import { isValidContact } from '@/lib/auth-validate';
 import { useBack } from '@/lib/nav';
 import { useTheme } from '@/theme';
-import { Icon } from '@/ui';
+import { Icon, Text, TextInput } from '@/ui';
 
 export default function LoginScreen() {
   const router = useRouter();

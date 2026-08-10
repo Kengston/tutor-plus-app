@@ -7,7 +7,7 @@
  * that means createStudent or updateStudent — this component never writes.
  */
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { createSubject } from '@/db/mutations';
@@ -16,7 +16,7 @@ import { useSubjects } from '@/db/hooks';
 import type { LessonFormat, StudentStatus } from '@/domain/types';
 import { useT } from '@/i18n';
 import { catColors, useTheme, type CatColor } from '@/theme';
-import { Icon } from '@/ui';
+import { Icon, Text, TextInput } from '@/ui';
 
 const CATEGORIES = Object.keys(catColors) as CatColor[];
 const STATUSES: StudentStatus[] = ['active', 'paused', 'archived'];

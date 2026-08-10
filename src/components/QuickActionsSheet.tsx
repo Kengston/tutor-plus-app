@@ -5,11 +5,11 @@
  * Labels: canon third item is «Новая операция» (spec 04-today; existing `finance.newOp`).
  */
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useT } from '@/i18n';
 import { useTheme } from '@/theme';
-import { Icon, Sheet, type IconName } from '@/ui';
+import { Icon, Sheet, Text, type IconName } from '@/ui';
 
 type QuickTint = 'accent' | 'primary';
 

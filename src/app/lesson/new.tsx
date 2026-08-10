@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DateTimePickerSheet } from '@/components/DateTimePickerSheet';
@@ -11,7 +11,7 @@ import { useT } from '@/i18n';
 import { useBack } from '@/lib/nav';
 import { dayBounds, hhmm, nowMs } from '@/lib/time';
 import { useTheme } from '@/theme';
-import { CatAvatar, Icon, Segmented, Sheet } from '@/ui';
+import { CatAvatar, Icon, Segmented, Sheet, Text, TextInput } from '@/ui';
 
 /** Today's next whole hour as a UTC-instant ms (device-local), via dayBounds + offset. */
 function defaultStartsAt(): number {

@@ -8,7 +8,7 @@
  */
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/EmptyState';
@@ -30,7 +30,7 @@ import { formatRub } from '@/lib/format';
 import { backOrHome } from '@/lib/nav';
 import { hhmm, nowMs } from '@/lib/time';
 import { useTheme } from '@/theme';
-import { CatAvatar, Chip, Dot, Icon, Sheet, type DotTone } from '@/ui';
+import { CatAvatar, Chip, Dot, Icon, Sheet, Text, TextInput, type DotTone } from '@/ui';
 
 /** RU date «8 июня» from a UTC-instant ms, via i18n month keys. */
 function dateLabelOf(ms: number, t: (k: StringKey) => string): string {

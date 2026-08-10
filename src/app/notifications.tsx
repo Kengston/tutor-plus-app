@@ -11,7 +11,7 @@
  */
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAllLessons, useAllTransactions, useNotificationReads, useProfile, useStudents } from '@/db/hooks';
@@ -25,7 +25,7 @@ import { useBack } from '@/lib/nav';
 import { DEFAULT_REMINDER_PREFS, reminderPrefsOf } from '@/lib/profile';
 import { hhmm, minutesUntil } from '@/lib/time';
 import { useTheme } from '@/theme';
-import { Icon, SectionLabel, Segmented, SwipeRow, type IconName } from '@/ui';
+import { Icon, SectionLabel, Segmented, SwipeRow, Text, type IconName } from '@/ui';
 
 /** Filter axis incl. the «Все» pseudo-category that clears the type filter. */
 type Filter = 'all' | NotificationCategory;

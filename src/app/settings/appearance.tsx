@@ -5,7 +5,7 @@
  * are visible; required ones are locked). Theme writes hit BOTH the context setter (instant
  * re-theme) and the profile row (survives reload) — ADR-0013 C.
  */
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useProfile } from '@/db/hooks';
@@ -14,7 +14,7 @@ import { useT, type StringKey } from '@/i18n';
 import { parseHomeBlocks, serializeHomeBlocks, type HomeBlock } from '@/lib/home-blocks';
 import { useBack } from '@/lib/nav';
 import { catColors, darkColors, lightColors, useTheme, useThemeMode, type CatColor, type ThemeMode } from '@/theme';
-import { Card, Icon, SectionLabel } from '@/ui';
+import { Card, Icon, SectionLabel, Text } from '@/ui';
 
 /** The three theme cards, in display order (spec: День / Вечер / Авто). */
 const THEME_CARDS: { key: ThemeMode; label: StringKey }[] = [

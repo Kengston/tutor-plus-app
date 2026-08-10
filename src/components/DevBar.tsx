@@ -1,10 +1,10 @@
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useMode, useT } from '@/i18n';
 import { useAuth } from '@/lib/auth';
 import { useTheme, useThemeMode } from '@/theme';
-import { Icon, type IconName } from '@/ui';
+import { Icon, Text, type IconName } from '@/ui';
 
 /**
  * Dev-only utility strip (`__DEV__`): quick theme + dual-mode toggles, UI-kit, sign-out.

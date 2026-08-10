@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { HeaderAction } from '@/components/AppHeader';
 import { EmptyState } from '@/components/EmptyState';
@@ -14,7 +14,7 @@ import type { LessonModel, StudentModel } from '@/db/models';
 import { formatRub } from '@/lib/format';
 import { dayBounds, hhmm, nowMs } from '@/lib/time';
 import { catColors, useTheme, type CatColor } from '@/theme';
-import { Card, CatAvatar, Chip, Dot, Fab, Icon, SectionLabel, Segmented, Sheet, type DotTone } from '@/ui';
+import { Card, CatAvatar, Chip, Dot, Fab, Icon, SectionLabel, Segmented, Sheet, Text, TextInput, type DotTone } from '@/ui';
 import type { StringKey } from '@/i18n';
 
 type ViewKind = 'calendar' | 'list';

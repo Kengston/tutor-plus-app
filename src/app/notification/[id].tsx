@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DateTimePickerSheet } from '@/components/DateTimePickerSheet';
@@ -28,7 +28,7 @@ import { useSnack } from '@/lib/snack';
 import { DEFAULT_REMINDER_PREFS, reminderPrefsOf } from '@/lib/profile';
 import { hhmm } from '@/lib/time';
 import { useTheme } from '@/theme';
-import { Card, Chip, Icon, type IconName } from '@/ui';
+import { Card, Chip, Icon, Text, type IconName } from '@/ui';
 
 /**
  * Notification detail (spec 09 §9.2) — the intermediate screen a feed row opens INSTEAD of
