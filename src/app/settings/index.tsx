@@ -8,7 +8,7 @@
  */
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { database } from '@/db';
@@ -19,7 +19,7 @@ import { useAuth } from '@/lib/auth';
 import { initialsOf } from '@/lib/format';
 import { nowMs } from '@/lib/time';
 import { useTheme, useThemeMode } from '@/theme';
-import { Card, CatAvatar, Icon, SectionLabel, Sheet, type IconName } from '@/ui';
+import { Card, CatAvatar, Icon, SectionLabel, Sheet, Text, type IconName } from '@/ui';
 
 import { useBack } from '@/lib/nav';
 import { WORK_DAY_KEYS, workDaysLabel } from '@/lib/work-days';

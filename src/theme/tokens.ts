@@ -25,6 +25,13 @@ export interface ColorTokens {
   // accent & status
   accent: string;
   accentSoft: string;
+  /**
+   * Чернила рукописного плюса В ЛОГОТИПЕ (`--brand-plus-ink` канона, §10). Днём это
+   * ГЛУБОКИЙ янтарь, а не бренд-акцент: на светлой бумаге #FFD364 выцветает и росчерк
+   * перестаёт читаться как «пометка». Вечером роль берёт сам акцент. Это НЕ нарушение
+   * правила жёлтого (§4) — токен именует бренд-роль, а не предупреждение.
+   */
+  brandPlusInk: string;
   // accent gradient stops (MultiBarChart highlighted-bar top stop, DayLane past-fill end
   // stop) — review fix TP-REVIEW-0810: both used to hardcode the DAY-theme stop verbatim,
   // so the «Вечер» gradient paired a themed `accent` with a day-lit stop.
@@ -58,6 +65,8 @@ export interface Theme {
   radius: { card: number; sheet: number; control: number; pill: number; field: number; row: number; group: number };
   /** Cross-platform boxShadow string (RN 0.85+ supports `boxShadow`). */
   shadow: { card: string; fab: string; sheet: string; control: string; marker: string; barGlow: string; pill: string; snack: string };
+  /** Длительности анимаций, мс (дизайн-система v2 §11). */
+  motion: { micro: number; standard: number; sheet: number };
 }
 
 export const lightColors: ColorTokens = {
@@ -77,6 +86,7 @@ export const lightColors: ColorTokens = {
   primaryDeep: '#151E2D',
   accent: '#FFD364',
   accentSoft: 'rgba(255,211,100,0.30)',
+  brandPlusInk: '#E0A93A',
   accentGradTop: '#FFE6A6',
   accentGradBottom: '#E8B43C',
   paid: '#27360D',
@@ -98,40 +108,53 @@ export const lightColors: ColorTokens = {
   catLavender: '#534A75',
 };
 
-/** «Вечер» — the prototype's `html[data-theme="evening"]` palette VERBATIM (UI-v2 S16, spec 00:
- *  фон #1A1613, акцент #EBB65C; the previous blue-ish dark set diverged from the mockups). */
+/**
+ * «Вечер» — канон v4.1 (дизайн-система v2 §3), похексно. Сине-чернильная палитра
+ * ЗАМЕНИЛА прежний тёплый коричневый набор (#1A1613/#EBB65C): тот расходился с
+ * макетами v4.1 — см. слайс #70 спеки #68.
+ *
+ * Фирменный приём канона: вечером ЯНТАРЬ БЕРЁТ РОЛЬ ДЕЙСТВИЯ — `primary` = `accent`
+ * = #FFD364, а не белые кнопки. Это же единственное осознанное исключение из «правила
+ * жёлтого» (§4): днём жёлтый — только бренд-акцент, вечером он ещё и primary/warning.
+ *
+ * Значения сняты ПОБУКВЕННО с `html[data-theme="evening"]` прототипа v4.1 (`Tutor+.html`),
+ * включая alpha-ступени поверх ivory-заголовка #F3ECDD (.84 / .70 / .46 / .13) — не
+ * пересчитывать «на глаз»: канон здесь и есть источник правды.
+ */
 export const darkColors: ColorTokens = {
-  bg: '#1A1613',
-  surface: '#242019',
-  elev: '#2C2620',
-  heading: '#F1E8D8',
-  body: 'rgba(241,232,216,0.85)',
-  muted: 'rgba(241,232,216,0.66)',
-  label3: 'rgba(241,232,216,0.44)',
-  hairline: 'rgba(241,232,216,0.11)',
-  primary: '#EBB65C',
-  onTint: '#23190A',
-  primaryLight: 'rgba(235,182,92,0.22)',
-  primaryVlight: 'rgba(241,232,216,0.055)',
-  primaryDeep: '#EBB65C',
-  accent: '#EBB65C',
-  accentSoft: 'rgba(235,182,92,0.20)',
-  // Same chromatic family as the evening `accent` (#EBB65C), lighter/darker shades —
-  // top lifts toward cream, bottom deepens toward amber, mirroring the day pair's spread.
-  accentGradTop: '#F5D08A',
-  accentGradBottom: '#D9A24B',
-  paid: '#93B183',
-  warning: '#E7B25A',
-  warningLight: 'rgba(231,178,90,0.18)',
-  danger: '#D98A63',
-  dangerLight: 'rgba(217,138,99,0.16)',
-  stoneInactive: 'rgba(241,232,216,0.44)',
-  stoneLight: 'rgba(241,232,216,0.06)',
-  stone700: 'rgba(241,232,216,0.70)',
+  bg: '#13161D',
+  surface: '#222A38',
+  elev: '#2B3547',
+  heading: '#F3ECDD',
+  body: 'rgba(243,236,221,0.84)',
+  muted: 'rgba(243,236,221,0.70)',
+  label3: 'rgba(243,236,221,0.46)',
+  hairline: 'rgba(243,236,221,0.13)',
+  primary: '#FFD364',
+  onTint: '#1B1407',
+  primaryLight: 'rgba(255,211,100,0.20)',
+  primaryVlight: 'rgba(243,236,221,0.06)',
+  primaryDeep: '#FFD364',
+  accent: '#FFD364',
+  accentSoft: 'rgba(255,211,100,0.22)',
+  brandPlusInk: '#FFD364',
+  // Вечерний `accent` совпадает с дневным (#FFD364), поэтому и стопы градиента те же:
+  // верх уходит в сливочный, низ — в тёмный янтарь.
+  accentGradTop: '#FFE6A6',
+  accentGradBottom: '#E8B43C',
+  paid: '#9CB87E',
+  warning: '#FFD364',
+  warningLight: 'rgba(255,211,100,0.18)',
+  danger: '#E08A6A',
+  dangerLight: 'rgba(224,138,106,0.16)',
+  stoneInactive: 'rgba(243,236,221,0.46)',
+  stoneLight: 'rgba(243,236,221,0.06)',
+  stone700: 'rgba(243,236,221,0.70)',
   // not overridden in the evening theme — inherit day values
   terracotta: '#C97F5D',
-  tabbar: 'rgba(26,22,19,0.66)',
-  sheetScrim: 'rgba(0,0,0,0.55)',
+  tabbar: 'rgba(20,24,32,0.66)',
+  // Канон §3: вечерний скрим глубже дневного — 0.6.
+  sheetScrim: 'rgba(0,0,0,0.60)',
   catTerracotta: '#9A4B28',
   catSlate: '#3D566D',
   catOchre: '#7B6328',
@@ -142,10 +165,19 @@ export const darkColors: ColorTokens = {
 
 const radius = { card: 22, sheet: 26, control: 12, pill: 999, field: 14, row: 16, group: 18 } as const;
 
+/**
+ * Моушн-токены (дизайн-система v2 §11, слайс #71): micro — мгновенная реакция на
+ * нажатие/переключение; standard — рисование росчерка и переходы состояний; sheet —
+ * появление шита. Тема-независимы, но живут в теме, чтобы у потребителя была ОДНА точка
+ * входа (`useTheme().motion`) и длительности не расползались по компонентам литералами.
+ */
+const motion = { micro: 130, standard: 250, sheet: 350 } as const;
+
 export const lightTheme: Theme = {
   scheme: 'light',
   colors: lightColors,
   radius,
+  motion,
   shadow: {
     card: '0px 12px 32px -22px rgba(0,0,0,0.18)',
     fab: '0px 10px 24px -6px rgba(0,0,0,0.35)',
@@ -162,6 +194,7 @@ export const darkTheme: Theme = {
   scheme: 'dark',
   colors: darkColors,
   radius,
+  motion,
   shadow: {
     card: '0px 14px 34px -22px rgba(0,0,0,0.55)',
     fab: '0px 10px 24px -6px rgba(0,0,0,0.35)',
@@ -200,6 +233,17 @@ export const brandGradient = {
   from: '#FFE6A6',
   mid: '#FFD364',
   to: '#E8B43C',
+} as const;
+
+/**
+ * Плитка приложения (`--brand-plate` канона, §10) — знак ЗАМОРОЖЕН ЦЕЛИКОМ: чернильная
+ * подложка одинакова в обеих темах, потому что это иконка приложения, а не элемент
+ * интерфейса. Меняется только T на плитке — ivory дневной бумаги / ivory вечернего
+ * заголовка, чтобы знак не грелся и не холодел вместе с фоном экрана.
+ */
+export const brandPlate = {
+  bg: '#151E2D',
+  mark: { light: '#FFFDF7', dark: '#F3ECDD' },
 } as const;
 
 /** Multi-series chart palette — DERIVED from the categorical accents so avatars, calendar

@@ -6,27 +6,38 @@
  * (ADR-0003 регулирует продуктовые строки). Исключить из i18n-аудита; удалить перед Phase 1.
  */
 import { type ReactNode, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { useT } from '@/i18n';
 import { formatRub } from '@/lib/format';
 import { chartColors, useTheme } from '@/theme';
 import {
+  AppPlate,
   Card,
   CatAvatar,
+  CheckStroke,
   Chip,
   CountUp,
+  CreateButton,
   DayLane,
   Donut,
   Dot,
+  EmptyMark,
   Fab,
   Icon,
   KpiStat,
+  MARGIN_MARK_KINDS,
+  MarginMark,
   MultiBarChart,
+  PlusStroke,
   Ring,
   Segmented,
   Sheet,
   SwipeRow,
+  Text,
+  TMark,
+  TSymbol,
+  Wordmark,
 } from '@/ui';
 
 /** Phase-0 showcase of the ported UI kit (also a smoke test for the workflow ports). */
@@ -35,10 +46,96 @@ export default function Gallery() {
   const t = useT();
   const [tab, setTab] = useState(t('analytics.overview'));
   const [sheet, setSheet] = useState(false);
+  // Ключ перезапуска рисования: кнопка «Нарисовать заново» просто инкрементит его.
+  const [drawKey, setDrawKey] = useState(0);
 
   return (
     <View style={[styles.fill, { backgroundColor: colors.bg }]}>
       <ScrollView contentContainerStyle={styles.content}>
+        <Section title="Бренд · росчерк и галочка">
+          <View style={styles.brandRow}>
+            <BrandCell label="перо 72">
+              <PlusStroke size="pen" px={72} animated drawKey={drawKey} />
+            </BrandCell>
+            <BrandCell label="маркер 44">
+              <PlusStroke size="marker" px={44} animated drawKey={drawKey} />
+            </BrandCell>
+            <BrandCell label="микро 18">
+              <PlusStroke size="micro" px={18} animated drawKey={drawKey} />
+            </BrandCell>
+            <BrandCell label="галочка 44">
+              <CheckStroke px={44} color={colors.paid} drawKey={drawKey} />
+            </BrandCell>
+            <BrandCell label="статика">
+              <PlusStroke size="pen" px={44} />
+            </BrandCell>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setDrawKey((k) => k + 1)}
+            style={({ pressed }) => [
+              styles.replay,
+              { backgroundColor: colors.primaryVlight, opacity: pressed ? 0.7 : 1 },
+            ]}>
+            <Text style={{ color: colors.heading, fontWeight: '600' }}>Нарисовать заново</Text>
+          </Pressable>
+        </Section>
+
+        <Section title="Бренд · знаки">
+          <View style={styles.brandRow}>
+            <BrandCell label="монограмма 44">
+              <TMark px={44} animated drawKey={drawKey} />
+            </BrandCell>
+            <BrandCell label="символ 44">
+              <TSymbol px={44} colorT={colors.heading} animated drawKey={drawKey} />
+            </BrandCell>
+            <BrandCell label="символ 18 (микро)">
+              <TSymbol px={18} colorT={colors.heading} />
+            </BrandCell>
+            <BrandCell label="плитка 64">
+              <AppPlate px={64} animated drawKey={drawKey} />
+            </BrandCell>
+            <BrandCell label="плитка 40">
+              <AppPlate px={40} />
+            </BrandCell>
+          </View>
+          <View style={styles.wordmarks}>
+            <Wordmark px={30} animated drawKey={drawKey} />
+            <Wordmark px={20} animated drawKey={drawKey} />
+            <Wordmark px={44} />
+          </View>
+        </Section>
+
+        <Section title="Бренд · пометки на полях">
+          <View style={styles.brandRow}>
+            {MARGIN_MARK_KINDS.map((kind) => (
+              <BrandCell key={kind} label={kind}>
+                <MarginMark kind={kind} px={64} date={11} drawKey={drawKey} />
+              </BrandCell>
+            ))}
+          </View>
+        </Section>
+
+        <Section title="Бренд · создание и пустое состояние">
+          <View style={styles.createRow}>
+            <CreateButton label={t('common.add')} onPress={() => setDrawKey((k) => k + 1)} />
+            <CreateButton
+              label={t('common.add')}
+              tone="ghost"
+              onPress={() => setDrawKey((k) => k + 1)}
+            />
+          </View>
+          <Card>
+            <EmptyMark
+              mark="plus_double"
+              title={t('today.empty')}
+              hint={t('today.nothingNext')}
+              action={t('common.add')}
+              onAction={() => setDrawKey((k) => k + 1)}
+            />
+          </Card>
+        </Section>
+
         <Section title="Кольцо · пончик">
           <View style={styles.rowCenter}>
             <Ring progress={0.62} centerTop={<Text style={[styles.big, { color: colors.heading }]}>5/8</Text>} />
@@ -144,6 +241,17 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
+/** Ячейка витрины бренда: сам знак + подпись, чтобы размеры сравнивались глазом. */
+function BrandCell({ label, children }: { label: string; children: ReactNode }) {
+  const { colors } = useTheme();
+  return (
+    <View style={styles.brandCell}>
+      <View style={styles.brandArt}>{children}</View>
+      <Text style={[styles.brandLabel, { color: colors.muted }]}>{label}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   content: { padding: 16, gap: 22, paddingBottom: 80 },
@@ -157,4 +265,12 @@ const styles = StyleSheet.create({
   chips: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   kpis: { flexDirection: 'row' },
   swipeInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16 },
+
+  brandRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', gap: 18 },
+  brandCell: { alignItems: 'center', gap: 6 },
+  brandArt: { height: 72, justifyContent: 'center' },
+  brandLabel: { fontSize: 11 },
+  replay: { alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12 },
+  wordmarks: { gap: 12, alignItems: 'flex-start' },
+  createRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
 });

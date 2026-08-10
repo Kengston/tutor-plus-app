@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Text, type TextStyle } from 'react-native';
+import { type TextStyle } from 'react-native';
 
 import { formatNumberRu } from '@/lib/format';
+import { Text } from './Text';
 
 export interface CountUpProps {
   value: number;

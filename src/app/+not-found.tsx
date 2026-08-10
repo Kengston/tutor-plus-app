@@ -1,8 +1,9 @@
 import { Link, Stack } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { useTheme } from '@/theme';
 import { useT } from '@/i18n';
+import { Text } from '@/ui';
 
 export default function NotFound() {
   const { colors } = useTheme();

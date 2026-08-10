@@ -15,7 +15,7 @@
  * `requestAnimationFrame`, so the entrance did not even start.)
  */
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -25,6 +25,8 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { useTheme } from '@/theme';
+import { CheckStroke } from './brand';
+import { Text } from './Text';
 
 export interface SnackbarProps {
   message: string;
@@ -32,6 +34,12 @@ export interface SnackbarProps {
   onAction?: () => void;
   /** Offset from the host container's bottom — clears the tab bar (prototype: 108). */
   bottom?: number;
+  /**
+   * Рукописная галочка перед текстом — спокойный «жест сделано» после создания
+   * (слайс #75, дизайн-система v2 §10). Тон канона — инструмент после уроков, поэтому
+   * подтверждение рисуется одной рукой со знаком, а не празднуется конфетти.
+   */
+  mark?: 'check';
 }
 
 /** Prototype `om-snack .28s cubic-bezier(.22,.61,.36,1)` — rise + fade in. */
@@ -44,7 +52,7 @@ const ENTER_DEADLINE_MS = ENTER_MS + 120;
 /** Flat resting style; plain values override whatever inline state the animation left behind. */
 const REST = { opacity: 1, transform: [{ translateY: 0 }] } as const;
 
-export function Snackbar({ message, actionLabel, onAction, bottom = 108 }: SnackbarProps) {
+export function Snackbar({ message, actionLabel, onAction, bottom = 108, mark }: SnackbarProps) {
   const { colors, radius, shadow } = useTheme();
 
   const opacity = useSharedValue(0);
@@ -72,6 +80,7 @@ export function Snackbar({ message, actionLabel, onAction, bottom = 108 }: Snack
         settled ? REST : animatedStyle,
         { bottom, backgroundColor: colors.heading, borderRadius: radius.row, boxShadow: shadow.snack },
       ]}>
+      {mark === 'check' ? <CheckStroke px={22} color={colors.accent} /> : null}
       <Text style={[styles.message, { color: colors.bg }]} numberOfLines={2}>
         {message}
       </Text>

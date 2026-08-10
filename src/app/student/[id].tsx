@@ -8,7 +8,7 @@
  */
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/EmptyState';
@@ -30,7 +30,7 @@ import { formatRub } from '@/lib/format';
 import { backOrHome } from '@/lib/nav';
 import { hhmm, nowMs } from '@/lib/time';
 import { useTheme } from '@/theme';
-import { CatAvatar, Chip, Dot, Icon, Sheet, type DotTone } from '@/ui';
+import { CatAvatar, Chip, Dot, type DotTone, Icon, PlusStroke, Sheet, Text, TextInput } from '@/ui';
 
 /** RU date «8 июня» from a UTC-instant ms, via i18n month keys. */
 function dateLabelOf(ms: number, t: (k: StringKey) => string): string {
@@ -111,7 +111,7 @@ export default function StudentCardScreen() {
     return (
       <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
         <Header title={t('profile.title')} onEdit={null} />
-        <EmptyState icon="users" text={t('common.none')} />
+        <EmptyState mark="wave" text={t('common.notFound')} />
       </SafeAreaView>
     );
   }
@@ -271,7 +271,8 @@ export default function StudentCardScreen() {
             style={({ pressed }) => [styles.noteAdd, { backgroundColor: colors.primary, borderRadius: radius.control, opacity: noteDraft.trim() ? (pressed ? 0.85 : 1) : 0.4 }]}
             accessibilityRole="button"
             accessibilityLabel={t('profile.addNote')}>
-            <Icon name="plus" size={20} sw={2} stroke={colors.onTint} />
+            {/* Жест «добавить» — рукописный росчерк (канон §10, слайс #75). */}
+            <PlusStroke size="marker" px={20} color={colors.onTint} />
           </Pressable>
         </View>
         {notes.length > 0 ? (

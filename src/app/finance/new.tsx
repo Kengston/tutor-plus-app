@@ -11,7 +11,7 @@
  * All strings via i18n (dual-mode resolves inside t()); all colours via theme tokens.
  */
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DateTimePickerSheet } from '@/components/DateTimePickerSheet';
@@ -23,7 +23,8 @@ import { formatNumberRu } from '@/lib/format';
 import { useBack } from '@/lib/nav';
 import { nowMs } from '@/lib/time';
 import { useTheme } from '@/theme';
-import { Card, Chip, type ChipTone, Icon, SectionLabel, Sheet } from '@/ui';
+import { displayFor } from '@/theme/fonts';
+import { Card, Chip, Icon, SectionLabel, Sheet, Text, TextInput, type ChipTone } from '@/ui';
 
 /**
  * Operation kinds in the type picker (spec 07 §7.3). `paid`/`debt` write a ledger txn;
@@ -382,7 +383,14 @@ const styles = StyleSheet.create({
 
   // amount preview
   preview: { alignItems: 'center', paddingTop: 4, paddingBottom: 6, gap: 10 },
-  previewAmount: { fontSize: 36, fontWeight: '700', letterSpacing: -0.6, fontVariant: ['tabular-nums'] },
+  previewAmount: {
+    fontSize: 36,
+    fontWeight: '700',
+    letterSpacing: -0.6,
+    // Героическая цифра экрана — Manrope display (дизайн-система v2 §6).
+    fontFamily: displayFor('700'),
+    fontVariant: ['tabular-nums'],
+  },
   previewChip: { flexDirection: 'row', justifyContent: 'center' },
 
   // inline choice button rows (type / method)

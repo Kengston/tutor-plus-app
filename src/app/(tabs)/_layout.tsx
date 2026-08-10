@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 
 import { useT } from '@/i18n';
 import { useTheme } from '@/theme';
+import { onestFor } from '@/theme/fonts';
 import { Icon } from '@/ui';
 
 export default function TabsLayout() {
@@ -15,7 +16,8 @@ export default function TabsLayout() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.stoneInactive,
         tabBarStyle: { backgroundColor: colors.tabbar, borderTopColor: colors.hairline },
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '500' },
+        // Подписи таббара рисует react-navigation, мимо кита — семейство явно (слайс #69).
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '500', fontFamily: onestFor('500') },
       }}>
       <Tabs.Screen
         name="index"
