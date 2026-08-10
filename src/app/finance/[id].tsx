@@ -159,7 +159,7 @@ export default function OperationDetailScreen() {
       <Header title={t('finance.opTitle')} onBack={() => goBack()} />
 
       {!view ? (
-        <EmptyState icon="wallet" text={t('common.none')} />
+        <EmptyState mark="wave" text={t('common.notFound')} />
       ) : (
         <View style={styles.content}>
           {/* Hero: signed amount (leading «+» for income) + the type chip. */}

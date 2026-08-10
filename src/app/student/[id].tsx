@@ -111,7 +111,7 @@ export default function StudentCardScreen() {
     return (
       <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
         <Header title={t('profile.title')} onEdit={null} />
-        <EmptyState icon="users" text={t('common.none')} />
+        <EmptyState mark="wave" text={t('common.notFound')} />
       </SafeAreaView>
     );
   }

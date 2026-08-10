@@ -180,7 +180,7 @@ export default function LessonCardScreen() {
       <Header title={t('lesson.nom')} onBack={() => goBack()} />
 
       {!lesson ? (
-        <EmptyState icon="calendar" text={t('common.none')} />
+        <EmptyState mark="wave" text={t('common.notFound')} />
       ) : (
         <View style={styles.content}>
           <Card style={styles.card}>

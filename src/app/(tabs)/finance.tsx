@@ -290,7 +290,12 @@ export default function FinanceScreen() {
       {/* 5/6 · Grouped list + empty states. */}
       {allEntries.length === 0 ? (
         // No data at all in the whole ledger.
-        <EmptyState icon="wallet" text={t('finance.empty')} />
+        <EmptyState
+          mark="underline"
+          text={t('finance.empty')}
+          action={t('finance.newOp')}
+          onAction={() => router.push('/finance/new')}
+        />
       ) : groups.length === 0 ? (
         // There IS data, but the current period/tab slice is empty — say which.
         <Card style={styles.emptySliceCard}>

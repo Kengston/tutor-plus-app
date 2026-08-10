@@ -148,7 +148,13 @@ export default function TodayScreen() {
       floatingAction={<Fab onPress={() => setQuickOpen(true)} />}>
       {visibleToday.length === 0 ? (
         // Empty day (spec 04 AC): no placeholder cards — a single empty state.
-        <EmptyState icon="calendar" text={t('today.empty')} />
+        <EmptyState
+          mark="circle_date"
+          date={new Date(start).getDate()}
+          text={t('today.empty')}
+          action={t('lesson.create')}
+          onAction={() => router.push('/lesson/new')}
+        />
       ) : (
         <>
           {/* «Ваш день» (spec 04, prototype TodayScreen): counts + dot-timeline. */}

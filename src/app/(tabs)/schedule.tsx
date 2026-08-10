@@ -661,8 +661,18 @@ interface DayFeedProps {
 function DayFeed({ lessons, studentsById, txns, onOpen, emptyText, formatLabel, payLabel }: DayFeedProps) {
   const t = useT();
   const { colors } = useTheme();
+  const router = useRouter();
 
-  if (lessons.length === 0) return <EmptyState icon="calendar" text={emptyText} />;
+  if (lessons.length === 0) {
+    return (
+      <EmptyState
+        mark="circle_date"
+        text={emptyText}
+        action={t('lesson.create')}
+        onAction={() => router.push('/lesson/new')}
+      />
+    );
+  }
   return (
     <View style={styles.listWrap}>
       {lessons.map((l) => {

@@ -61,7 +61,7 @@ export default function ScheduleSlotsScreen() {
     return (
       <SafeAreaView edges={['top']} style={[styles.fill, { backgroundColor: colors.bg }]}>
         <Header title={t('slots.title')} />
-        <EmptyState icon="users" text={t('common.none')} />
+        <EmptyState mark="wave" text={t('common.notFound')} />
       </SafeAreaView>
     );
   }
@@ -77,7 +77,12 @@ export default function ScheduleSlotsScreen() {
       <Header title={t('slots.title')} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {active.length === 0 ? (
-          <EmptyState icon="calendar" text={t('slots.empty')} />
+          <EmptyState
+            mark="plus_pen"
+            text={t('slots.empty')}
+            action={t('slots.add')}
+            onAction={() => setAdding(true)}
+          />
         ) : (
           <View style={styles.list}>
             {active.map((slot) => (

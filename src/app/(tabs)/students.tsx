@@ -21,7 +21,7 @@ import type { StringKey } from '@/i18n';
 import { formatRub } from '@/lib/format';
 import { dayBounds, hhmm, nowMs } from '@/lib/time';
 import { useTheme } from '@/theme';
-import { Card, CatAvatar, Chip, Fab, Icon, Sheet, Text, TextInput } from '@/ui';
+import { Card, CatAvatar, Chip, Fab, Icon, MarginMark, type MarginMarkKind, Sheet, Text, TextInput } from '@/ui';
 
 const FILTERS: { key: StudentFilter; label: StringKey }[] = [
   { key: 'all', label: 'filter.all' },
@@ -158,7 +158,7 @@ export default function StudentsScreen() {
       {/* List / three empty states (spec 06 §6.1–6.2) */}
       {students.length === 0 ? (
         <EmptyBlock
-          icon="users"
+          icon="plus_double"
           title={t('students.emptyTitle')}
           body={t('students.emptyBody')}
           actionLabel={t('students.addFirst')}
@@ -166,7 +166,7 @@ export default function StudentsScreen() {
         />
       ) : visible.length === 0 && searching ? (
         <EmptyBlock
-          icon="search"
+          icon="wave"
           title={t('students.searchEmpty')}
           body={`${t('students.searchEmptyBy')} «${query.trim()}» ${t('students.searchEmptyNo')}`}
           actionLabel={t('students.clearSearch')}
@@ -176,7 +176,7 @@ export default function StudentsScreen() {
           }}
         />
       ) : visible.length === 0 ? (
-        <EmptyBlock icon="filter" title={t('students.emptyFiltered')} body={t('students.emptyFilters')} />
+        <EmptyBlock icon="underline" title={t('students.emptyFiltered')} body={t('students.emptyFilters')} />
       ) : (
         <View style={styles.list}>
           {visible.map((s) => {
@@ -271,7 +271,8 @@ function EmptyBlock({
   actionLabel,
   onAction,
 }: {
-  icon: 'users' | 'search' | 'filter';
+  /** Вид рукописной пометки канона (§10) вместо стоковой иконки. */
+  icon: MarginMarkKind;
   title: string;
   body: string;
   actionLabel?: string;
@@ -280,9 +281,7 @@ function EmptyBlock({
   const { colors, radius } = useTheme();
   return (
     <View style={styles.emptyBlock}>
-      <View style={[styles.emptyIcon, { backgroundColor: colors.stoneLight }]}>
-        <Icon name={icon} size={26} sw={1.6} stroke={colors.stoneInactive} />
-      </View>
+      <MarginMark kind={icon} px={72} />
       <Text style={[styles.emptyTitle, { color: colors.heading }]}>{title}</Text>
       <Text style={[styles.emptyBody, { color: colors.muted }]}>{body}</Text>
       {actionLabel && onAction ? (
@@ -356,7 +355,6 @@ const styles = StyleSheet.create({
 
   // empty states
   emptyBlock: { alignItems: 'center', gap: 10, paddingTop: 40, paddingHorizontal: 24 },
-  emptyIcon: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
   emptyTitle: { fontSize: 16.5, fontWeight: '700', letterSpacing: -0.2, textAlign: 'center', marginTop: 4 },
   emptyBody: { fontSize: 14, fontWeight: '500', textAlign: 'center', lineHeight: 20 },
   emptyAction: { paddingHorizontal: 20, paddingVertical: 12, marginTop: 6 },

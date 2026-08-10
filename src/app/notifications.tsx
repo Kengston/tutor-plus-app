@@ -14,6 +14,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { EmptyState } from '@/components/EmptyState';
 import { useAllLessons, useAllTransactions, useNotificationReads, useProfile, useStudents } from '@/db/hooks';
 import { markAllNotificationsRead, markNotificationRead } from '@/db/mutations';
 import { buildFeed, NOTIFICATION_CATEGORIES } from '@/domain/notifications';
@@ -204,10 +205,23 @@ export default function NotificationsScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {items.length === 0 ? (
           // Nothing in the feed at all.
-          <Empty title={t('notif.empty')} hint={t('notif.emptyHint')} />
+          <EmptyState
+            mark="check"
+            text={t('notif.empty')}
+            hint={t('notif.emptyHint')}
+            action={t('nset.title')}
+            actionKind="plain"
+            onAction={() => router.push('/notification-settings')}
+          />
         ) : filtered.length === 0 ? (
           // Feed has rows, but the active filter hides them all.
-          <Empty title={t('notif.emptyFiltered')} />
+          <EmptyState
+            mark="wave"
+            text={t('notif.emptyFiltered')}
+            action={t('common.all')}
+            actionKind="plain"
+            onAction={() => setFilter('all')}
+          />
         ) : (
           sections.map(({ group, rows }) => (
             <View key={group} style={styles.section}>
@@ -381,18 +395,6 @@ function Header({
   );
 }
 
-/** Centred empty block (feed-empty / filtered-empty), styled like EmptyState. */
-function Empty({ title, hint }: { title: string; hint?: string }) {
-  const { colors } = useTheme();
-  return (
-    <View style={styles.empty}>
-      <Icon name="bell" size={44} sw={1.4} stroke={colors.label3} />
-      <Text style={[styles.emptyText, { color: colors.muted }]}>{title}</Text>
-      {hint ? <Text style={[styles.emptyHint, { color: colors.muted }]}>{hint}</Text> : null}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   header: {
@@ -433,9 +435,6 @@ const styles = StyleSheet.create({
   unreadDot: { width: 8, height: 8, borderRadius: 4 },
 
   // empty
-  empty: { alignItems: 'center', justifyContent: 'center', paddingVertical: 72, gap: 12 },
-  emptyText: { fontSize: 15.5, fontWeight: '500', textAlign: 'center' },
-  emptyHint: { fontSize: 13, textAlign: 'center' },
 
   pressed: { opacity: 0.85 },
 });

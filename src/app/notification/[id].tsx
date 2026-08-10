@@ -145,7 +145,7 @@ export default function NotificationDetailScreen() {
       <Header title={t('notif.detailTitle')} onBack={() => goBack()} />
 
       {!item ? (
-        <EmptyState icon="bell" text={t('common.none')} />
+        <EmptyState mark="wave" text={t('common.notFound')} />
       ) : (
         <View style={styles.content}>
           {/* Hero: the event title + who. */}

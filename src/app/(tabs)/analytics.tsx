@@ -194,7 +194,7 @@ export default function AnalyticsScreen() {
         </>
       ) : !hasData ? (
         <View style={styles.emptyWrap}>
-          <EmptyState icon="chart" text={t('analytics.empty')} hint={t('analytics.noDataHint')} />
+          <EmptyState mark="wave" text={t('analytics.empty')} hint={t('analytics.noDataHint')} />
           <Pressable
             onPress={resetPeriod}
             style={({ pressed }) => [
